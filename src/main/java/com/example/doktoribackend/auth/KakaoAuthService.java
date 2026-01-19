@@ -3,19 +3,22 @@ package com.example.doktoribackend.auth;
 import com.example.doktoribackend.auth.dto.KakaoTokenResponse;
 import com.example.doktoribackend.auth.dto.KakaoUserResponse;
 import com.example.doktoribackend.auth.dto.OAuthProvider;
+import com.example.doktoribackend.security.TokenResponse;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
-import com.example.doktoribackend.security.jwt.JwtTokenProvider;
-import com.example.doktoribackend.user.domain.*;
+import com.example.doktoribackend.user.domain.Gender;
+import com.example.doktoribackend.user.domain.User;
+import com.example.doktoribackend.user.domain.UserAccount;
+import com.example.doktoribackend.user.domain.UserPreference;
+import com.example.doktoribackend.user.domain.UserStat;
 import com.example.doktoribackend.user.repository.UserAccountRepository;
+import com.example.doktoribackend.user.repository.UserPreferenceRepository;
 import com.example.doktoribackend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.util.UriComponentsBuilder;
-
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -24,7 +27,8 @@ public class KakaoAuthService implements OAuthService {
     private final KakaoOAuthClient kakaoOAuthClient;
     private final UserRepository userRepository;
     private final UserAccountRepository userAccountRepository;
-    private final JwtTokenProvider jwtTokenProvider;
+    private final UserPreferenceRepository userPreferenceRepository;
+    private final TokenService tokenService;
 
     @Value("${kakao.oauth.frontend-redirect}")
     private String frontendRedirect;
@@ -36,20 +40,26 @@ public class KakaoAuthService implements OAuthService {
 
     @Override
     @Transactional
-    public String handleCallback(String code) {
+    public TokenResponse handleCallback(String code) {
         KakaoTokenResponse tokenResponse = kakaoOAuthClient.exchangeToken(code);
 
         KakaoUserResponse userResponse = kakaoOAuthClient.fetchUser(tokenResponse.getAccessToken());
         Long kakaoId = userResponse.getId();
 
-        Optional<UserAccount> userAccountOpt = userAccountRepository
-                .findByProviderAndProviderId(OAuthProvider.KAKAO, String.valueOf(kakaoId));
+        UserAccount existingAccount = userAccountRepository
+                .findByProviderAndProviderId(OAuthProvider.KAKAO, String.valueOf(kakaoId))
+                .orElse(null);
 
-        if (userAccountOpt.isPresent()) {
-            return handleExistingUser(userAccountOpt.get());
+        String nickname = extractNickname(userResponse, kakaoId);
+        String profileImagePath = extractProfileImage(userResponse);
+        Gender gender = extractGender(userResponse);
+        Integer birthYear = extractBirthYear(userResponse);
+
+        if (existingAccount != null) {
+            return handleExistingUser(existingAccount, nickname, profileImagePath, gender, birthYear);
         }
 
-        return handleNewUser(userResponse);
+        return handleNewUser(userResponse, nickname, profileImagePath, gender, birthYear);
     }
 
     @Override
@@ -67,27 +77,36 @@ public class KakaoAuthService implements OAuthService {
     }
 
 
-    private String handleExistingUser(UserAccount userAccount) {
+    private TokenResponse handleExistingUser(UserAccount userAccount,
+                                          String nickname,
+                                          String profileImagePath,
+                                          Gender gender,
+                                          Integer birthYear) {
         User user = userAccount.getUser();
 
         if (user.isDeleted()) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 
-        return jwtTokenProvider.createRefreshToken(user);
+        user.updateNickname(nickname);
+        if (profileImagePath != null && !profileImagePath.isBlank()) {
+            user.updateProfileImage(profileImagePath);
+        }
+        ensurePreference(user, gender, birthYear);
+
+        return tokenService.issueTokens(user);
     }
 
-    private String handleNewUser(KakaoUserResponse userResponse) {
+    private TokenResponse handleNewUser(KakaoUserResponse userResponse,
+                                     String nickname,
+                                     String profileImagePath,
+                                     Gender gender,
+                                     Integer birthYear) {
         Long kakaoId = userResponse.getId();
-
-        String nickname = extractNickname(userResponse, kakaoId);
-        String profileImagePath = extractProfileImage(userResponse);
-        Gender gender = extractGender(userResponse);
-        Integer birthYear = extractBirthYear(userResponse);
 
         User newUser = createUser(nickname, profileImagePath, String.valueOf(kakaoId), gender, birthYear);
 
-        return jwtTokenProvider.createRefreshToken(newUser);
+        return tokenService.issueTokens(newUser);
     }
 
     private User createUser(String nickname, String profileImagePath, String providerId,
@@ -107,7 +126,7 @@ public class KakaoAuthService implements OAuthService {
         UserPreference userPreference = UserPreference.builder()
                 .user(user)
                 .gender(gender)
-                .birthYear(birthYear)
+                .birthYear(birthYear != null ? birthYear : 0)
                 .build();
 
         UserStat userStat = UserStat.builder()
@@ -167,5 +186,20 @@ public class KakaoAuthService implements OAuthService {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private void ensurePreference(User user, Gender gender, Integer birthYear) {
+        UserPreference preference = user.getUserPreference();
+        if (preference == null) {
+            UserPreference created = UserPreference.builder()
+                    .user(user)
+                    .gender(gender)
+                    .birthYear(birthYear != null ? birthYear : 0)
+                    .build();
+            user.linkPreference(created);
+            userPreferenceRepository.save(created);
+            return;
+        }
+        preference.updateOAuthInfo(gender, birthYear);
     }
 }
