@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+        "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+        "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+
+<suppressions>
+    <!-- 테스트 파일은 메서드 길이 제한 완화 -->
+    <suppress checks="MethodLength" files=".*Test\.java"/>
+    <suppress checks="ParameterNumber" files=".*Test\.java"/>
+
+    <!-- Generated 파일 제외 -->
+    <suppress checks=".*" files=".*Generated.*\.java"/>
+</suppressions>
