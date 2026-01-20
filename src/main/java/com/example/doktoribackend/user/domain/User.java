@@ -1,65 +1,71 @@
 package com.example.doktoribackend.user.domain;
 
-import com.example.doktoribackend.common.Role;
+import com.example.doktoribackend.common.domain.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
 @Getter
-@Builder
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor
-public class User {
+public class User extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private String email;
-
     @Column(nullable = false)
     private String nickname;
 
-    @Column(unique = true)
-    private Long kakaoId;
-
-    @Column(length = 300)
-    private String leaderIntro;
-
-    @Column(length = 300)
-    private String memberIntro;
-
-    @Column(length = 512)
+    @Column(name = "profile_image_path")
     private String profileImagePath;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Role role;
+    @Column(name = "leader_intro")
+    private String leaderIntro;
 
-    private Instant deletedAt;
+    @Column(name = "member_intro")
+    private String memberIntro;
 
-    public static User createKakaoUser(Long kakaoId, String email, String nickname) {
-        return User.builder()
-                .kakaoId(kakaoId)
-                .email(email)
-                .nickname(nickname)
-                .role(Role.ROLE_USER)
-                .build();
-    }
+    @Column(name = "is_onboarding_completed", nullable = false)
+    private boolean isOnboardingCompleted = false;
 
-    public void updateProfile(String email, String nickname) {
-        this.email = email;
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL,
+            fetch = FetchType.LAZY, orphanRemoval = true)
+    private UserPreference userPreference;
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL,
+            fetch = FetchType.LAZY, orphanRemoval = true)
+    private UserAccount userAccount;
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL,
+            fetch = FetchType.LAZY, orphanRemoval = true)
+    private UserStat userStat;
+
+    @Builder
+    public User(String nickname, String profileImagePath,
+                String leaderIntro, String memberIntro,
+                Boolean isOnboardingCompleted) {
         this.nickname = nickname;
+        this.profileImagePath = profileImagePath;
+        this.leaderIntro = leaderIntro;
+        this.memberIntro = memberIntro;
+        this.isOnboardingCompleted = isOnboardingCompleted != null
+                ? isOnboardingCompleted : false;
     }
 
-    public void linkKakaoId(Long kakaoId) {
-        if (this.kakaoId == null) {
-            this.kakaoId = kakaoId;
+    public void updateNickname(String nickname) {
+        if (nickname != null && !nickname.isBlank()) {
+            this.nickname = nickname;
         }
+    }
+
+    public void updateProfileImage(String profileImagePath) {
+        this.profileImagePath = profileImagePath;
     }
 
     public void updateLeaderIntro(String leaderIntro) {
@@ -70,7 +76,27 @@ public class User {
         this.memberIntro = memberIntro;
     }
 
-    public void updateProfileImagePath(String profileImagePath) {
-        this.profileImagePath = profileImagePath;
+    public void completeOnboarding() {
+        this.isOnboardingCompleted = true;
+    }
+
+    public void softDelete() {
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    public void linkPreference(UserPreference userPreference) {
+        this.userPreference = userPreference;
+    }
+
+    public void linkAccount(UserAccount userAccount) {
+        this.userAccount = userAccount;
+    }
+
+    public void linkStat(UserStat userStat) {
+        this.userStat = userStat;
     }
 }
