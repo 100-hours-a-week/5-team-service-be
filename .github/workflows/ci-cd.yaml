@@ -108,13 +108,37 @@ jobs:
           strip_components: 2
           overwrite: true
 
-      - name: Deploy
+      - name: Create env file and deploy
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          # DB
+          DB_HOST: ${{ steps.env.outputs.env_name == 'prod' && secrets.PROD_DB_HOST || secrets.DEV_DB_HOST }}
+          DB_NAME: ${{ steps.env.outputs.env_name == 'prod' && secrets.PROD_DB_NAME || secrets.DEV_DB_NAME }}
+          DB_USERNAME: ${{ steps.env.outputs.env_name == 'prod' && secrets.PROD_DB_USERNAME || secrets.DEV_DB_USERNAME }}
+          DB_PASSWORD: ${{ steps.env.outputs.env_name == 'prod' && secrets.PROD_DB_PASSWORD || secrets.DEV_DB_PASSWORD }}
+          # Kakao OAuth
+          KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
+          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          # JWT
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         with:
           host: ${{ steps.env.outputs.host == 'EC2_HOST' && secrets.EC2_HOST || secrets.DEV_EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          script: bash /home/ubuntu/app/deploy.sh be
+          envs: DB_HOST,DB_NAME,DB_USERNAME,DB_PASSWORD,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,JWT_SECRET
+          script: |
+            mkdir -p /home/ubuntu/app/backend
+            cat > /home/ubuntu/app/backend/.env << EOF
+            DB_HOST=${DB_HOST}
+            DB_NAME=${DB_NAME}
+            DB_USERNAME=${DB_USERNAME}
+            DB_PASSWORD=${DB_PASSWORD}
+            KAKAO_CLIENT_ID=${KAKAO_CLIENT_ID}
+            KAKAO_CLIENT_SECRET=${KAKAO_CLIENT_SECRET}
+            JWT_SECRET=${JWT_SECRET}
+            EOF
+            chmod 600 /home/ubuntu/app/backend/.env
+            bash /home/ubuntu/app/deploy.sh be
 
       - name: Notify Discord
         if: always()
