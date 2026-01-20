@@ -6,6 +6,8 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+import static com.example.doktoribackend.common.constants.ValidationConstant.*;
+
 @Entity
 @Table(name = "users")
 @Getter
@@ -16,16 +18,16 @@ public class User extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = NICKNAME_MAX_LENGTH)
     private String nickname;
 
-    @Column(name = "profile_image_path")
+    @Column(name = "profile_image_path", length = PROFILE_IMAGE_PATH_MAX_LENGTH)
     private String profileImagePath;
 
-    @Column(name = "leader_intro")
+    @Column(name = "leader_intro", length = INTRO_MAX_LENGTH)
     private String leaderIntro;
 
-    @Column(name = "member_intro")
+    @Column(name = "member_intro", length = INTRO_MAX_LENGTH)
     private String memberIntro;
 
     @Column(name = "is_onboarding_completed", nullable = false)
