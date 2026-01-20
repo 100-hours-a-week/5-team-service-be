@@ -1,9 +1,13 @@
 spring:
   profiles:
-    default: local,secret
-    group:
-      dev: local,secret
-      prod: prod
+    active: ${SPRING_PROFILES_ACTIVE:local}
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
   jpa:
     properties:
       hibernate:
@@ -22,3 +26,19 @@ springdoc:
     display-request-duration: true
     doc-expansion: list
     persistAuthorization: true
+
+kakao:
+  oauth:
+    client-id: ${KAKAO_CLIENT_ID}
+    client-secret: ${KAKAO_CLIENT_SECRET}
+    redirect-uri: ${KAKAO_REDIRECT_URI}
+    authorize-url: https://kauth.kakao.com/oauth/authorize
+    token-url: https://kauth.kakao.com/oauth/token
+    user-info-url: https://kapi.kakao.com/v2/user/me
+    frontend-redirect: ${KAKAO_FRONTEND_REDIRECT}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    access-exp-minutes: 60
+    refresh-exp-seconds: 1209600

@@ -1,5 +1,8 @@
-package com.example.doktoribackend.user.domain;
+package com.example.doktoribackend.user.domain.preference;
 
+import com.example.doktoribackend.user.domain.Gender;
+import com.example.doktoribackend.user.domain.User;
+import com.example.doktoribackend.user.policy.ReadingVolume;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -47,7 +50,7 @@ public class UserPreference {
         this.user = user;
         this.readingVolume = readingVolume;
         this.gender = (gender != null) ? gender : Gender.UNKNOWN;
-        this.birthYear = birthYear;
+        this.birthYear = (birthYear != null) ? birthYear : 0;
     }
 
     public void updateOAuthInfo(Gender gender, Integer birthYear) {

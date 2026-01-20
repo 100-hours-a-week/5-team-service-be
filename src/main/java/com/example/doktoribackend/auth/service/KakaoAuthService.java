@@ -10,7 +10,7 @@ import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.user.domain.Gender;
 import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.domain.UserAccount;
-import com.example.doktoribackend.user.domain.UserPreference;
+import com.example.doktoribackend.user.domain.preference.UserPreference;
 import com.example.doktoribackend.user.domain.UserStat;
 import com.example.doktoribackend.user.repository.UserAccountRepository;
 import com.example.doktoribackend.user.repository.UserPreferenceRepository;
