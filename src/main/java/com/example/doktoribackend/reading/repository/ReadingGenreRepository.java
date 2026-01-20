@@ -10,4 +10,6 @@ public interface ReadingGenreRepository extends JpaRepository<ReadingGenre, Long
     boolean existsByIdAndDeletedAtIsNull(Long id);
 
     List<ReadingGenre> findAllByIdInAndDeletedAtIsNull(Collection<Long> ids);
+
+    List<ReadingGenre> findAllByDeletedAtIsNullOrderByPriorityAsc();
 }

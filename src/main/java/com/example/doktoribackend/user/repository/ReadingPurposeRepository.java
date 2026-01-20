@@ -8,4 +8,6 @@ import java.util.List;
 
 public interface ReadingPurposeRepository extends JpaRepository<ReadingPurpose, Long> {
     List<ReadingPurpose> findAllByIdInAndDeletedAtIsNull(Collection<Long> ids);
+
+    List<ReadingPurpose> findAllByDeletedAtIsNullOrderByPriorityAsc();
 }
