@@ -4,9 +4,9 @@ import com.example.doktoribackend.auth.service.TokenService;
 import com.example.doktoribackend.common.response.ApiResult;
 import com.example.doktoribackend.common.util.CookieUtil;
 import com.example.doktoribackend.common.error.ErrorCode;
-import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.auth.dto.AccessTokenResponse;
 import com.example.doktoribackend.auth.dto.TokenResponse;
+import com.example.doktoribackend.exception.CustomException;
 import com.example.doktoribackend.security.jwt.JwtTokenProvider;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,7 +37,7 @@ public class AuthController {
         String refreshToken = CookieUtil.resolveRefreshToken(request);
 
         if (refreshToken == null || refreshToken.isBlank()) {
-            throw new BusinessException(ErrorCode.NOT_EXIST_REFRESH_TOKEN);
+            throw new CustomException(ErrorCode.NOT_EXIST_REFRESH_TOKEN);
         }
 
         TokenResponse refreshed = tokenService.refreshTokens(refreshToken);

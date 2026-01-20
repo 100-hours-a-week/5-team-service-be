@@ -5,8 +5,8 @@ import com.example.doktoribackend.auth.dto.OAuthProvider;
 import com.example.doktoribackend.auth.service.OAuthService;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.util.CookieUtil;
-import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.auth.dto.TokenResponse;
+import com.example.doktoribackend.exception.CustomException;
 import com.example.doktoribackend.security.jwt.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
+
+import java.util.UUID;
 
 @Controller
 @RequiredArgsConstructor
@@ -32,7 +34,7 @@ public class OAuthController {
         OAuthProvider oauthProvider = OAuthProvider.fromString(provider);
 
         OAuthService service = oauthFactory.getService(oauthProvider);
-        String resolvedState = (state == null || state.isBlank()) ? java.util.UUID.randomUUID().toString() : state;
+        String resolvedState = (state == null || state.isBlank()) ? UUID.randomUUID().toString() : state;
         CookieUtil.addStateCookie(response, resolvedState);
         return new RedirectView(service.buildAuthorizeUrl(resolvedState));
     }
@@ -50,7 +52,7 @@ public class OAuthController {
 
         String savedState = CookieUtil.resolveState(request);
         if (savedState == null || !savedState.equals(state)) {
-            throw new BusinessException(ErrorCode.INVALID_OAUTH_STATE);
+            throw new CustomException(ErrorCode.INVALID_OAUTH_STATE);
         }
 
         TokenResponse tokens = service.handleCallback(code);

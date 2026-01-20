@@ -3,7 +3,7 @@ package com.example.doktoribackend.auth.component;
 import com.example.doktoribackend.auth.service.OAuthService;
 import com.example.doktoribackend.auth.dto.OAuthProvider;
 import com.example.doktoribackend.common.error.ErrorCode;
-import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.exception.CustomException;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -27,7 +27,7 @@ public class OAuthServiceFactory {
     public OAuthService getService(OAuthProvider provider) {
         OAuthService service = services.get(provider);
         if (service == null) {
-            throw new BusinessException(ErrorCode.UNSUPPORTED_PROVIDER);
+            throw new CustomException(ErrorCode.UNSUPPORTED_PROVIDER);
         }
         return service;
     }
