@@ -51,6 +51,8 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
 
     implementation 'io.netty:netty-resolver-dns-native-macos:4.1.110.Final:osx-aarch_64'
+
+    implementation 'com.github.f4b6a3:tsid-creator:5.2.6'
 }
 
 tasks.named('test') {

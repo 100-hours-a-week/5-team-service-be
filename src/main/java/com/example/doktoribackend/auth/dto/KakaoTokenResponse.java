@@ -2,26 +2,24 @@ package com.example.doktoribackend.auth.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.Getter;
 
-@Getter
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class KakaoTokenResponse {
+public record KakaoTokenResponse(
 
-    @JsonProperty("access_token")
-    private String accessToken;
+        @JsonProperty("access_token")
+        String accessToken,
 
-    @JsonProperty("refresh_token")
-    private String refreshToken;
+        @JsonProperty("refresh_token")
+        String refreshToken,
 
-    @JsonProperty("expires_in")
-    private Long expiresIn;
+        @JsonProperty("expires_in")
+        Long expiresIn,
 
-    @JsonProperty("refresh_token_expires_in")
-    private Long refreshTokenExpiresIn;
+        @JsonProperty("refresh_token_expires_in")
+        Long refreshTokenExpiresIn,
 
-    @JsonProperty("token_type")
-    private String tokenType;
+        @JsonProperty("token_type")
+        String tokenType,
 
-    private String scope;
-}
+        String scope
+) {}

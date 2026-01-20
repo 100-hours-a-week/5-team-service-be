@@ -25,27 +25,27 @@ public class KakaoOAuthClient {
     @Value("${kakao.oauth.client-id}")
     private String clientId;
 
-    @Value("${kakao.oauth.client-secret:}")
+    @Value("${kakao.oauth.client-secret}")
     private String clientSecret;
 
     @Value("${kakao.oauth.redirect-uri}")
     private String redirectUri;
 
-    @Value("${kakao.oauth.authorize-url:https://kauth.kakao.com/oauth/authorize}")
+    @Value("${kakao.oauth.authorize-url}")
     private String authorizeUrl;
 
-    @Value("${kakao.oauth.token-url:https://kauth.kakao.com/oauth/token}")
+    @Value("${kakao.oauth.token-url}")
     private String tokenUrl;
 
-    @Value("${kakao.oauth.user-info-url:https://kapi.kakao.com/v2/user/me}")
+    @Value("${kakao.oauth.user-info-url}")
     private String userInfoUrl;
 
     public String buildAuthorizeUrl(String state) {
-        return UriComponentsBuilder.fromHttpUrl(authorizeUrl)
+        return UriComponentsBuilder.fromUriString(authorizeUrl)
                 .queryParam("response_type", "code")
                 .queryParam("client_id", clientId)
                 .queryParam("redirect_uri", redirectUri)
-                .queryParam("scope", "profile_nickname account_email")
+                .queryParam("scope", "profile_nickname profile_image account_email gender birthyear")
                 .queryParam("state", state)
                 .build()
                 .toUriString();

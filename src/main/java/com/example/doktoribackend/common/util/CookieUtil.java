@@ -7,6 +7,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 
+import static com.example.doktoribackend.common.constants.CookieConstant.OAUTH_STATE;
+import static com.example.doktoribackend.common.constants.CookieConstant.OAUTH_STATE_PATH;
 import static com.example.doktoribackend.common.constants.CookieConstant.REFRESH_COOKIE_PATH;
 import static com.example.doktoribackend.common.constants.CookieConstant.REFRESH_TOKEN;
 
@@ -44,6 +46,41 @@ public class CookieUtil {
                 .path(REFRESH_COOKIE_PATH)
                 .maxAge(0)
                 .sameSite("Lax")
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    public static void addStateCookie(HttpServletResponse response, String state) {
+        ResponseCookie cookie = ResponseCookie.from(OAUTH_STATE, state)
+                .httpOnly(true)
+                .secure(true)
+                .path(OAUTH_STATE_PATH)
+                .maxAge(600)
+                .sameSite("None")
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    public static String resolveState(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return null;
+        }
+        for (Cookie cookie : cookies) {
+            if (OAUTH_STATE.equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+        return null;
+    }
+
+    public static void removeStateCookie(HttpServletResponse response) {
+        ResponseCookie cookie = ResponseCookie.from(OAUTH_STATE, "")
+                .httpOnly(true)
+                .secure(true)
+                .path(OAUTH_STATE_PATH)
+                .maxAge(0)
+                .sameSite("None")
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }

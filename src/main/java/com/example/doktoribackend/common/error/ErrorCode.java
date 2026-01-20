@@ -21,6 +21,8 @@ public enum ErrorCode {
     // OAuth
     KAKAO_TOKEN_FETCH_FAILED(HttpStatus.UNAUTHORIZED, "KAKAO_TOKEN_FETCH_FAILED", "카카오 토큰 발급에 실패했습니다."),
     KAKAO_USER_INFO_FETCH_FAILED(HttpStatus.UNAUTHORIZED, "KAKAO_USER_INFO_FETCH_FAILED", "카카오 사용자 정보 조회에 실패했습니다."),
+    UNSUPPORTED_PROVIDER(HttpStatus.BAD_REQUEST, "UNSUPPORTED_PROVIDER", "지원하지 않는 OAuth 제공자입니다."),
+    INVALID_OAUTH_STATE(HttpStatus.UNAUTHORIZED, "INVALID_OAUTH_STATE", "OAuth 상태 값이 일치하지 않습니다."),
 
     // Auth
     AUTH_UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "AUTH_UNAUTHORIZED", "인증이 필요합니다."),

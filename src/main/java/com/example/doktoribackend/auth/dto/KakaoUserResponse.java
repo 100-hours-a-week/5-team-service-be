@@ -2,27 +2,27 @@ package com.example.doktoribackend.auth.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.Getter;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
-@Getter
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class KakaoUserResponse {
-    private Long id;
+public record KakaoUserResponse(
+        Long id,
+        @JsonProperty("kakao_account") KakaoAccount kakaoAccount
+) {
 
-    @JsonProperty("kakao_account")
-    private KakaoAccount kakaoAccount;
-
-    @Getter
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class KakaoAccount {
-        private String email;
-        private Profile profile;
-    }
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record KakaoAccount(
+            Profile profile,
+            String gender,
+            String birthyear
+    ) {}
 
-    @Getter
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class Profile {
-        @JsonProperty("nickname")
-        private String nickname;
-    }
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record Profile(
+            String nickname,
+            String profileImageUrl
+    ) {}
 }

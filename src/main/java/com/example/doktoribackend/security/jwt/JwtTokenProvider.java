@@ -5,6 +5,7 @@ import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.user.domain.User;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
 @Component
+@Getter
 public class JwtTokenProvider {
 
     @Value("${app.jwt.secret}")
@@ -35,30 +37,24 @@ public class JwtTokenProvider {
         Instant now = Instant.now();
         Instant exp = now.plus(accessExpMinutes, ChronoUnit.MINUTES);
 
-        String accessToken = Jwts.builder()
+        return Jwts.builder()
                 .setSubject(user.getId().toString())
                 .claim("userId", user.getId())
-                .claim("email", user.getEmail())
                 .claim("nickname", user.getNickname())
-                .claim("role", user.getRole().name())
                 .setIssuedAt(Date.from(now))
                 .setExpiration(Date.from(exp))
                 .signWith(getKey(), SignatureAlgorithm.HS256)
                 .compact();
-
-        return accessToken;
     }
 
-    public String createRefreshToken(User user) {
+    public String createRefreshToken(User user, String tokenId) {
         Instant now = Instant.now();
         Instant exp = now.plusSeconds(refreshExpSeconds);
 
         return Jwts.builder()
+                .setId(tokenId)
                 .setSubject(user.getId().toString())
                 .claim("type", "refresh")
-                .claim("email", user.getEmail())
-                .claim("nickname", user.getNickname())
-                .claim("role", user.getRole().name())
                 .setIssuedAt(Date.from(now))
                 .setExpiration(Date.from(exp))
                 .signWith(getKey(), SignatureAlgorithm.HS256)
@@ -99,16 +95,6 @@ public class JwtTokenProvider {
         return Long.parseLong(claims.getSubject());
     }
 
-    public String getEmailFromAccessToken(String accessToken) {
-        Claims claims = parseClaims(accessToken);
-        return claims.get("email", String.class);
-    }
-
-    public String getRoleFromAccessToken(String accessToken) {
-        Claims claims = parseClaims(accessToken);
-        return claims.get("role", String.class);
-    }
-
     public String getNicknameFromAccessToken(String accessToken) {
         Claims claims = parseClaims(accessToken);
         return claims.get("nickname", String.class);
@@ -134,7 +120,12 @@ public class JwtTokenProvider {
         return claims;
     }
 
-    public long getRefreshExpSeconds() {
-        return refreshExpSeconds;
+    public String getTokenIdFromRefreshToken(String refreshToken) {
+        Claims claims = validateRefreshToken(refreshToken);
+        String jti = claims.getId();
+        if (jti == null || jti.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
+        }
+        return jti;
     }
 }
