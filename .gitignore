@@ -19,6 +19,7 @@ bin/
 
 # secrets
 **/application-secret.yml
+.env
 
 ### IntelliJ IDEA ###
 .idea
