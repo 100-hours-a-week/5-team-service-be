@@ -79,10 +79,10 @@ public class KakaoAuthService implements OAuthService {
 
 
     private TokenResponse handleExistingUser(UserAccount userAccount,
-                                          String nickname,
-                                          String profileImagePath,
-                                          Gender gender,
-                                          Integer birthYear) {
+                                             String nickname,
+                                             String profileImagePath,
+                                             Gender gender,
+                                             Integer birthYear) {
         User user = userAccount.getUser();
 
         if (user.isDeleted()) {
@@ -99,10 +99,10 @@ public class KakaoAuthService implements OAuthService {
     }
 
     private TokenResponse handleNewUser(KakaoUserResponse userResponse,
-                                     String nickname,
-                                     String profileImagePath,
-                                     Gender gender,
-                                     Integer birthYear) {
+                                        String nickname,
+                                        String profileImagePath,
+                                        Gender gender,
+                                        Integer birthYear) {
         Long kakaoId = userResponse.id();
 
         User newUser = createUser(nickname, profileImagePath, String.valueOf(kakaoId), gender, birthYear);

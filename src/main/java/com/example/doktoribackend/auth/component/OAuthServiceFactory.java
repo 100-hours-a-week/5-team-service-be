@@ -16,7 +16,6 @@ public class OAuthServiceFactory {
 
     private final Map<OAuthProvider, OAuthService> services;
 
-    // Spring이 OAuthService 구현체들을 List로 자동 주입
     public OAuthServiceFactory(List<OAuthService> oauthServices) {
         this.services = oauthServices.stream()
                 .collect(Collectors.toMap(
