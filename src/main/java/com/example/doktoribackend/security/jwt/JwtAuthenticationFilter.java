@@ -39,7 +39,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return false;
     }
 
-    // 모든 요청마다 이 메서드가 호출되고, 여기서 JWT 검증과 인증 처리를 한 뒤 다음 필터로 넘어감
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
@@ -53,14 +52,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             Long userId = jwtTokenProvider.getUserIdFromAccessToken(token);
 
-            // 이미 다른 필터나 로직에서 인증을 처리한 경우가 아니라면
             if (userId != null &&
                     SecurityContextHolder.getContext().getAuthentication() == null) {
 
                 CustomUserDetails userDetails = (CustomUserDetails)
                         userDetailsService.loadUserByUsername(userId.toString());
 
-                // Authentication 객체 생성
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
                                 userDetails,
@@ -68,12 +65,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 userDetails.getAuthorities()
                         );
 
-                // 부가 정보 설정 : IP 주소 등
                 authentication.setDetails(
                         new WebAuthenticationDetailsSource().buildDetails(request)
                 );
 
-                // SecurityContext에 인증 정보 저장
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
 
@@ -82,7 +77,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
             }
         }
-        // 다음 필터/서블릿으로 넘김
         filterChain.doFilter(request, response);
     }
 }
