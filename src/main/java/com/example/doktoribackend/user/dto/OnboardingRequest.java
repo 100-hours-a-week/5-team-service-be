@@ -10,7 +10,6 @@ import java.util.List;
 public record OnboardingRequest(
 
         @Schema(description = "월 독서량 ID", example = "1")
-        @NotNull(message = "월 독서량을 선택해주세요")
         @Positive
         Long readingVolumeId,
 
