@@ -5,7 +5,6 @@ import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.domain.id.UserReadingGenreId;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
