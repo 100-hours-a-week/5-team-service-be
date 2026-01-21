@@ -37,10 +37,9 @@ class UserServiceTest {
                 .profileImagePath("/images/profile.png")
                 .leaderIntro("leader intro")
                 .memberIntro("member intro")
-                .onboardingCompleted(true)
                 .build();
         ReflectionTestUtils.setField(user, "id", 1L);
-
+        user.completeOnboarding();
         given(userRepository.findByIdAndDeletedAtIsNull(1L)).willReturn(Optional.of(user));
 
         UserProfileResponse response = userService.getMyProfile(1L);
@@ -71,7 +70,6 @@ class UserServiceTest {
                 .profileImagePath("/images/old.png")
                 .leaderIntro("old leader")
                 .memberIntro("old member")
-                .onboardingCompleted(false)
                 .build();
         ReflectionTestUtils.setField(user, "id", 5L);
 
