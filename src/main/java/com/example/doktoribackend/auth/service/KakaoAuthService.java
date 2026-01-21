@@ -7,7 +7,6 @@ import com.example.doktoribackend.auth.dto.OAuthProvider;
 import com.example.doktoribackend.auth.dto.TokenResponse;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
-import com.example.doktoribackend.user.domain.Gender;
 import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.domain.UserAccount;
 import com.example.doktoribackend.user.domain.preference.UserPreference;
@@ -53,14 +52,11 @@ public class KakaoAuthService implements OAuthService {
 
         String nickname = extractNickname(userResponse, kakaoId);
         String profileImagePath = extractProfileImage(userResponse);
-        Gender gender = extractGender(userResponse);
-        Integer birthYear = extractBirthYear(userResponse);
-
         if (existingAccount != null) {
-            return handleExistingUser(existingAccount, nickname, profileImagePath, gender, birthYear);
+            return handleExistingUser(existingAccount, nickname, profileImagePath);
         }
 
-        return handleNewUser(userResponse, nickname, profileImagePath, gender, birthYear);
+        return handleNewUser(userResponse, nickname, profileImagePath);
     }
 
     @Override
@@ -80,9 +76,7 @@ public class KakaoAuthService implements OAuthService {
 
     private TokenResponse handleExistingUser(UserAccount userAccount,
                                              String nickname,
-                                             String profileImagePath,
-                                             Gender gender,
-                                             Integer birthYear) {
+                                             String profileImagePath) {
         User user = userAccount.getUser();
 
         if (user.isDeleted()) {
@@ -93,25 +87,22 @@ public class KakaoAuthService implements OAuthService {
         if (profileImagePath != null && !profileImagePath.isBlank()) {
             user.updateProfileImage(profileImagePath);
         }
-        ensurePreference(user, gender, birthYear);
+        ensurePreference(user);
 
         return tokenService.issueTokens(user);
     }
 
     private TokenResponse handleNewUser(KakaoUserResponse userResponse,
                                         String nickname,
-                                        String profileImagePath,
-                                        Gender gender,
-                                        Integer birthYear) {
+                                        String profileImagePath) {
         Long kakaoId = userResponse.id();
 
-        User newUser = createUser(nickname, profileImagePath, String.valueOf(kakaoId), gender, birthYear);
+        User newUser = createUser(nickname, profileImagePath, String.valueOf(kakaoId));
 
         return tokenService.issueTokens(newUser);
     }
 
-    private User createUser(String nickname, String profileImagePath, String providerId,
-                            Gender gender, Integer birthYear) {
+    private User createUser(String nickname, String profileImagePath, String providerId) {
         User user = User.builder()
                 .nickname(nickname)
                 .profileImagePath(profileImagePath)
@@ -126,8 +117,6 @@ public class KakaoAuthService implements OAuthService {
 
         UserPreference userPreference = UserPreference.builder()
                 .user(user)
-                .gender(gender)
-                .birthYear(birthYear != null ? birthYear : 0)
                 .build();
 
         UserStat userStat = UserStat.builder()
@@ -164,43 +153,14 @@ public class KakaoAuthService implements OAuthService {
         return null;
     }
 
-    private Gender extractGender(KakaoUserResponse userResponse) {
-        if (userResponse.kakaoAccount() == null
-                || userResponse.kakaoAccount().gender() == null) {
-            return Gender.UNKNOWN;
-        }
-
-        String kakaoGender = userResponse.kakaoAccount().gender();
-        return Gender.fromKakaoValue(kakaoGender);
-    }
-
-    private Integer extractBirthYear(KakaoUserResponse userResponse) {
-        if (userResponse.kakaoAccount() == null
-                || userResponse.kakaoAccount().birthyear() == null) {
-            return null;
-        }
-
-        String birthYear = userResponse.kakaoAccount().birthyear();
-
-        try {
-            return Integer.parseInt(birthYear.trim());
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private void ensurePreference(User user, Gender gender, Integer birthYear) {
+    private void ensurePreference(User user) {
         UserPreference preference = user.getUserPreference();
         if (preference == null) {
             UserPreference created = UserPreference.builder()
                     .user(user)
-                    .gender(gender)
-                    .birthYear(birthYear != null ? birthYear : 0)
                     .build();
             user.linkPreference(created);
             userPreferenceRepository.save(created);
-            return;
         }
-        preference.updateOAuthInfo(gender, birthYear);
     }
 }

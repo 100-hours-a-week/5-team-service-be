@@ -3,6 +3,7 @@ package com.example.doktoribackend.user.controller;
 import com.example.doktoribackend.common.response.ApiResult;
 import com.example.doktoribackend.security.CustomUserDetails;
 import com.example.doktoribackend.user.dto.OnboardingRequest;
+import com.example.doktoribackend.user.dto.ProfileRequiredInfoRequest;
 import com.example.doktoribackend.user.dto.UpdateUserProfileRequest;
 import com.example.doktoribackend.user.dto.UserProfileResponse;
 import com.example.doktoribackend.user.service.OnboardingService;
@@ -44,6 +45,16 @@ public class UserController {
             @Valid @RequestBody UpdateUserProfileRequest request
     ) {
         UserProfileResponse response = userService.updateMyProfile(userDetails.getId(), request);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Operation(summary = "프로필 필수 정보 등록", description = "성별과 출생연도 정보를 등록합니다.")
+    @PutMapping("/me/profile")
+    public ResponseEntity<ApiResult<UserProfileResponse>> updateProfileRequiredInfo(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody ProfileRequiredInfoRequest request
+    ) {
+        UserProfileResponse response = userService.updateProfileRequiredInfo(userDetails.getId(), request);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 

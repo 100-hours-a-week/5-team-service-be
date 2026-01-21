@@ -45,7 +45,7 @@ public class KakaoOAuthClient {
                 .queryParam("response_type", "code")
                 .queryParam("client_id", clientId)
                 .queryParam("redirect_uri", redirectUri)
-                .queryParam("scope", "profile_nickname profile_image account_email gender birthyear")
+                .queryParam("scope", "profile_nickname profile_image account_email")
                 .queryParam("state", state)
                 .build()
                 .toUriString();

@@ -14,9 +14,7 @@ public record KakaoUserResponse(
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record KakaoAccount(
-            Profile profile,
-            String gender,
-            String birthyear
+            Profile profile
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)

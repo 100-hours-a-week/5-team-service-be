@@ -11,6 +11,9 @@ public record UserProfileResponse(
         @Schema(description = "프로필 이미지 경로", example = "https://image.kr/img.jpg")
         String profileImagePath,
 
+        @Schema(description = "프로필 정보 입력 완료 여부", example = "true")
+        boolean profileCompleted,
+
         @Schema(description = "온보딩 완료 여부", example = "true")
         boolean onboardingCompleted,
 

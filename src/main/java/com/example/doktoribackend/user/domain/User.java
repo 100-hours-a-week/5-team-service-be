@@ -31,8 +31,11 @@ public class User extends BaseTimeEntity {
     @Column(name = "member_intro", length = INTRO_MAX_LENGTH)
     private String memberIntro;
 
-    @Column(name = "is_onboarding_completed", nullable = false)
+    @Column(name = "onboarding_completed", nullable = false)
     private boolean onboardingCompleted = false;
+
+    @Column(name = "profile_completed", nullable = false)
+    private boolean profileCompleted = false;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
@@ -49,6 +52,9 @@ public class User extends BaseTimeEntity {
             fetch = FetchType.LAZY, orphanRemoval = true)
     private UserStat userStat;
 
+    @Enumerated(EnumType.STRING)
+    private Role role;
+
     @Builder
     public User(String nickname, String profileImagePath,
                 String leaderIntro, String memberIntro,
@@ -58,7 +64,7 @@ public class User extends BaseTimeEntity {
         this.leaderIntro = leaderIntro;
         this.memberIntro = memberIntro;
         this.onboardingCompleted = onboardingCompleted != null
-                ? onboardingCompleted : false;
+                && onboardingCompleted;
     }
 
     public void updateNickname(String nickname) {
@@ -81,6 +87,10 @@ public class User extends BaseTimeEntity {
 
     public void completeOnboarding() {
         this.onboardingCompleted = true;
+    }
+
+    public void completeProfile() {
+        this.profileCompleted = true;
     }
 
     public void softDelete() {
