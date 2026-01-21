@@ -24,19 +24,16 @@ class UserPreferenceTest {
     }
 
     @Test
-    @DisplayName("updateOAuthInfo: null이 아닌 값만 갱신한다")
-    void updateOAuthInfo_updatesOnlyNonNullFields() {
+    @DisplayName("updateRequiredInfo: 성별과 출생연도를 갱신한다")
+    void updateRequiredInfo_updatesGenderAndBirthYear() {
         UserPreference preference = UserPreference.builder()
                 .user(createUser())
                 .gender(Gender.MALE)
                 .birthYear(1990)
                 .build();
 
-        preference.updateOAuthInfo(Gender.FEMALE, 2000);
-        assertThat(preference.getGender()).isEqualTo(Gender.FEMALE);
-        assertThat(preference.getBirthYear()).isEqualTo(2000);
+        preference.updateRequiredInfo(Gender.FEMALE, 2000);
 
-        preference.updateOAuthInfo(null, null);
         assertThat(preference.getGender()).isEqualTo(Gender.FEMALE);
         assertThat(preference.getBirthYear()).isEqualTo(2000);
     }
