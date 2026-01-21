@@ -53,18 +53,15 @@ public class User extends BaseTimeEntity {
     private UserStat userStat;
 
     @Enumerated(EnumType.STRING)
-    private Role role;
+    private Role role = Role.ROLE_USER;
 
     @Builder
     public User(String nickname, String profileImagePath,
-                String leaderIntro, String memberIntro,
-                Boolean onboardingCompleted) {
+                String leaderIntro, String memberIntro) {
         this.nickname = nickname;
         this.profileImagePath = profileImagePath;
         this.leaderIntro = leaderIntro;
         this.memberIntro = memberIntro;
-        this.onboardingCompleted = onboardingCompleted != null
-                && onboardingCompleted;
     }
 
     public void updateNickname(String nickname) {

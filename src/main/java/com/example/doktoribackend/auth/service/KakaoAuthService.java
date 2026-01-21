@@ -106,7 +106,6 @@ public class KakaoAuthService implements OAuthService {
         User user = User.builder()
                 .nickname(nickname)
                 .profileImagePath(profileImagePath)
-                .onboardingCompleted(false)
                 .build();
 
         UserAccount userAccount = UserAccount.builder()

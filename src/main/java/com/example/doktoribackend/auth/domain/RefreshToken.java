@@ -1,6 +1,7 @@
 package com.example.doktoribackend.auth.domain;
 
 import com.example.doktoribackend.common.domain.BaseTimeEntity;
+import com.example.doktoribackend.user.domain.User;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -19,8 +20,9 @@ public class RefreshToken extends BaseTimeEntity {
     @Column(name = "token_id", length = 13, nullable = false, updatable = false)
     private String tokenId;
 
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
@@ -33,9 +35,9 @@ public class RefreshToken extends BaseTimeEntity {
     private Long version = 0L;
 
     @Builder
-    public RefreshToken(String tokenId, Long userId, LocalDateTime expiresAt) {
+    public RefreshToken(String tokenId, User user, LocalDateTime expiresAt) {
         this.tokenId = tokenId;
-        this.userId = userId;
+        this.user = user;
         this.expiresAt = expiresAt;
         this.revoked = false;
     }
@@ -50,5 +52,9 @@ public class RefreshToken extends BaseTimeEntity {
 
     public boolean isValid() {
         return !revoked && !isExpired();
+    }
+
+    public Long getUserId() {
+        return user != null ? user.getId() : null;
     }
 }

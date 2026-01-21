@@ -31,7 +31,7 @@ public class TokenService {
 
     @Transactional
     public TokenResponse issueTokens(User user) {
-        revokeAllUserTokens(user.getId());
+        revokeAllUserTokens(user);
         return createTokenPair(user);
     }
 
@@ -76,9 +76,9 @@ public class TokenService {
     }
 
     @Transactional
-    public void revokeAllUserTokens(Long userId) {
+    public void revokeAllUserTokens(User user) {
         List<RefreshToken> tokens = refreshTokenRepository
-                .findAllByUserIdAndRevokedFalse(userId);
+                .findAllByUserAndRevokedFalse(user);
 
         if (!tokens.isEmpty()) {
             tokens.forEach(RefreshToken::revoke);
@@ -103,18 +103,18 @@ public class TokenService {
         String tokenId = TsidCreator.getTsid().toString();
         String refreshToken = jwtTokenProvider.createRefreshToken(user, tokenId);
 
-        saveRefreshToken(tokenId, user.getId());
+        saveRefreshToken(tokenId, user);
 
         return new TokenResponse(accessToken, refreshToken);
     }
 
-    private void saveRefreshToken(String tokenId, Long userId) {
+    private void saveRefreshToken(String tokenId, User user) {
         LocalDateTime expiresAt = LocalDateTime.now()
                 .plusSeconds(jwtTokenProvider.getRefreshExpSeconds());
 
         RefreshToken entity = RefreshToken.builder()
                 .tokenId(tokenId)
-                .userId(userId)
+                .user(user)
                 .expiresAt(expiresAt)
                 .build();
 
