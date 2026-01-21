@@ -1,8 +1,6 @@
 package com.example.doktoribackend.user.controller;
 
-import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.response.ApiResult;
-import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.security.CustomUserDetails;
 import com.example.doktoribackend.user.dto.OnboardingRequest;
 import com.example.doktoribackend.user.dto.UpdateUserProfileRequest;

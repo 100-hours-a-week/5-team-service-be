@@ -47,6 +47,7 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'com.h2database:h2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
     // OpenAPI
@@ -60,8 +61,10 @@ dependencies {
     implementation 'io.netty:netty-resolver-dns-native-macos:4.1.110.Final:osx-aarch_64'
 
     implementation 'com.github.f4b6a3:tsid-creator:5.2.6'
+    testImplementation 'com.h2database:h2'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+    systemProperty "spring.profiles.active", "test"
 }
