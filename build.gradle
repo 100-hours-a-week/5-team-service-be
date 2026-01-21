@@ -54,7 +54,9 @@ dependencies {
     implementation 'io.netty:netty-resolver-dns-native-macos:4.1.110.Final:osx-aarch_64'
 
     implementation 'com.github.f4b6a3:tsid-creator:5.2.6'
-    testImplementation 'com.h2database:h2'
+
+    testRuntimeOnly 'com.h2database:h2'
+    runtimeOnly 'com.h2database:h2'
 }
 
 tasks.named('test') {
