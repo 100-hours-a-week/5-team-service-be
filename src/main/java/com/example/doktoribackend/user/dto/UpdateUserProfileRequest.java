@@ -1,7 +1,7 @@
 package com.example.doktoribackend.user.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
@@ -11,7 +11,7 @@ import static com.example.doktoribackend.common.constants.ValidationConstant.*;
 public record UpdateUserProfileRequest(
 
         @Schema(description = "닉네임", example = "newNickname")
-        @NotNull(message = "닉네임은 필수입니다")
+        @NotBlank(message = "닉네임은 필수입니다")
         @Size(max = NICKNAME_MAX_LENGTH, message = "닉네임은 20자를 초과할 수 없습니다")
         @Pattern(
                 regexp = "^[^\\p{Cntrl}\\p{So}\\p{Cs}]*$",

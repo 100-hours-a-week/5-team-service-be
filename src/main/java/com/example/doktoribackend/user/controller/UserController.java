@@ -43,7 +43,7 @@ public class UserController {
     @PutMapping("/me")
     public ResponseEntity<ApiResult<UserProfileResponse>> updateMyProfile(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @RequestBody UpdateUserProfileRequest request
+            @Valid @RequestBody UpdateUserProfileRequest request
     ) {
         UserProfileResponse response = userService.updateMyProfile(userDetails.getId(), request);
         return ResponseEntity.ok(ApiResult.ok(response));
