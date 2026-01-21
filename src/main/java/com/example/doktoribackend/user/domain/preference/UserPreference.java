@@ -53,13 +53,9 @@ public class UserPreference {
         this.birthYear = (birthYear != null) ? birthYear : 0;
     }
 
-    public void updateOAuthInfo(Gender gender, Integer birthYear) {
-        if (gender != null) {
-            this.gender = gender;
-        }
-        if (birthYear != null) {
-            this.birthYear = birthYear;
-        }
+    public void updateRequiredInfo(Gender gender, Integer birthYear) {
+        this.gender = gender;
+        this.birthYear = birthYear;
     }
 
     public void updateOnboardingInfo(ReadingVolume readingVolume) {
