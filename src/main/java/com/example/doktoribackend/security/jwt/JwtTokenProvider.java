@@ -28,7 +28,6 @@ public class JwtTokenProvider {
     @Value("${app.jwt.refresh-exp-seconds}")
     private long refreshExpSeconds;
 
-    // Key 객체
     private Key getKey() {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
@@ -61,7 +60,6 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    // 서명 검증 + 파싱
     private Claims parseClaims(String token) {
         try {
             return Jwts.parserBuilder()
