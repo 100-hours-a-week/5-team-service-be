@@ -53,6 +53,7 @@ public class User extends BaseTimeEntity {
     private UserStat userStat;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
     private Role role = Role.ROLE_USER;
 
     @Builder
