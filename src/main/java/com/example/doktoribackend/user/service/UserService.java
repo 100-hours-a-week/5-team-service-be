@@ -93,6 +93,8 @@ public class UserService {
             userPreferenceRepository.save(preference);
             return;
         }
-        preference.changeNotificationAgreement(notificationAgreement);
+        if (preference.isNotificationAgreement() != notificationAgreement) {
+            preference.changeNotificationAgreement(notificationAgreement);
+        }
     }
 }
