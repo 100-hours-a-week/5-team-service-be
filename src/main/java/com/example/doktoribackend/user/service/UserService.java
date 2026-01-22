@@ -3,6 +3,7 @@ package com.example.doktoribackend.user.service;
 import com.example.doktoribackend.exception.UserNotFoundException;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.user.domain.Gender;
 import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.domain.preference.UserPreference;
 import com.example.doktoribackend.user.dto.ProfileRequiredInfoRequest;
@@ -28,6 +29,14 @@ public class UserService {
                 .orElseThrow(UserNotFoundException::new);
 
         return UserMapper.toUserProfileResponse(user);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean getNotificationAgreement(Long userId) {
+        User user = userRepository.findByIdAndDeletedAtIsNull(userId)
+                .orElseThrow(UserNotFoundException::new);
+        UserPreference preference = user.getUserPreference();
+        return preference != null && preference.isNotificationAgreement();
     }
 
     @Transactional
@@ -59,14 +68,33 @@ public class UserService {
                     .gender(request.gender())
                     .birthYear(request.birthYear())
                     .build();
+            preference.changeNotificationAgreement(request.notificationAgreement());
             user.linkPreference(preference);
             userPreferenceRepository.save(preference);
         } else {
-            preference.updateRequiredInfo(request.gender(), request.birthYear());
+            preference.updateRequiredInfo(request.gender(), request.birthYear(), request.notificationAgreement());
         }
-
         user.completeProfile();
-
         return UserMapper.toUserProfileResponse(user);
+    }
+
+    @Transactional
+    public void updateNotificationAgreement(Long userId, boolean notificationAgreement) {
+        User user = userRepository.findByIdAndDeletedAtIsNull(userId)
+                .orElseThrow(UserNotFoundException::new);
+        UserPreference preference = user.getUserPreference();
+        if (preference == null) {
+            preference = UserPreference.builder()
+                    .user(user)
+                    .gender(Gender.UNKNOWN)
+                    .birthYear(0)
+                    .build();
+            user.linkPreference(preference);
+            userPreferenceRepository.save(preference);
+            return;
+        }
+        if (preference.isNotificationAgreement() != notificationAgreement) {
+            preference.changeNotificationAgreement(notificationAgreement);
+        }
     }
 }

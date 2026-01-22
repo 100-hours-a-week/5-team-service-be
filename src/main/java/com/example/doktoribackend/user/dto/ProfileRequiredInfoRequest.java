@@ -13,6 +13,9 @@ public record ProfileRequiredInfoRequest (
         @NotNull(message = "생년월일은 필수입니다.")
         @Min(value = 1900, message = "출생년도는 1900 이상이어야 합니다.")
         @Max(value = 2100, message = "출생년도는 2100 이하여야 합니다.")
-        Integer birthYear
+        Integer birthYear,
+
+        @NotNull(message = "알림 수신 여부는 필수입니다.")
+        Boolean notificationAgreement
 ){
 }

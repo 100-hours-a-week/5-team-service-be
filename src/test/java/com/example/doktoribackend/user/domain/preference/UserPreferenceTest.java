@@ -32,7 +32,7 @@ class UserPreferenceTest {
                 .birthYear(1990)
                 .build();
 
-        preference.updateRequiredInfo(Gender.FEMALE, 2000);
+        preference.updateRequiredInfo(Gender.FEMALE, 2000, true);
 
         assertThat(preference.getGender()).isEqualTo(Gender.FEMALE);
         assertThat(preference.getBirthYear()).isEqualTo(2000);

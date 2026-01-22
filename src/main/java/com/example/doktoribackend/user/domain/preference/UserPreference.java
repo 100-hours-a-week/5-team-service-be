@@ -38,6 +38,9 @@ public class UserPreference {
     @Column(name = "birth_year", nullable = false)
     private Integer birthYear;
 
+    @Column(name = "notification_agreement", nullable = false)
+    private boolean notificationAgreement = true;
+
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
@@ -53,9 +56,20 @@ public class UserPreference {
         this.birthYear = (birthYear != null) ? birthYear : 0;
     }
 
-    public void updateRequiredInfo(Gender gender, Integer birthYear) {
-        this.gender = gender;
-        this.birthYear = birthYear;
+    public void updateRequiredInfo(Gender gender, Integer birthYear, Boolean notificationAgreement) {
+        if (gender != null) {
+            this.gender = gender;
+        }
+        if (birthYear != null) {
+            this.birthYear = birthYear;
+        }
+        if (notificationAgreement != null) {
+            this.notificationAgreement = notificationAgreement;
+        }
+    }
+
+    public void changeNotificationAgreement(boolean agreed) {
+        this.notificationAgreement = agreed;
     }
 
     public void updateOnboardingInfo(ReadingVolume readingVolume) {

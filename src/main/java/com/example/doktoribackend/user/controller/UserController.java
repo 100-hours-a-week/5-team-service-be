@@ -2,6 +2,8 @@ package com.example.doktoribackend.user.controller;
 
 import com.example.doktoribackend.common.response.ApiResult;
 import com.example.doktoribackend.security.CustomUserDetails;
+import com.example.doktoribackend.user.dto.NotificationAgreementRequest;
+import com.example.doktoribackend.user.dto.NotificationAgreementResponse;
 import com.example.doktoribackend.user.dto.OnboardingRequest;
 import com.example.doktoribackend.user.dto.ProfileRequiredInfoRequest;
 import com.example.doktoribackend.user.dto.UpdateUserProfileRequest;
@@ -56,6 +58,25 @@ public class UserController {
     ) {
         UserProfileResponse response = userService.updateProfileRequiredInfo(userDetails.getId(), request);
         return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Operation(summary = "알림 수신 여부 변경", description = "알림 수신 동의를 설정합니다.")
+    @PutMapping("/me/notifications")
+    public ResponseEntity<ApiResult<Void>> updateNotificationAgreement(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody NotificationAgreementRequest request
+    ) {
+        userService.updateNotificationAgreement(userDetails.getId(), request.notificationAgreement());
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "알림 수신 여부 조회", description = "알림 수신 동의 상태를 조회합니다.")
+    @GetMapping("/me/notifications")
+    public ResponseEntity<ApiResult<NotificationAgreementResponse>> getNotificationAgreement(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        boolean agreed = userService.getNotificationAgreement(userDetails.getId());
+        return ResponseEntity.ok(ApiResult.ok(new NotificationAgreementResponse(agreed)));
     }
 
     @Operation(summary = "온보딩", description = "소셜 로그인 이후 사용자의 온보딩 정보를 저장합니다.")
