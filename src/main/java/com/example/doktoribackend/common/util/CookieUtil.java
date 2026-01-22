@@ -53,10 +53,10 @@ public class CookieUtil {
     public static void addStateCookie(HttpServletResponse response, String state) {
         ResponseCookie cookie = ResponseCookie.from(OAUTH_STATE, state)
                 .httpOnly(true)
-                .secure(true)
+                .secure(false)
                 .path(OAUTH_STATE_PATH)
                 .maxAge(600)
-                .sameSite("None")
+                .sameSite("Lax")
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
@@ -77,10 +77,10 @@ public class CookieUtil {
     public static void removeStateCookie(HttpServletResponse response) {
         ResponseCookie cookie = ResponseCookie.from(OAUTH_STATE, "")
                 .httpOnly(true)
-                .secure(true)
+                .secure(false)
                 .path(OAUTH_STATE_PATH)
                 .maxAge(0)
-                .sameSite("None")
+                .sameSite("Lax")
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
