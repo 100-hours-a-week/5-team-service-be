@@ -8,7 +8,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "meeting_round",
+@Table(name = "meeting_rounds",
         uniqueConstraints = @UniqueConstraint(name = "uk_meeting_round", columnNames = {"meeting_id", "round_no"})
 )
 @Getter

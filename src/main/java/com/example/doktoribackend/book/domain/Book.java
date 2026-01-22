@@ -8,7 +8,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "book", indexes = {
+@Table(name = "books", indexes = {
         @Index(name = "idx_book_title_deleted_at", columnList = "title,deleted_at")
 })
 @Getter

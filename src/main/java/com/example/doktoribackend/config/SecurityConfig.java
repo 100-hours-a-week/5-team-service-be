@@ -7,6 +7,7 @@ import com.example.doktoribackend.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -48,6 +49,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_AUTH).permitAll()
                         .requestMatchers(PUBLIC_DOCS).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/meetings").permitAll()
                         .anyRequest().authenticated()
                 )
                 .userDetailsService(customUserDetailsService)
@@ -58,4 +60,3 @@ public class SecurityConfig {
         return http.build();
     }
 }
-

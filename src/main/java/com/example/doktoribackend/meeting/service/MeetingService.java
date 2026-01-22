@@ -10,6 +10,10 @@ import com.example.doktoribackend.meeting.domain.MeetingMember;
 import com.example.doktoribackend.meeting.domain.MeetingRound;
 import com.example.doktoribackend.meeting.dto.MeetingCreateRequest;
 import com.example.doktoribackend.meeting.dto.MeetingCreateResponse;
+import com.example.doktoribackend.meeting.dto.MeetingListItem;
+import com.example.doktoribackend.meeting.dto.MeetingListRequest;
+import com.example.doktoribackend.meeting.dto.MeetingListResponse;
+import com.example.doktoribackend.meeting.dto.PageInfo;
 import com.example.doktoribackend.meeting.repository.MeetingMemberRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
@@ -116,6 +120,19 @@ public class MeetingService {
         }
 
         return new MeetingCreateResponse(meeting.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public MeetingListResponse getMeetings(MeetingListRequest request) {
+        int size = request.getSizeOrDefault();
+        List<MeetingListItem> results = meetingRepository.findMeetingList(request, size + 1);
+
+        boolean hasNext = results.size() > size;
+        List<MeetingListItem> items = hasNext ? results.subList(0, size) : results;
+        Long nextCursorId = hasNext ? items.get(items.size() - 1).getMeetingId() : null;
+
+        PageInfo pageInfo = new PageInfo(nextCursorId, hasNext, size);
+        return new MeetingListResponse(items, pageInfo);
     }
 
     private int resolveDurationMinutes(Integer durationMinutes, LocalTime startTime, LocalTime endTime) {
