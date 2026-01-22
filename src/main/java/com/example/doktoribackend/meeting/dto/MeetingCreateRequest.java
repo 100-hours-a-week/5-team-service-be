@@ -71,7 +71,7 @@ public class MeetingCreateRequest {
     @Min(30)
     @Max(1440)
     @Schema(example = "90")
-    private Integer durationMinutes;
+    private Short durationMinutes;
 
     @NotNull
     @JsonDeserialize(using = FlexibleLocalDateDeserializer.class)
