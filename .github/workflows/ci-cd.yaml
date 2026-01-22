@@ -111,7 +111,7 @@ jobs:
       - name: Create .env and deploy
         uses: appleboy/ssh-action@v1.0.3
         env:
-          SPRING_PROFILES_ACTIVE: prod
+          SPRING_PROFILES_ACTIVE: ${{ steps.env.outputs.env_name == 'prod' && 'prod' || 'dev' }}
           DB_URL: ${{ steps.env.outputs.env_name == 'prod' && secrets.PROD_DB_URL || secrets.DEV_DB_URL }}
           DB_USERNAME: ${{ steps.env.outputs.env_name == 'prod' && secrets.PROD_DB_USERNAME || secrets.DEV_DB_USERNAME }}
           DB_PASSWORD: ${{ steps.env.outputs.env_name == 'prod' && secrets.PROD_DB_PASSWORD || secrets.DEV_DB_PASSWORD }}
