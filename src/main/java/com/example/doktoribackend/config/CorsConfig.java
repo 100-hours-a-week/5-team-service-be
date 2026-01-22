@@ -19,7 +19,7 @@ public class CorsConfig {
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
                 "https://doktori.kr",
-                "http://3.38.153.41"
+                "https://dev.doktori.kr"
         ));
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
