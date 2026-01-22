@@ -44,16 +44,16 @@ public class Meeting extends BaseTimeEntity {
     private String description;
 
     @Column(nullable = false)
-    private Integer capacity;
+    private Byte capacity;
 
-    @Column(name = "current_count", nullable = false)
-    private Integer currentCount;
+    @Column(name = "current_count", nullable = false, columnDefinition = "TINYINT")
+    private Byte currentCount;
 
-    @Column(name = "round_count", nullable = false)
-    private Integer roundCount;
+    @Column(name = "round_count", nullable = false, columnDefinition = "TINYINT")
+    private Byte roundCount;
 
-    @Column(name = "current_round", nullable = false)
-    private Integer currentRound;
+    @Column(name = "current_round", nullable = false, columnDefinition = "TINYINT")
+    private Byte currentRound;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -85,14 +85,14 @@ public class Meeting extends BaseTimeEntity {
             String meetingImagePath,
             String title,
             String description,
-            int capacity,
-            int roundCount,
+            Byte capacity,
+            Byte roundCount,
             MeetingDayOfWeek dayOfWeek,
             LocalTime startTime,
             int durationMinutes,
             LocalDateTime firstRoundAt,
             LocalDate recruitmentDeadline,
-            int currentCount
+            Byte currentCount
     ) {
         return Meeting.builder()
                 .leaderUser(leaderUser)
@@ -104,7 +104,7 @@ public class Meeting extends BaseTimeEntity {
                 .capacity(capacity)
                 .currentCount(currentCount)
                 .roundCount(roundCount)
-                .currentRound(1)
+                .currentRound((byte) 1)
                 .status(MeetingStatus.RECRUITING)
                 .dayOfWeek(dayOfWeek)
                 .startTime(startTime)

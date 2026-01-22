@@ -12,3 +12,8 @@ spring:
 logging:
   level:
     org.hibernate.SQL: debug
+
+app:
+  cookie:
+    secure: false
+    same-site: Lax

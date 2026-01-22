@@ -24,6 +24,7 @@ public class OAuthController {
 
     private final OAuthServiceFactory oauthFactory;
     private final JwtTokenProvider jwtTokenProvider;
+    private final CookieUtil cookieUtil;
 
     @GetMapping("/{provider}")
     public RedirectView redirectToOAuth(
@@ -35,7 +36,7 @@ public class OAuthController {
 
         OAuthService service = oauthFactory.getService(oauthProvider);
         String resolvedState = (state == null || state.isBlank()) ? UUID.randomUUID().toString() : state;
-        CookieUtil.addStateCookie(response, resolvedState);
+        cookieUtil.addStateCookie(response, resolvedState);
         return new RedirectView(service.buildAuthorizeUrl(resolvedState));
     }
 
@@ -50,19 +51,19 @@ public class OAuthController {
         OAuthProvider oauthProvider = OAuthProvider.fromString(provider);
         OAuthService service = oauthFactory.getService(oauthProvider);
 
-        String savedState = CookieUtil.resolveState(request);
+        String savedState = cookieUtil.resolveState(request);
         if (savedState == null || !savedState.equals(state)) {
             throw new CustomException(ErrorCode.INVALID_OAUTH_STATE);
         }
 
         TokenResponse tokens = service.handleCallback(code);
 
-        CookieUtil.addRefreshTokenCookie(
+        cookieUtil.addRefreshTokenCookie(
                 response,
                 tokens.refreshToken(),
                 jwtTokenProvider.getRefreshExpSeconds()
         );
-        CookieUtil.removeStateCookie(response);
+        cookieUtil.removeStateCookie(response);
 
         String redirectUrl = service.buildFrontendRedirect(state);
         return new RedirectView(redirectUrl);

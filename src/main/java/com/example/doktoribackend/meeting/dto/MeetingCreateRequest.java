@@ -40,13 +40,13 @@ public class MeetingCreateRequest {
     @Min(3)
     @Max(8)
     @Schema(example = "8")
-    private Integer capacity;
+    private Byte capacity;
 
     @NotNull
     @Min(1)
     @Max(8)
     @Schema(example = "4")
-    private Integer roundCount;
+    private Byte roundCount;
 
     @NotEmpty
     @Valid
@@ -110,7 +110,7 @@ public class MeetingCreateRequest {
         if (roundCount == null || rounds == null) {
             return true;
         }
-        Set<Integer> numbers = new HashSet<>();
+        Set<Byte> numbers = new HashSet<>();
         for (RoundRequest round : rounds) {
             if (round == null || round.getRoundNumber() == null) {
                 return false;
@@ -140,7 +140,7 @@ public class MeetingCreateRequest {
         @NotNull
         @Min(1)
         @Schema(example = "1")
-        private Integer roundNumber;
+        private Byte roundNumber;
 
         @NotNull
         @JsonDeserialize(using = FlexibleLocalDateDeserializer.class)
@@ -166,7 +166,7 @@ public class MeetingCreateRequest {
         @NotNull
         @Min(1)
         @Schema(example = "1")
-        private Integer roundNo;
+        private Byte roundNo;
 
         @NotNull
         @Valid

@@ -61,7 +61,7 @@ public class MeetingService {
         LocalDateTime firstRoundAt = LocalDateTime.of(firstRoundDate, startTime);
         MeetingDayOfWeek dayOfWeek = MeetingDayOfWeek.from(firstRoundDate);
 
-        Map<Integer, LocalDate> roundDates = toRoundDateMap(request.getRounds());
+        Map<Byte, LocalDate> roundDates = toRoundDateMap(request.getRounds());
         if (!roundDates.containsKey(1)) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
@@ -69,7 +69,7 @@ public class MeetingService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        Map<Integer, MeetingCreateRequest.BookRequest> booksByRound = toBookByRoundMap(request.getBooksByRound());
+        Map<Byte, MeetingCreateRequest.BookRequest> booksByRound = toBookByRoundMap(request.getBooksByRound());
         if (booksByRound.size() != roundDates.size()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
@@ -92,7 +92,7 @@ public class MeetingService {
                 durationMinutes,
                 firstRoundAt,
                 request.getRecruitmentDeadline(),
-                1
+                (byte) 1
         );
         meetingRepository.save(meeting);
 
@@ -102,7 +102,7 @@ public class MeetingService {
 
         List<MeetingRound> rounds = request.getRounds().stream()
                 .map(round -> {
-                    int roundNo = round.getRoundNumber();
+                    Byte roundNo = round.getRoundNumber();
                     MeetingCreateRequest.BookRequest bookRequest = booksByRound.get(roundNo);
                     if (bookRequest == null) {
                         throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
@@ -149,18 +149,18 @@ public class MeetingService {
         return durationMinutes;
     }
 
-    private Map<Integer, LocalDate> toRoundDateMap(List<MeetingCreateRequest.RoundRequest> rounds) {
-        Map<Integer, LocalDate> map = new HashMap<>();
+    private Map<Byte, LocalDate> toRoundDateMap(List<MeetingCreateRequest.RoundRequest> rounds) {
+        Map<Byte, LocalDate> map = new HashMap<>();
         for (MeetingCreateRequest.RoundRequest round : rounds) {
             map.put(round.getRoundNumber(), round.getDate());
         }
         return map;
     }
 
-    private Map<Integer, MeetingCreateRequest.BookRequest> toBookByRoundMap(
+    private Map<Byte, MeetingCreateRequest.BookRequest> toBookByRoundMap(
             List<MeetingCreateRequest.BookByRoundRequest> bookRequests
     ) {
-        Map<Integer, MeetingCreateRequest.BookRequest> map = new HashMap<>();
+        Map<Byte, MeetingCreateRequest.BookRequest> map = new HashMap<>();
         for (MeetingCreateRequest.BookByRoundRequest request : bookRequests) {
             if (map.putIfAbsent(request.getRoundNo(), request.getBook()) != null) {
                 throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);

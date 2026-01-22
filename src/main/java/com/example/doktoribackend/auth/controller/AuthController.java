@@ -24,6 +24,7 @@ public class AuthController {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final TokenService tokenService;
+    private final CookieUtil cookieUtil;
 
     @Operation(
             summary = "Access Token 갱신",
@@ -34,7 +35,7 @@ public class AuthController {
             HttpServletRequest request,
             HttpServletResponse response) {
 
-        String refreshToken = CookieUtil.resolveRefreshToken(request);
+        String refreshToken = cookieUtil.resolveRefreshToken(request);
 
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new CustomException(ErrorCode.NOT_EXIST_REFRESH_TOKEN);
@@ -42,7 +43,7 @@ public class AuthController {
 
         TokenResponse refreshed = tokenService.refreshTokens(refreshToken);
 
-        CookieUtil.addRefreshTokenCookie(
+        cookieUtil.addRefreshTokenCookie(
                 response,
                 refreshed.refreshToken(),
                 jwtTokenProvider.getRefreshExpSeconds()
@@ -59,11 +60,11 @@ public class AuthController {
     )
     @DeleteMapping("/tokens")
     public ResponseEntity<ApiResult<Void>> logout(HttpServletRequest request, HttpServletResponse response) {
-        String refreshToken = CookieUtil.resolveRefreshToken(request);
+        String refreshToken = cookieUtil.resolveRefreshToken(request);
         if (refreshToken != null && !refreshToken.isBlank()) {
             tokenService.logout(refreshToken);
         }
-        CookieUtil.removeRefreshTokenCookie(response);
+        cookieUtil.removeRefreshTokenCookie(response);
         return ResponseEntity.noContent().build();
     }
 }

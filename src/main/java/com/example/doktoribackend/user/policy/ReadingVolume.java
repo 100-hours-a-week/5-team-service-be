@@ -23,8 +23,8 @@ public class ReadingVolume extends BaseTimeEntity {
     @Column(name = "name", nullable = false, length = 50)
     private String name;
 
-    @Column(name= "priority", nullable = false)
-    private Integer priority;
+    @Column(name= "priority", nullable = false, columnDefinition = "TINYINT")
+    private Byte priority;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;

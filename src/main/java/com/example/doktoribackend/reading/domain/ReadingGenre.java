@@ -26,8 +26,8 @@ public class ReadingGenre extends BaseTimeEntity {
     @Column(nullable = false, length = 50)
     private String name;
 
-    @Column(nullable = false)
-    private Integer priority;
+    @Column(name= "priority", nullable = false, columnDefinition = "TINYINT")
+    private Byte priority;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
