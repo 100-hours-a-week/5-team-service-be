@@ -46,13 +46,13 @@ public class Meeting extends BaseTimeEntity {
     @Column(nullable = false)
     private Byte capacity;
 
-    @Column(name = "current_count", nullable = false, columnDefinition = "TINYINT")
+    @Column(name = "current_count", nullable = false)
     private Byte currentCount;
 
-    @Column(name = "round_count", nullable = false, columnDefinition = "TINYINT")
+    @Column(name = "round_count", nullable = false)
     private Byte roundCount;
 
-    @Column(name = "current_round", nullable = false, columnDefinition = "TINYINT")
+    @Column(name = "current_round", nullable = false)
     private Byte currentRound;
 
     @Enumerated(EnumType.STRING)
@@ -67,7 +67,7 @@ public class Meeting extends BaseTimeEntity {
     private LocalTime startTime;
 
     @Column(name = "duration_minutes", nullable = false)
-    private Integer durationMinutes;
+    private Short durationMinutes;
 
     @Column(name = "first_round_at", nullable = false)
     private LocalDateTime firstRoundAt;
@@ -89,7 +89,7 @@ public class Meeting extends BaseTimeEntity {
             Byte roundCount,
             MeetingDayOfWeek dayOfWeek,
             LocalTime startTime,
-            int durationMinutes,
+            Short durationMinutes,
             LocalDateTime firstRoundAt,
             LocalDate recruitmentDeadline,
             Byte currentCount

@@ -55,7 +55,7 @@ public class MeetingService {
         MeetingCreateRequest.TimeRequest time = request.getTime();
         LocalTime startTime = time.getStartTime();
         LocalTime endTime = time.getEndTime();
-        int durationMinutes = resolveDurationMinutes(request.getDurationMinutes(), startTime, endTime);
+        Short durationMinutes = resolveDurationMinutes(request.getDurationMinutes(), startTime, endTime);
 
         LocalDate firstRoundDate = request.getFirstRoundAt();
         LocalDateTime firstRoundAt = LocalDateTime.of(firstRoundDate, startTime);
@@ -102,7 +102,7 @@ public class MeetingService {
 
         List<MeetingRound> rounds = request.getRounds().stream()
                 .map(round -> {
-                    Byte roundNo = round.getRoundNumber();
+                    byte roundNo = round.getRoundNumber();
                     MeetingCreateRequest.BookRequest bookRequest = booksByRound.get(roundNo);
                     if (bookRequest == null) {
                         throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
@@ -135,15 +135,15 @@ public class MeetingService {
         return new MeetingListResponse(items, pageInfo);
     }
 
-    private int resolveDurationMinutes(Integer durationMinutes, LocalTime startTime, LocalTime endTime) {
+    private short resolveDurationMinutes(Short durationMinutes, LocalTime startTime, LocalTime endTime) {
         long diff = ChronoUnit.MINUTES.between(startTime, endTime);
         if (diff < 30 || diff % 30 != 0) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
         if (durationMinutes == null) {
-            return (int) diff;
+            return (short) diff;
         }
-        if (durationMinutes < 30 || durationMinutes % 30 != 0 || durationMinutes != (int) diff) {
+        if (durationMinutes < 30 || durationMinutes % 30 != 0 || durationMinutes != (short) diff) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
         return durationMinutes;

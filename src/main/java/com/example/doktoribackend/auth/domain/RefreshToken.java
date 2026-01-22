@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 public class RefreshToken extends BaseTimeEntity {
 
     @Id
-    @Column(name = "token_id", length = 13, nullable = false, updatable = false)
+    @Column(name = "token_id", length = 13, columnDefinition = "CHAR(13)")
     private String tokenId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
