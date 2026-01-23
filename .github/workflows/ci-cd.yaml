@@ -60,16 +60,32 @@ jobs:
       - name: Notify Discord on failure
         if: failure()
         run: |
+
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          COMMIT_MSG=$(echo '${{ github.event.head_commit.message }}' | head -1)
+          COMMIT_AUTHOR="${{ github.event.head_commit.author.name }}"
+          COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+          ACTIONS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
           curl -H "Content-Type: application/json" \
                -X POST \
-               -d '{
-                 "content": "❌ **Backend CI Failed!**",
-                 "embeds": [{
-                   "title": "Build Details",
-                   "description": "Repo: ${{ github.repository }}\nBranch: ${{ github.ref_name }}\nCheck: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-                   "color": 15158528
+               -d "{
+                 \"content\": \"❌ **Backend CI 빌드 실패**\",
+                 \"embeds\": [{
+                   \"title\": \"🔴 빌드 실패 알림\",
+                   \"color\": 15158528,
+                   \"fields\": [
+                     {\"name\": \"📦 저장소\", \"value\": \"\`${{ github.repository }}\`\", \"inline\": true},
+                     {\"name\": \"🌿 브랜치\", \"value\": \"\`${{ github.ref_name }}\`\", \"inline\": true},
+                     {\"name\": \"🔖 커밋\", \"value\": \"[\`$SHORT_SHA\`]($COMMIT_URL)\", \"inline\": true},
+                     {\"name\": \"💬 커밋 메시지\", \"value\": \"$COMMIT_MSG\", \"inline\": false},
+                     {\"name\": \"👤 작성자\", \"value\": \"$COMMIT_AUTHOR\", \"inline\": true},
+                     {\"name\": \"📋 상세 로그\", \"value\": \"[Actions에서 확인]($ACTIONS_URL)\", \"inline\": true}
+                   ],
+                   \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
                  }]
-               }' \
+               }" \
                ${{ secrets.DISCORD_WEBHOOK_URL }} || true
 
   deploy:
@@ -108,50 +124,62 @@ jobs:
           strip_components: 2
           overwrite: true
 
-      - name: Create .env and deploy
+      - name: Deploy
         uses: appleboy/ssh-action@v1.0.3
-        env:
-          SPRING_PROFILES_ACTIVE: ${{ steps.env.outputs.env_name == 'prod' && 'prod' || 'dev' }}
-          DB_URL: ${{ steps.env.outputs.env_name == 'prod' && secrets.PROD_DB_URL || secrets.DEV_DB_URL }}
-          DB_USERNAME: ${{ steps.env.outputs.env_name == 'prod' && secrets.PROD_DB_USERNAME || secrets.DEV_DB_USERNAME }}
-          DB_PASSWORD: ${{ steps.env.outputs.env_name == 'prod' && secrets.PROD_DB_PASSWORD || secrets.DEV_DB_PASSWORD }}
-          KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
-          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
-          KAKAO_REDIRECT_URI: ${{ steps.env.outputs.env_name == 'prod' && secrets.PROD_KAKAO_REDIRECT_URI || secrets.DEV_KAKAO_REDIRECT_URI }}
-          KAKAO_FRONTEND_REDIRECT: ${{ steps.env.outputs.env_name == 'prod' && secrets.PROD_KAKAO_FRONTEND_REDIRECT || secrets.DEV_KAKAO_FRONTEND_REDIRECT }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         with:
           host: ${{ steps.env.outputs.host == 'EC2_HOST' && secrets.EC2_HOST || secrets.DEV_EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: SPRING_PROFILES_ACTIVE,DB_URL,DB_USERNAME,DB_PASSWORD,KAKAO_CLIENT_ID,KAKAO_CLIENT_SECRET,KAKAO_REDIRECT_URI,KAKAO_FRONTEND_REDIRECT,JWT_SECRET
-          script: |
-            mkdir -p /home/ubuntu/app/backend
-            cat > /home/ubuntu/app/backend/.env << EOF
-            SPRING_PROFILES_ACTIVE=$SPRING_PROFILES_ACTIVE
-            DB_URL=$DB_URL
-            DB_USERNAME=$DB_USERNAME
-            DB_PASSWORD=$DB_PASSWORD
-            KAKAO_CLIENT_ID=$KAKAO_CLIENT_ID
-            KAKAO_CLIENT_SECRET=$KAKAO_CLIENT_SECRET
-            KAKAO_REDIRECT_URI=$KAKAO_REDIRECT_URI
-            KAKAO_FRONTEND_REDIRECT=$KAKAO_FRONTEND_REDIRECT
-            JWT_SECRET=$JWT_SECRET
-            EOF
-            chmod 600 /home/ubuntu/app/backend/.env
-            bash /home/ubuntu/app/deploy.sh be
+          script: bash /home/ubuntu/app/deploy.sh be
 
       - name: Notify Discord
         if: always()
         run: |
+          # 환경별 설정
+          ENV_NAME="${{ steps.env.outputs.env_name }}"
+          if [ "$ENV_NAME" == "prod" ]; then
+            ENV_EMOJI="🚀"
+            ENV_LABEL="Production"
+          else
+            ENV_EMOJI="🔧"
+            ENV_LABEL="Development"
+          fi
+
+          # 커밋 정보
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          COMMIT_MSG=$(echo '${{ github.event.head_commit.message }}' | head -1)
+          COMMIT_AUTHOR="${{ github.event.head_commit.author.name }}"
+          COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+          ACTIONS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          # 상태별 색상 및 메시지
           if [ "${{ job.status }}" == "success" ]; then
             COLOR=3066993
-            MSG="✅ **Backend ${{ steps.env.outputs.env_name }} 배포 성공!**"
+            STATUS_EMOJI="✅"
+            STATUS_TEXT="배포 성공"
           else
             COLOR=15158528
-            MSG="❌ **Backend ${{ steps.env.outputs.env_name }} 배포 실패!**"
+            STATUS_EMOJI="❌"
+            STATUS_TEXT="배포 실패"
           fi
+
           curl -H "Content-Type: application/json" \
                -X POST \
-               -d "{\"content\": \"$MSG\", \"embeds\": [{\"title\": \"${{ github.repository }}\", \"description\": \"Branch: ${{ github.ref_name }}\", \"color\": $COLOR}]}" \
+               -d "{
+                 \"content\": \"$STATUS_EMOJI **Backend $ENV_LABEL 배포 알림**\",
+                 \"embeds\": [{
+                   \"title\": \"$ENV_EMOJI [$ENV_LABEL] $STATUS_TEXT\",
+                   \"color\": $COLOR,
+                   \"fields\": [
+                     {\"name\": \"📦 저장소\", \"value\": \"\`${{ github.repository }}\`\", \"inline\": true},
+                     {\"name\": \"🌿 브랜치\", \"value\": \"\`${{ github.ref_name }}\`\", \"inline\": true},
+                     {\"name\": \"🔖 커밋\", \"value\": \"[\`$SHORT_SHA\`]($COMMIT_URL)\", \"inline\": true},
+                     {\"name\": \"💬 커밋 메시지\", \"value\": \"$COMMIT_MSG\", \"inline\": false},
+                     {\"name\": \"👤 작성자\", \"value\": \"$COMMIT_AUTHOR\", \"inline\": true},
+                     {\"name\": \"📋 상세 로그\", \"value\": \"[Actions에서 확인]($ACTIONS_URL)\", \"inline\": true}
+                   ],
+                   \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+                 }]
+               }" \
                ${{ secrets.DISCORD_WEBHOOK_URL }} || true
