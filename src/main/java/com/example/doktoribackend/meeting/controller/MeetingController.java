@@ -33,7 +33,6 @@ import java.net.URI;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/meetings")
-@Validated
 public class MeetingController {
 
     private final MeetingService meetingService;
