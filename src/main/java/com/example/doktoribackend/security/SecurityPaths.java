@@ -7,7 +7,8 @@ public final class SecurityPaths {
     public static final String[] PUBLIC_AUTH = {
             "/oauth/**",
             "/auth/**",
-            "/health"
+            "/health",
+            "/actuator/**"
     };
 
     public static final String[] PUBLIC_DOCS = {
