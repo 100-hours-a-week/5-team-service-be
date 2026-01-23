@@ -27,7 +27,9 @@ public class KakaoBookClient {
         try {
             return webClient.get()
                     .uri(uriBuilder -> uriBuilder
-                            .path(baseUrl)
+                            .scheme("https")
+                            .host("dapi.kakao.com")
+                            .path("/v3/search/book")
                             .queryParam("query", query)
                             .queryParam("page", page)
                             .queryParam("size", size)
