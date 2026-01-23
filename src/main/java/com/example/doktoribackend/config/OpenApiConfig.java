@@ -16,7 +16,7 @@ class OpenApiConfig {
         String bearerSchemeName = "bearerAuth";
 
         Server devServer = new Server();
-        devServer.setUrl("https://dev.doktori.kr");
+        devServer.setUrl("https://dev.doktori.kr/api");
         devServer.setDescription("Development Server");
 
         return new OpenAPI()
