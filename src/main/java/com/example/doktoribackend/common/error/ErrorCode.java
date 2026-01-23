@@ -35,6 +35,9 @@ public enum ErrorCode {
     REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "REFRESH_TOKEN_EXPIRED"," 리프레시 토큰이 만료되었습니다."),
     INVALID_USER_ID(HttpStatus.BAD_REQUEST, "INVALID_USER_ID", "유효하지 않은 사용자 ID입니다."),
 
+    // External API
+    UPSTREAM_KAKAO_FAILED(HttpStatus.BAD_GATEWAY, "UPSTREAM_KAKAO_FAILED", "카카오 API 호출에 실패했습니다."),
+
     // User
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "존재하지 않는 사용자입니다."),
     PROFILE_ALREADY_COMPLETED(HttpStatus.CONFLICT, "PROFILE_ALREADY_COMPLETED", "이미 프로필 필수 정보를 완료했습니다."),

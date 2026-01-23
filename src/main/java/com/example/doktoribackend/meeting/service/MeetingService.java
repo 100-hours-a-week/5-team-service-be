@@ -57,13 +57,13 @@ public class MeetingService {
         MeetingCreateRequest.TimeRequest time = request.getTime();
         LocalTime startTime = time.getStartTime();
         LocalTime endTime = time.getEndTime();
-        Short durationMinutes = resolveDurationMinutes(request.getDurationMinutes(), startTime, endTime);
+        int durationMinutes = resolveDurationMinutes(request.getDurationMinutes(), startTime, endTime);
 
         LocalDate firstRoundDate = request.getFirstRoundAt();
         LocalDateTime firstRoundAt = LocalDateTime.of(firstRoundDate, startTime);
         MeetingDayOfWeek dayOfWeek = MeetingDayOfWeek.from(firstRoundDate);
 
-        Map<Byte, LocalDate> roundDates = toRoundDateMap(request.getRounds());
+        Map<Integer, LocalDate> roundDates = toRoundDateMap(request.getRounds());
         if (!roundDates.containsKey(1)) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
@@ -71,7 +71,7 @@ public class MeetingService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        Map<Byte, MeetingCreateRequest.BookRequest> booksByRound = toBookByRoundMap(request.getBooksByRound());
+        Map<Integer, MeetingCreateRequest.BookRequest> booksByRound = toBookByRoundMap(request.getBooksByRound());
         if (booksByRound.size() != roundDates.size()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
@@ -96,7 +96,7 @@ public class MeetingService {
                 durationMinutes,
                 firstRoundAt,
                 request.getRecruitmentDeadline(),
-                (byte) 1
+                1
         );
         meetingRepository.save(meeting);
 
@@ -106,7 +106,7 @@ public class MeetingService {
 
         List<MeetingRound> rounds = request.getRounds().stream()
                 .map(round -> {
-                    byte roundNo = round.getRoundNumber();
+                    int roundNo = round.getRoundNo();
                     MeetingCreateRequest.BookRequest bookRequest = booksByRound.get(roundNo);
                     if (bookRequest == null) {
                         throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
@@ -151,32 +151,32 @@ public class MeetingService {
         return new MeetingListResponse(mapped, pageInfo);
     }
 
-    private short resolveDurationMinutes(Short durationMinutes, LocalTime startTime, LocalTime endTime) {
+    private int resolveDurationMinutes(Integer durationMinutes, LocalTime startTime, LocalTime endTime) {
         long diff = ChronoUnit.MINUTES.between(startTime, endTime);
         if (diff < 30 || diff % 30 != 0) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
         if (durationMinutes == null) {
-            return (short) diff;
+            return (int) diff;
         }
-        if (durationMinutes < 30 || durationMinutes % 30 != 0 || durationMinutes != (short) diff) {
+        if (durationMinutes < 30 || durationMinutes % 30 != 0 || durationMinutes != (int) diff) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
         return durationMinutes;
     }
 
-    private Map<Byte, LocalDate> toRoundDateMap(List<MeetingCreateRequest.RoundRequest> rounds) {
-        Map<Byte, LocalDate> map = new HashMap<>();
+    private Map<Integer, LocalDate> toRoundDateMap(List<MeetingCreateRequest.RoundRequest> rounds) {
+        Map<Integer, LocalDate> map = new HashMap<>();
         for (MeetingCreateRequest.RoundRequest round : rounds) {
-            map.put(round.getRoundNumber(), round.getDate());
+            map.put(round.getRoundNo(), round.getDate());
         }
         return map;
     }
 
-    private Map<Byte, MeetingCreateRequest.BookRequest> toBookByRoundMap(
+    private Map<Integer, MeetingCreateRequest.BookRequest> toBookByRoundMap(
             List<MeetingCreateRequest.BookByRoundRequest> bookRequests
     ) {
-        Map<Byte, MeetingCreateRequest.BookRequest> map = new HashMap<>();
+        Map<Integer, MeetingCreateRequest.BookRequest> map = new HashMap<>();
         for (MeetingCreateRequest.BookByRoundRequest request : bookRequests) {
             if (map.putIfAbsent(request.getRoundNo(), request.getBook()) != null) {
                 throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
@@ -188,14 +188,22 @@ public class MeetingService {
     private Book resolveBook(MeetingCreateRequest.BookRequest request) {
         String isbn13 = normalizeIsbn(request.getIsbn13());
         if (isbn13 != null) {
-            return bookRepository.findByIsbn13AndDeletedAtIsNull(isbn13)
+            return bookRepository.findByIsbn13(isbn13)
+                    .map(this::reviveIfDeleted)
                     .orElseGet(() -> bookRepository.save(toBook(request, isbn13)));
         }
         return bookRepository.save(toBook(request, null));
     }
 
+    private Book reviveIfDeleted(Book existing) {
+        if (existing.isDeleted()) {
+            existing.revive();
+        }
+        return existing;
+    }
+
     private Book toBook(MeetingCreateRequest.BookRequest request, String isbn13) {
-        String authors = joinAuthors(request.getAuthors());
+        String authors = normalizeAuthors(request.getAuthors());
         return Book.create(
                 isbn13,
                 request.getTitle(),
@@ -214,10 +222,11 @@ public class MeetingService {
         return normalized.isBlank() ? null : normalized;
     }
 
-    private String joinAuthors(List<String> authors) {
-        if (authors == null || authors.isEmpty()) {
+    private String normalizeAuthors(String authors) {
+        if (authors == null) {
             return null;
         }
-        return String.join(", ", authors);
+        String normalized = authors.trim();
+        return normalized.isBlank() ? null : normalized;
     }
 }

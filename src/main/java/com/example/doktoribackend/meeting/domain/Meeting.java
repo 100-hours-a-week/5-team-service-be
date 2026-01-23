@@ -43,17 +43,17 @@ public class Meeting extends BaseTimeEntity {
     @Column(nullable = false, length = 300)
     private String description;
 
-    @Column(nullable = false)
-    private Byte capacity;
+    @Column(nullable = false, columnDefinition = "TINYINT")
+    private Integer capacity;
 
-    @Column(name = "current_count", nullable = false)
-    private Byte currentCount;
+    @Column(name = "current_count", nullable = false, columnDefinition = "TINYINT")
+    private Integer currentCount;
 
-    @Column(name = "round_count", nullable = false)
-    private Byte roundCount;
+    @Column(name = "round_count", nullable = false, columnDefinition = "TINYINT")
+    private Integer roundCount;
 
-    @Column(name = "current_round", nullable = false)
-    private Byte currentRound;
+    @Column(name = "current_round", nullable = false, columnDefinition = "TINYINT")
+    private Integer currentRound;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -66,8 +66,8 @@ public class Meeting extends BaseTimeEntity {
     @Column(name = "start_time", nullable = false)
     private LocalTime startTime;
 
-    @Column(name = "duration_minutes", nullable = false)
-    private Short durationMinutes;
+    @Column(name = "duration_minutes", nullable = false, columnDefinition = "SMALLINT")
+    private Integer durationMinutes;
 
     @Column(name = "first_round_at", nullable = false)
     private LocalDateTime firstRoundAt;
@@ -85,14 +85,14 @@ public class Meeting extends BaseTimeEntity {
             String meetingImagePath,
             String title,
             String description,
-            Byte capacity,
-            Byte roundCount,
+            Integer capacity,
+            Integer roundCount,
             MeetingDayOfWeek dayOfWeek,
             LocalTime startTime,
-            Short durationMinutes,
+            Integer durationMinutes,
             LocalDateTime firstRoundAt,
             LocalDate recruitmentDeadline,
-            Byte currentCount
+            Integer currentCount
     ) {
         return Meeting.builder()
                 .leaderUser(leaderUser)
@@ -104,7 +104,7 @@ public class Meeting extends BaseTimeEntity {
                 .capacity(capacity)
                 .currentCount(currentCount)
                 .roundCount(roundCount)
-                .currentRound((byte) 1)
+                .currentRound(1)
                 .status(MeetingStatus.RECRUITING)
                 .dayOfWeek(dayOfWeek)
                 .startTime(startTime)

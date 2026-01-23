@@ -29,8 +29,8 @@ public class MeetingRound extends BaseTimeEntity {
     @JoinColumn(name = "book_id", nullable = false)
     private Book book;
 
-    @Column(name = "round_no", nullable = false)
-    private Byte roundNo;
+    @Column(name = "round_no", nullable = false, columnDefinition = "TINYINT")
+    private Integer roundNo;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -48,7 +48,7 @@ public class MeetingRound extends BaseTimeEntity {
     public static MeetingRound create(
             Meeting meeting,
             Book book,
-            Byte roundNo,
+            Integer roundNo,
             LocalDateTime startAt,
             LocalDateTime endAt
     ) {

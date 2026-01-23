@@ -38,6 +38,9 @@ public class Book extends BaseTimeEntity {
 
     private LocalDate publishedAt;
 
+    @Column(length = 2000)
+    private String summary;
+
     private LocalDateTime deletedAt;
 
     public static Book create(
@@ -56,5 +59,13 @@ public class Book extends BaseTimeEntity {
                 .thumbnailUrl(thumbnailUrl)
                 .publishedAt(publishedAt)
                 .build();
+    }
+
+    public void revive() {
+        this.deletedAt = null;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 }

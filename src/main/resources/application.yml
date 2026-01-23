@@ -36,6 +36,9 @@ kakao:
     token-url: https://kauth.kakao.com/oauth/token
     user-info-url: https://kapi.kakao.com/v2/user/me
     frontend-redirect: ${KAKAO_FRONTEND_REDIRECT}
+  book:
+    base-url: https://dapi.kakao.com/v3/search/book
+    rest-api-key: ${KAKAO_REST_API_KEY}
 
 app:
   jwt:

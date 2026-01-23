@@ -40,13 +40,13 @@ public class MeetingCreateRequest {
     @Min(3)
     @Max(8)
     @Schema(example = "8")
-    private Byte capacity;
+    private Integer capacity;
 
     @NotNull
     @Min(1)
     @Max(8)
     @Schema(example = "4")
-    private Byte roundCount;
+    private Integer roundCount;
 
     @NotEmpty
     @Valid
@@ -71,7 +71,7 @@ public class MeetingCreateRequest {
     @Min(30)
     @Max(1440)
     @Schema(example = "90")
-    private Short durationMinutes;
+    private Integer durationMinutes;
 
     @NotNull
     @JsonDeserialize(using = FlexibleLocalDateDeserializer.class)
@@ -110,15 +110,15 @@ public class MeetingCreateRequest {
         if (roundCount == null || rounds == null) {
             return true;
         }
-        Set<Byte> numbers = new HashSet<>();
+        Set<Integer> numbers = new HashSet<>();
         for (RoundRequest round : rounds) {
-            if (round == null || round.getRoundNumber() == null) {
+            if (round == null || round.getRoundNo() == null) {
                 return false;
             }
-            if (round.getRoundNumber() < 1 || round.getRoundNumber() > roundCount) {
+            if (round.getRoundNo() < 1 || round.getRoundNo() > roundCount) {
                 return false;
             }
-            if (!numbers.add(round.getRoundNumber())) {
+            if (!numbers.add(round.getRoundNo())) {
                 return false;
             }
         }
@@ -140,7 +140,7 @@ public class MeetingCreateRequest {
         @NotNull
         @Min(1)
         @Schema(example = "1")
-        private Byte roundNumber;
+        private Integer roundNo;
 
         @NotNull
         @JsonDeserialize(using = FlexibleLocalDateDeserializer.class)
@@ -166,7 +166,7 @@ public class MeetingCreateRequest {
         @NotNull
         @Min(1)
         @Schema(example = "1")
-        private Byte roundNo;
+        private Integer roundNo;
 
         @NotNull
         @Valid
@@ -184,8 +184,9 @@ public class MeetingCreateRequest {
         @Schema(example = "아몬드")
         private String title;
 
-        @Schema(example = "[\"손원평\"]")
-        private List<@NotBlank @Size(max = 100) String> authors;
+        @Size(max = 255)
+        @Schema(example = "손원평")
+        private String authors;
 
         @Size(max = 255)
         @Schema(example = "출판사")
