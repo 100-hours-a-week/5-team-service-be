@@ -24,6 +24,7 @@ class OpenApiConfig {
                         .title("Doktori API")
                         .version("v1")
                         .description("Doktori API 문서"))
+                .addServersItem(devServer)
                 .components(new Components()
                         .addSecuritySchemes(bearerSchemeName,
                                 new SecurityScheme()
