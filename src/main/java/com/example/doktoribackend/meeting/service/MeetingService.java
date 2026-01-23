@@ -114,7 +114,7 @@ public class MeetingService {
                     Book book = resolveBook(bookRequest);
                     LocalDateTime startAt = LocalDateTime.of(round.getDate(), startTime);
                     LocalDateTime endAt = startAt.plusMinutes(durationMinutes);
-                    return MeetingRound.create(meeting, book, (byte) roundNo, startAt, endAt);
+                    return MeetingRound.create(meeting, book, roundNo, startAt, endAt);
                 })
                 .toList();
         meetingRoundRepository.saveAll(rounds);
