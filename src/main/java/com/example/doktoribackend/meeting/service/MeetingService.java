@@ -18,6 +18,7 @@ import com.example.doktoribackend.meeting.repository.MeetingMemberRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
 import com.example.doktoribackend.reading.repository.ReadingGenreRepository;
+import com.example.doktoribackend.s3.ImageUrlResolver;
 import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,7 @@ public class MeetingService {
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
     private final ReadingGenreRepository readingGenreRepository;
+    private final ImageUrlResolver imageUrlResolver;
 
     @Transactional
     public MeetingCreateResponse createMeeting(Long userId, MeetingCreateRequest request) {
@@ -78,11 +80,13 @@ public class MeetingService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
+        String meetingImagePath = request.getMeetingImagePath();
+
         Meeting meeting = Meeting.create(
                 leader,
                 request.getReadingGenreId(),
                 request.getLeaderIntro(),
-                request.getMeetingImagePath(),
+                meetingImagePath,
                 request.getTitle(),
                 request.getDescription(),
                 request.getCapacity(),
@@ -129,10 +133,22 @@ public class MeetingService {
 
         boolean hasNext = results.size() > size;
         List<MeetingListItem> items = hasNext ? results.subList(0, size) : results;
+        List<MeetingListItem> mapped = items.stream()
+                .map(item -> new MeetingListItem(
+                        item.getMeetingId(),
+                        imageUrlResolver.toUrl(item.getMeetingImagePath()),
+                        item.getTitle(),
+                        item.getReadingGenreId(),
+                        item.getLeaderNickname(),
+                        item.getCapacity(),
+                        item.getCurrentMemberCount()
+                ))
+                .toList();
+
         Long nextCursorId = hasNext ? items.get(items.size() - 1).getMeetingId() : null;
 
         PageInfo pageInfo = new PageInfo(nextCursorId, hasNext, size);
-        return new MeetingListResponse(items, pageInfo);
+        return new MeetingListResponse(mapped, pageInfo);
     }
 
     private short resolveDurationMinutes(Short durationMinutes, LocalTime startTime, LocalTime endTime) {

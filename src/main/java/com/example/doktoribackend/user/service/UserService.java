@@ -3,6 +3,8 @@ package com.example.doktoribackend.user.service;
 import com.example.doktoribackend.exception.UserNotFoundException;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.s3.ImageUrlResolver;
+import com.example.doktoribackend.s3.service.FileService;
 import com.example.doktoribackend.user.domain.Gender;
 import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.domain.preference.UserPreference;
@@ -22,13 +24,15 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final UserPreferenceRepository userPreferenceRepository;
+    private final ImageUrlResolver imageUrlResolver;
+    private final FileService fileService;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getMyProfile(Long userId) {
         User user = userRepository.findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(UserNotFoundException::new);
 
-        return UserMapper.toUserProfileResponse(user);
+        return UserMapper.toUserProfileResponse(user, imageUrlResolver);
     }
 
     @Transactional(readOnly = true)
@@ -44,12 +48,16 @@ public class UserService {
         User user = userRepository.findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(UserNotFoundException::new);
 
+        String oldImagePath = user.getProfileImagePath();
+        String newImagePath = request.profileImagePath();
+        fileService.deleteImageIfChanged(oldImagePath, newImagePath);
+
         user.updateNickname(request.nickname());
-        user.updateProfileImage(request.profileImagePath());
+        user.updateProfileImage(newImagePath);
         user.updateLeaderIntro(request.leaderIntro());
         user.updateMemberIntro(request.memberIntro());
 
-        return UserMapper.toUserProfileResponse(user);
+        return UserMapper.toUserProfileResponse(user, imageUrlResolver);
     }
 
     @Transactional
@@ -75,7 +83,7 @@ public class UserService {
             preference.updateRequiredInfo(request.gender(), request.birthYear(), request.notificationAgreement());
         }
         user.completeProfile();
-        return UserMapper.toUserProfileResponse(user);
+        return UserMapper.toUserProfileResponse(user, imageUrlResolver);
     }
 
     @Transactional

@@ -21,6 +21,7 @@ import com.example.doktoribackend.user.repository.UserPreferenceRepository;
 import com.example.doktoribackend.user.repository.UserReadingGenreRepository;
 import com.example.doktoribackend.user.repository.UserReadingPurposeRepository;
 import com.example.doktoribackend.user.repository.UserRepository;
+import com.example.doktoribackend.s3.ImageUrlResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,7 @@ public class OnboardingService {
     private final ReadingGenreRepository readingGenreRepository;
     private final UserReadingPurposeRepository userReadingPurposeRepository;
     private final UserReadingGenreRepository userReadingGenreRepository;
+    private final ImageUrlResolver imageUrlResolver;
 
     @Transactional
     public UserProfileResponse onboard(Long userId, OnboardingRequest request) {
@@ -63,7 +65,7 @@ public class OnboardingService {
 
         user.completeOnboarding();
 
-        return UserMapper.toUserProfileResponse(user);
+        return UserMapper.toUserProfileResponse(user, imageUrlResolver);
     }
 
     private UserPreference resolvePreference(User user) {
