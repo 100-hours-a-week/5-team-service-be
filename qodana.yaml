@@ -27,5 +27,19 @@ exclude:
   - name: Java/Security
   - name: Vulnerable API usage
 
+  - name: All
+    paths:
+      - "build"                   # Gradle 빌드 디렉토리
+      - "**/generated/**"         # 일반적인 generated 소스 폴더
+      - "**/Q*.java"              # QueryDSL 생성 파일 (QMember.java 등)
+      - "src/test/resources"      # 테스트 리소스
+
 # 실패 임계값 설정
+# TODO : 협의 후 심각도 기준 조정
 failThreshold: 100
+
+## 실패 조건 (단순 개수보다 심각도 기준 추천)
+#failureConditions:
+#  severity:
+#    CRITICAL: 0  # Critical 이슈는 즉시 실패
+#    HIGH: 10     # High 이슈는 10개까지 허용 (팀 상황에 맞춰 조절)
