@@ -56,7 +56,11 @@ public enum ErrorCode {
     FILE_SIZE_EXCEEDED(HttpStatus.BAD_REQUEST, "FILE_SIZE_EXCEEDED", "허용된 파일 크기를 초과했습니다."),
     INVALID_FILE_SIZE(HttpStatus.BAD_REQUEST, "INVALID_FILE_SIZE", "파일 크기가 유효하지 않습니다."),
     INVALID_FILE_EXTENSION(HttpStatus.BAD_REQUEST, "INVALID_FILE_EXTENSION", "허용되지 않은 파일 확장자입니다."),
-    CONTENT_TYPE_MISMATCH(HttpStatus.BAD_REQUEST, "CONTENT_TYPE_MISMATCH", "파일 확장자와 콘텐츠 타입이 일치하지 않습니다.");
+    CONTENT_TYPE_MISMATCH(HttpStatus.BAD_REQUEST, "CONTENT_TYPE_MISMATCH", "파일 확장자와 콘텐츠 타입이 일치하지 않습니다."),
+
+    //Meeting
+    MEETING_NOT_FOUND(HttpStatus.NOT_FOUND, "MEETING_NOT_FOUND", "존재하지 않는 모임입니다.")
+    ;
 
 
     private final HttpStatus status;

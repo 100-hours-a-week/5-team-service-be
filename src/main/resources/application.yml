@@ -63,3 +63,9 @@ management:
   endpoint:
     prometheus:
       enabled: true
+
+zoom:
+  account-id: ${ZOOM_ACCOUNT_ID}
+  client-id: ${ZOOM_CLIENT_ID}
+  client-secret: ${ZOOM_CLIENT_SECRET}
+  api-base-url: https://api.zoom.us/v2
