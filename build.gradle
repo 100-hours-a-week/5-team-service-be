@@ -71,12 +71,15 @@ dependencies {
 
     // Google Calendar API
     implementation 'com.google.apis:google-api-services-calendar:v3-rev20220715-2.0.0'
-
-    // Google OAuth 2.0
     implementation 'com.google.auth:google-auth-library-oauth2-http:1.19.0'
-
-    // Google API Client
     implementation 'com.google.api-client:google-api-client:2.2.0'
+
+    // Guava 최신 버전 명시적으로 추가
+    implementation 'com.google.guava:guava:33.0.0-jre'
+
+    // Flyway
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-mysql'
 }
 
 tasks.named('test') {

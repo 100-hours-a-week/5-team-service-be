@@ -61,4 +61,8 @@ public class MeetingRound extends BaseTimeEntity {
                 .endAt(endAt)
                 .build();
     }
+
+    public void updateMeetingLink(String meetingLink) {
+        this.meetingLink = meetingLink;
+    }
 }
