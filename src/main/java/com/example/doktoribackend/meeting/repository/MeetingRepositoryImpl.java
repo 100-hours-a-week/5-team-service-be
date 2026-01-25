@@ -2,7 +2,7 @@ package com.example.doktoribackend.meeting.repository;
 
 import com.example.doktoribackend.meeting.domain.Meeting;
 import com.example.doktoribackend.meeting.domain.MeetingStatus;
-import com.example.doktoribackend.meeting.dto.MeetingListItem;
+import com.example.doktoribackend.meeting.dto.MeetingListRow;
 import com.example.doktoribackend.meeting.dto.MeetingListRequest;
 import com.example.doktoribackend.user.domain.User;
 import jakarta.persistence.EntityManager;
@@ -22,9 +22,9 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
     private EntityManager entityManager;
 
     @Override
-    public List<MeetingListItem> findMeetingList(MeetingListRequest request, int limit) {
+    public List<MeetingListRow> findMeetingList(MeetingListRequest request, int limit) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
-        CriteriaQuery<MeetingListItem> query = cb.createQuery(MeetingListItem.class);
+        CriteriaQuery<MeetingListRow> query = cb.createQuery(MeetingListRow.class);
         Root<Meeting> meeting = query.from(Meeting.class);
         Join<Meeting, User> leader = meeting.join("leaderUser", JoinType.INNER);
 
@@ -58,19 +58,20 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
         }
 
         // Join + projection to avoid N+1 when mapping leader nickname.
-        query.select(cb.construct(MeetingListItem.class,
+        query.select(cb.construct(MeetingListRow.class,
                         meeting.get("id"),
                         meeting.get("meetingImagePath"),
                         meeting.get("title"),
                         meeting.get("readingGenreId"),
                         leader.get("nickname"),
                         meeting.get("capacity"),
-                        meeting.get("currentCount")
+                        meeting.get("currentCount"),
+                        meeting.get("recruitmentDeadline")
                 ))
                 .where(predicates.toArray(new Predicate[0]))
                 .orderBy(cb.desc(meeting.get("id")));
 
-        TypedQuery<MeetingListItem> typedQuery = entityManager.createQuery(query);
+        TypedQuery<MeetingListRow> typedQuery = entityManager.createQuery(query);
         typedQuery.setMaxResults(limit);
         return typedQuery.getResultList();
     }

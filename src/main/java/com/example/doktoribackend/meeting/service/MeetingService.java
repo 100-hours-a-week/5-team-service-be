@@ -10,10 +10,11 @@ import com.example.doktoribackend.meeting.domain.MeetingMember;
 import com.example.doktoribackend.meeting.domain.MeetingRound;
 import com.example.doktoribackend.meeting.dto.MeetingCreateRequest;
 import com.example.doktoribackend.meeting.dto.MeetingCreateResponse;
-import com.example.doktoribackend.meeting.dto.MeetingListItem;
 import com.example.doktoribackend.meeting.dto.MeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MeetingListResponse;
 import com.example.doktoribackend.meeting.dto.PageInfo;
+import com.example.doktoribackend.meeting.dto.MeetingListItem;
+import com.example.doktoribackend.meeting.dto.MeetingListRow;
 import com.example.doktoribackend.meeting.repository.MeetingMemberRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
@@ -129,26 +130,38 @@ public class MeetingService {
     @Transactional(readOnly = true)
     public MeetingListResponse getMeetings(MeetingListRequest request) {
         int size = request.getSizeOrDefault();
-        List<MeetingListItem> results = meetingRepository.findMeetingList(request, size + 1);
+        List<MeetingListRow> results = meetingRepository.findMeetingList(request, size + 1);
 
         boolean hasNext = results.size() > size;
-        List<MeetingListItem> items = hasNext ? results.subList(0, size) : results;
-        List<MeetingListItem> mapped = items.stream()
-                .map(item -> new MeetingListItem(
-                        item.getMeetingId(),
-                        imageUrlResolver.toUrl(item.getMeetingImagePath()),
-                        item.getTitle(),
-                        item.getReadingGenreId(),
-                        item.getLeaderNickname(),
-                        item.getCapacity(),
-                        item.getCurrentMemberCount()
-                ))
+        List<MeetingListRow> sliced = hasNext ? results.subList(0, size) : results;
+        List<MeetingListItem> mapped = sliced.stream()
+                .map(this::toListItem)
                 .toList();
 
-        Long nextCursorId = hasNext ? items.get(items.size() - 1).getMeetingId() : null;
+        Long nextCursorId = hasNext ? mapped.get(mapped.size() - 1).getMeetingId() : null;
 
         PageInfo pageInfo = new PageInfo(nextCursorId, hasNext, size);
         return new MeetingListResponse(mapped, pageInfo);
+    }
+
+    private MeetingListItem toListItem(MeetingListRow row) {
+        Long remainingDays = null;
+        if (row.getRecruitmentDeadline() != null) {
+            remainingDays = java.time.temporal.ChronoUnit.DAYS.between(
+                    java.time.LocalDate.now(),
+                    row.getRecruitmentDeadline()
+            );
+        }
+        return new MeetingListItem(
+                row.getMeetingId(),
+                imageUrlResolver.toUrl(row.getMeetingImagePath()),
+                row.getTitle(),
+                row.getReadingGenreId(),
+                row.getLeaderNickname(),
+                row.getCapacity(),
+                row.getCurrentMemberCount(),
+                remainingDays
+        );
     }
 
     private int resolveDurationMinutes(Integer durationMinutes, LocalTime startTime, LocalTime endTime) {
