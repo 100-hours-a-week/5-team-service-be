@@ -27,6 +27,7 @@ public class ZoomLinkSchedulerService {
 
     private final MeetingRoundRepository meetingRoundRepository;
     private final ZoomService zoomService;
+    private final ZoomLinkUpdateService zoomLinkUpdateService;
 
     private static final int BATCH_SIZE = 10;
     private static final int MAX_RETRY_COUNT = 3;
@@ -40,11 +41,6 @@ public class ZoomLinkSchedulerService {
             MeetingStatus.RECRUITING
     );
 
-    /**
-     * 매 시 20분, 50분에 실행
-     * - 20분 실행 → 30분 시작 모임의 링크 생성
-     * - 50분 실행 → 정각 시작 모임의 링크 생성
-     */
     @Scheduled(cron = "0 20,50 * * * *")
     public void createZoomLinksForUpcomingMeetings() {
         LocalDateTime executionTime = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
@@ -73,14 +69,10 @@ public class ZoomLinkSchedulerService {
             return;
         }
 
-        log.info("[Scheduler] 대상 MeetingRound 조회 완료 - 총 {}건, 대상 시작시간: {}",
-                meetingRoundIds.size(), targetTime);
-
         int totalCount = meetingRoundIds.size();
         int successCount = 0;
         int failCount = 0;
         int processedCount = 0;
-        int batchNumber = 0;
 
         for (int i = 0; i < meetingRoundIds.size(); i += BATCH_SIZE) {
             long elapsedMinutes = Duration.ofMillis(System.currentTimeMillis() - startTimeMillis).toMinutes();
@@ -90,7 +82,6 @@ public class ZoomLinkSchedulerService {
                 break;
             }
 
-            batchNumber++;
             int endIndex = Math.min(i + BATCH_SIZE, meetingRoundIds.size());
             List<Long> batchIds = meetingRoundIds.subList(i, endIndex);
 
@@ -137,10 +128,7 @@ public class ZoomLinkSchedulerService {
 
             try {
                 String joinUrl = zoomService.createMeeting(topic, startAt, MEETING_DURATION_MINUTES);
-                saveMeetingLink(meetingRoundId, joinUrl);
-
-                log.info("[SUCCESS] Zoom 링크 생성 완료 - MeetingRoundId: {}, MeetingId: {}, StartAt: {}, JoinUrl: {}",
-                        meetingRoundId, meetingId, startAt, joinUrl);
+                zoomLinkUpdateService.saveMeetingLink(meetingRoundId, joinUrl);
                 return true;
 
             } catch (ZoomAuthenticationException e) {
@@ -167,15 +155,6 @@ public class ZoomLinkSchedulerService {
                 meetingRoundId, meetingId, startAt, lastError, attemptCount, MAX_RETRY_COUNT);
 
         return false;
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void saveMeetingLink(Long meetingRoundId, String meetingLink) {
-        MeetingRound meetingRound = meetingRoundRepository.findById(meetingRoundId).orElseThrow(
-                ()->new BusinessException(ErrorCode.MEETING_NOT_FOUND));
-
-        meetingRound.updateMeetingLink(meetingLink);
-        meetingRoundRepository.save(meetingRound);
     }
 
     private long calculateRetryDelay(int retry) {
