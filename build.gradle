@@ -76,6 +76,10 @@ dependencies {
 
     // Guava 최신 버전 명시적으로 추가
     implementation 'com.google.guava:guava:33.0.0-jre'
+
+    // Flyway
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-mysql'
 }
 
 tasks.named('test') {
