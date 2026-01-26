@@ -65,4 +65,9 @@ public class MeetingRound extends BaseTimeEntity {
     public void updateMeetingLink(String meetingLink) {
         this.meetingLink = meetingLink;
     }
+
+    // 양방향 관계 설정을 위한 메서드
+    public void setMeeting(Meeting meeting) {
+        this.meeting = meeting;
+    }
 }
