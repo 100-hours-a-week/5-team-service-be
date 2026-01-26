@@ -60,6 +60,10 @@ public enum ErrorCode {
 
     //Meeting
     MEETING_NOT_FOUND(HttpStatus.NOT_FOUND, "MEETING_NOT_FOUND", "존재하지 않는 모임입니다."),
+    JOIN_REQUEST_ALREADY_EXISTS(HttpStatus.CONFLICT, "JOIN_REQUEST_ALREADY_EXISTS", "이미 참여 요청이 접수된 모임입니다."),
+    JOIN_REQUEST_BLOCKED(HttpStatus.FORBIDDEN, "JOIN_REQUEST_BLOCKED", "해당 모임에 참여할 수 없습니다."),
+    RECRUITMENT_CLOSED(HttpStatus.CONFLICT, "RECRUITMENT_CLOSED", "모집이 마감된 모임입니다."),
+    CAPACITY_FULL(HttpStatus.CONFLICT, "CAPACITY_FULL", "모집 정원이 가득 찼습니다."),
 
     // Notification
     NOTIFICATION_TYPE_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION_TYPE_NOT_FOUND", "알림 유형을 찾을 수 없습니다."),
