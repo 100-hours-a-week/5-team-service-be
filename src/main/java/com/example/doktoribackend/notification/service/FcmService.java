@@ -79,7 +79,7 @@ public class FcmService {
         try {
             firebaseMessaging.send(message);
         } catch (FirebaseMessagingException e) {
-            log.error("Failed to send FCM message to token: {}", token, e);
+            log.error("Failed to send FCM message", e);
         }
     }
 
