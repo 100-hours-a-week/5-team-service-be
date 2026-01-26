@@ -20,7 +20,7 @@ bin/
 # secrets
 **/application-secret.yml
 .env
-**/src/main/resources/google-service-account.json
+**/src/main/resources/firebase-service-account.json
 
 ### IntelliJ IDEA ###
 .idea

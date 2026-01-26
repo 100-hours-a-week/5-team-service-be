@@ -59,8 +59,11 @@ public enum ErrorCode {
     CONTENT_TYPE_MISMATCH(HttpStatus.BAD_REQUEST, "CONTENT_TYPE_MISMATCH", "파일 확장자와 콘텐츠 타입이 일치하지 않습니다."),
 
     //Meeting
-    MEETING_NOT_FOUND(HttpStatus.NOT_FOUND, "MEETING_NOT_FOUND", "존재하지 않는 모임입니다.")
-    ;
+    MEETING_NOT_FOUND(HttpStatus.NOT_FOUND, "MEETING_NOT_FOUND", "존재하지 않는 모임입니다."),
+
+    // Notification
+    NOTIFICATION_TYPE_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION_TYPE_NOT_FOUND", "알림 유형을 찾을 수 없습니다."),
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION_NOT_FOUND", "알림을 찾을 수 없습니다.");
 
 
     private final HttpStatus status;
