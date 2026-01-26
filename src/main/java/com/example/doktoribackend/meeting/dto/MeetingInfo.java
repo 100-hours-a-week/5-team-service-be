@@ -13,7 +13,7 @@ import java.time.LocalDate;
 public class MeetingInfo {
     private Long meetingId;
 
-    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, timezone = "UTC")
     private Instant createdAt;
 
     private String status;
