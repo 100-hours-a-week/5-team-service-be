@@ -310,5 +310,64 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
         return typedQuery.getResultList();
     }
 
+    @Override
+    public List<MeetingListRow> findMyTodayMeetings(Long userId, java.time.LocalDate today) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<MeetingListRow> query = cb.createQuery(MeetingListRow.class);
+        Root<Meeting> meeting = query.from(Meeting.class);
+        Join<Meeting, User> leader = meeting.join("leaderUser", JoinType.INNER);
+
+        // MeetingMember 서브쿼리: 나의 모임 (APPROVED + PENDING)
+        Subquery<Long> memberSubquery = query.subquery(Long.class);
+        Root<com.example.doktoribackend.meeting.domain.MeetingMember> memberRoot = 
+                memberSubquery.from(com.example.doktoribackend.meeting.domain.MeetingMember.class);
+        
+        memberSubquery.select(memberRoot.get("meeting").get("id"))
+                .where(
+                        cb.equal(memberRoot.get("user").get("id"), userId),
+                        cb.or(
+                                cb.equal(memberRoot.get("status"), 
+                                        com.example.doktoribackend.meeting.domain.MeetingMemberStatus.APPROVED),
+                                cb.equal(memberRoot.get("status"), 
+                                        com.example.doktoribackend.meeting.domain.MeetingMemberStatus.PENDING)
+                        )
+                );
+
+        // MeetingRound 서브쿼리: 오늘 날짜의 회차가 있는 모임
+        Subquery<Long> todayRoundSubquery = query.subquery(Long.class);
+        Root<MeetingRound> roundRoot = todayRoundSubquery.from(MeetingRound.class);
+        
+        todayRoundSubquery.select(roundRoot.get("meeting").get("id"))
+                .where(
+                        cb.equal(cb.function("DATE", java.time.LocalDate.class, roundRoot.get("startAt")), today)
+                );
+
+        List<Predicate> predicates = new ArrayList<>();
+        predicates.add(cb.isNull(meeting.get("deletedAt")));
+        predicates.add(meeting.get("id").in(memberSubquery));
+        predicates.add(meeting.get("id").in(todayRoundSubquery));
+        
+        // ACTIVE만 (RECRUITING, FINISHED)
+        predicates.add(cb.or(
+                cb.equal(meeting.get("status"), MeetingStatus.RECRUITING),
+                cb.equal(meeting.get("status"), MeetingStatus.FINISHED)
+        ));
+
+        query.select(cb.construct(MeetingListRow.class,
+                        meeting.get("id"),
+                        meeting.get("meetingImagePath"),
+                        meeting.get("title"),
+                        meeting.get("readingGenreId"),
+                        leader.get("nickname"),
+                        meeting.get("capacity"),
+                        meeting.get("currentCount"),
+                        meeting.get("recruitmentDeadline")
+                ))
+                .where(predicates.toArray(new Predicate[0]))
+                .orderBy(cb.desc(meeting.get("id")));
+
+        return entityManager.createQuery(query).getResultList();
+    }
+
     
 }
