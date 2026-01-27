@@ -144,7 +144,7 @@ public class MeetingCreateRequest {
 
         @NotNull
         @JsonDeserialize(using = FlexibleLocalDateDeserializer.class)
-        @Schema(example = "2026/01/12")
+        @Schema(example = "2026-01-12")
         private LocalDate date;
     }
 

@@ -14,8 +14,7 @@ import java.util.List;
 public class FlexibleLocalDateDeserializer extends JsonDeserializer<LocalDate> {
 
     private static final List<DateTimeFormatter> FORMATTERS = List.of(
-            DateTimeFormatter.ISO_LOCAL_DATE,
-            DateTimeFormatter.ofPattern("yyyy/MM/dd")
+            DateTimeFormatter.ISO_LOCAL_DATE
     );
 
     @Override

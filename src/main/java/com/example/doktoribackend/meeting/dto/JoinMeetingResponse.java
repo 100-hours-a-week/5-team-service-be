@@ -14,7 +14,7 @@ public class JoinMeetingResponse {
     private Long meetingId;
     private String status;
 
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ssXXX", timezone = "Asia/Seoul")
+    @JsonFormat(pattern = "yyyy-MM-dd")
     private Instant requestedAt;
 
     public static JoinMeetingResponse from(MeetingMember member) {
