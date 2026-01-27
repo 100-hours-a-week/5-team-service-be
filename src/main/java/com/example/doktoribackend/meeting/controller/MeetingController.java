@@ -9,6 +9,7 @@ import com.example.doktoribackend.meeting.dto.MeetingDetailResponse;
 import com.example.doktoribackend.meeting.dto.JoinMeetingResponse;
 import com.example.doktoribackend.meeting.dto.MeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MeetingListResponse;
+import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
 import com.example.doktoribackend.meeting.service.MeetingService;
 import com.example.doktoribackend.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -310,5 +311,52 @@ public class MeetingController {
                 .toUri();
         return ResponseEntity.created(location)
                 .body(ApiResult.ok(response));
+    }
+
+    @Operation(summary = "모임 검색", description = "책 제목 또는 모임 제목으로 모임을 검색합니다. 책 제목 매칭이 우선이며, RECRUITING 상태가 먼저 표시됩니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResult.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "OK",
+                                      "message": "요청이 성공적으로 처리되었습니다.",
+                                      "data": {
+                                        "items": [
+                                          {
+                                            "meetingId": 101,
+                                            "meetingImagePath": "https://cdn.example.com/meetings/101.jpg",
+                                            "title": "함께 읽는 에세이 모임",
+                                            "readingGenreId": 1,
+                                            "leaderNickname": "startup",
+                                            "capacity": 8,
+                                            "currentMemberCount": 5,
+                                            "remainingDays": 4
+                                          }
+                                        ],
+                                        "pageInfo": {
+                                          "nextCursorId": 150,
+                                          "hasNext": true,
+                                          "size": 10
+                                        }
+                                      }
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "400", description = "Bad Request",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "INVALID_REQUEST",
+                                      "message": "올바르지 않은 요청입니다."
+                                    }
+                                    """)))
+    })
+    @GetMapping("/search")
+    public ResponseEntity<ApiResult<MeetingListResponse>> searchMeetings(
+            @Valid @ModelAttribute MeetingSearchRequest request
+    ) {
+        MeetingListResponse response = meetingService.searchMeetings(request);
+        return ResponseEntity.ok(ApiResult.ok(response));
     }
 }
