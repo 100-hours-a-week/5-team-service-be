@@ -52,14 +52,23 @@ public class BookReport extends BaseTimeEntity {
         return bookReport;
     }
 
-    public void resubmit(String content) {
-        this.content = content;
-        this.status = BookReportStatus.PENDING_REVIEW;
-        this.rejectionReason = null;
-        this.aiValidatedAt = null;
-    }
-
     public boolean isResubmittable() {
         return this.status == BookReportStatus.REJECTED;
+    }
+
+    public void approve() {
+        this.status = BookReportStatus.APPROVED;
+        this.aiValidatedAt = LocalDateTime.now();
+        this.rejectionReason = null;
+    }
+
+    public void reject(String rejectionReason) {
+        this.status = BookReportStatus.REJECTED;
+        this.aiValidatedAt = LocalDateTime.now();
+        this.rejectionReason = rejectionReason;
+    }
+
+    public void softDelete() {
+        this.deletedAt = LocalDateTime.now();
     }
 }
