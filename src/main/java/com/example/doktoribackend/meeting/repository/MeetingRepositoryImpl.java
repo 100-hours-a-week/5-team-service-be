@@ -249,5 +249,66 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
                 .otherwise(1);
     }
 
+    @Override
+    public List<MeetingListRow> findMyMeetings(Long userId, Long cursorId, boolean activeOnly, int limit) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<MeetingListRow> query = cb.createQuery(MeetingListRow.class);
+        Root<Meeting> meeting = query.from(Meeting.class);
+        Join<Meeting, User> leader = meeting.join("leaderUser", JoinType.INNER);
+
+        // MeetingMember 서브쿼리로 나의 모임만 필터링
+        Subquery<Long> memberSubquery = query.subquery(Long.class);
+        Root<com.example.doktoribackend.meeting.domain.MeetingMember> memberRoot = 
+                memberSubquery.from(com.example.doktoribackend.meeting.domain.MeetingMember.class);
+        
+        // APPROVED와 PENDING 모두 포함
+        memberSubquery.select(memberRoot.get("meeting").get("id"))
+                .where(
+                        cb.equal(memberRoot.get("user").get("id"), userId),
+                        cb.or(
+                                cb.equal(memberRoot.get("status"), 
+                                        com.example.doktoribackend.meeting.domain.MeetingMemberStatus.APPROVED),
+                                cb.equal(memberRoot.get("status"), 
+                                        com.example.doktoribackend.meeting.domain.MeetingMemberStatus.PENDING)
+                        )
+                );
+
+        List<Predicate> predicates = new ArrayList<>();
+        predicates.add(cb.isNull(meeting.get("deletedAt")));
+        predicates.add(meeting.get("id").in(memberSubquery));
+
+        // status=ACTIVE 필터: RECRUITING or FINISHED
+        if (activeOnly) {
+            predicates.add(cb.or(
+                    cb.equal(meeting.get("status"), MeetingStatus.RECRUITING),
+                    cb.equal(meeting.get("status"), MeetingStatus.FINISHED)
+            ));
+        } else {
+            // status=INACTIVE 필터: CANCELED
+            predicates.add(cb.equal(meeting.get("status"), MeetingStatus.CANCELED));
+        }
+
+        if (cursorId != null) {
+            predicates.add(cb.lt(meeting.get("id"), cursorId));
+        }
+
+        query.select(cb.construct(MeetingListRow.class,
+                        meeting.get("id"),
+                        meeting.get("meetingImagePath"),
+                        meeting.get("title"),
+                        meeting.get("readingGenreId"),
+                        leader.get("nickname"),
+                        meeting.get("capacity"),
+                        meeting.get("currentCount"),
+                        meeting.get("recruitmentDeadline")
+                ))
+                .where(predicates.toArray(new Predicate[0]))
+                .orderBy(cb.desc(meeting.get("id")));
+
+        TypedQuery<MeetingListRow> typedQuery = entityManager.createQuery(query);
+        typedQuery.setMaxResults(limit);
+        return typedQuery.getResultList();
+    }
+
     
 }

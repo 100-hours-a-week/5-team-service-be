@@ -33,6 +33,13 @@ public interface MeetingRoundRepository extends JpaRepository<MeetingRound, Long
             "AND m.status IN ('RECRUITING', 'FINISHED')")
     List<MeetingRound> findRoundsStartingAt(@Param("targetTime") LocalDateTime targetTime);
 
+
+    @Query("SELECT mr FROM MeetingRound mr " +
+           "JOIN FETCH mr.book " +
+           "WHERE mr.meeting.id = :meetingId " +
+           "ORDER BY mr.roundNo ASC")
+    List<MeetingRound> findByMeetingIdWithBook(@Param("meetingId") Long meetingId);
+
     @Query("SELECT mr FROM MeetingRound mr " +
             "WHERE mr.meeting.id = :meetingId " +
             "AND mr.roundNo = :roundNo")
@@ -41,10 +48,10 @@ public interface MeetingRoundRepository extends JpaRepository<MeetingRound, Long
             @Param("roundNo") Integer roundNo
     );
 
-    @Query("SELECT mr FROM MeetingRound mr " +
-           "JOIN FETCH mr.book " +
+    // 나의 모임 리스트: 다음 회차 날짜 조회
+    @Query("SELECT mr.startAt FROM MeetingRound mr " +
            "WHERE mr.meeting.id = :meetingId " +
-           "ORDER BY mr.roundNo ASC")
-    List<MeetingRound> findByMeetingIdWithBook(@Param("meetingId") Long meetingId);
-
+           "AND mr.startAt >= :now " +
+           "ORDER BY mr.startAt ASC")
+    List<LocalDateTime> findNextRoundDate(@Param("meetingId") Long meetingId, @Param("now") LocalDateTime now);
 }

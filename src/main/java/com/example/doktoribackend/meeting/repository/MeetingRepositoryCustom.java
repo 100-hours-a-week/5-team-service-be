@@ -9,4 +9,5 @@ import java.util.List;
 public interface MeetingRepositoryCustom {
     List<MeetingListRow> findMeetingList(MeetingListRequest request, int limit);
     List<MeetingListRow> searchMeetings(MeetingSearchRequest request, int limit);
+    List<MeetingListRow> findMyMeetings(Long userId, Long cursorId, boolean activeOnly, int limit);
 }
