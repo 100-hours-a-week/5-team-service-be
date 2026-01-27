@@ -36,6 +36,9 @@ jobs:
         with:
           results-dir: ${{ runner.temp }}/qodana-results
           upload-result: true
+          cache-default-branch-only: false
+          primary-cache-key: qodana-${{ hashFiles('build.gradle', 'settings.gradle', 'gradle.properties') }}
+          additional-cache-key: qodana-base
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
 
@@ -60,6 +63,7 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+          cache: gradle
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -68,7 +72,7 @@ jobs:
           config-file: ./.github/codeql/codeql-config.yml
 
       - name: Build with Gradle
-        run: chmod +x ./gradlew && ./gradlew build -x test --no-daemon
+        run: chmod +x ./gradlew && ./gradlew build -x test --no-daemon --build-cache --scan
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4

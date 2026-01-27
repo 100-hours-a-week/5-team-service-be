@@ -266,6 +266,22 @@ public class MeetingService {
         return new MyMeetingListResponse(mapped, pageInfo);
     }
 
+    @Transactional(readOnly = true)
+    public MyMeetingListResponse getMyTodayMeetings(Long userId) {
+        LocalDate today = LocalDate.now();
+        List<MeetingListRow> results = meetingRepository.findMyTodayMeetings(userId, today);
+        
+        LocalDateTime now = LocalDateTime.now();
+        List<MyMeetingItem> mapped = results.stream()
+                .map(row -> toMyMeetingItem(row, now))
+                .toList();
+
+        // 페이징 없음
+        PageInfo pageInfo = new PageInfo(null, false, 10);
+        
+        return new MyMeetingListResponse(mapped, pageInfo);
+    }
+
     private MyMeetingItem toMyMeetingItem(MeetingListRow row, LocalDateTime now) {
         // Meeting 조회 (currentRound 필요)
         Meeting meeting = meetingRepository.findById(row.getMeetingId())
