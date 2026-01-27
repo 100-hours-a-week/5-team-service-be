@@ -184,4 +184,55 @@ public class UserController {
         MyMeetingListResponse response = meetingService.getMyMeetings(userDetails.getId(), request);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
+
+    @Operation(summary = "나의 오늘 모임 조회", description = "로그인 사용자의 오늘 진행되는 모임 목록을 조회합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResult.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "OK",
+                                      "message": "요청이 성공적으로 처리되었습니다.",
+                                      "data": {
+                                        "items": [
+                                          {
+                                            "meetingId": 1,
+                                            "meetingImagePath": "https://image.kr/meeting/1.jpg",
+                                            "title": "함께 읽는 에세이 모임",
+                                            "readingGenreId": 1,
+                                            "leaderNickname": "startup",
+                                            "currentRound": 2,
+                                            "meetingDate": "2026-01-27"
+                                          }
+                                        ],
+                                        "pageInfo": {
+                                          "nextCursorId": null,
+                                          "hasNext": false,
+                                          "size": 10
+                                        }
+                                      }
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "AUTH_UNAUTHORIZED",
+                                      "message": "인증이 필요합니다."
+                                    }
+                                    """)))
+    })
+    @GetMapping("/me/meetings/today")
+    public ResponseEntity<ApiResult<MyMeetingListResponse>> getMyTodayMeetings(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        // 인증 확인
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        MyMeetingListResponse response = meetingService.getMyTodayMeetings(userDetails.getId());
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
 }
