@@ -36,6 +36,7 @@ jobs:
         with:
           results-dir: ${{ runner.temp }}/qodana-results
           upload-result: true
+          cache-default-branch-only: false
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
 
@@ -60,6 +61,7 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+          cache: gradle
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
