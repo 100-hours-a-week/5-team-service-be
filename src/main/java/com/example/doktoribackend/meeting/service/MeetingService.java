@@ -16,6 +16,7 @@ import com.example.doktoribackend.meeting.dto.MeetingDetailResponse;
 import com.example.doktoribackend.meeting.dto.JoinMeetingResponse;
 import com.example.doktoribackend.meeting.dto.MeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MeetingListResponse;
+import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
 import com.example.doktoribackend.meeting.dto.PageInfo;
 import com.example.doktoribackend.meeting.dto.MeetingListItem;
 import com.example.doktoribackend.meeting.dto.MeetingListRow;
@@ -217,6 +218,23 @@ public class MeetingService {
 
         // 7. 응답 반환
         return JoinMeetingResponse.from(member);
+    }
+
+    @Transactional(readOnly = true)
+    public MeetingListResponse searchMeetings(MeetingSearchRequest request) {
+        int size = request.getSizeOrDefault();
+        List<MeetingListRow> results = meetingRepository.searchMeetings(request, size + 1);
+
+        boolean hasNext = results.size() > size;
+        List<MeetingListRow> sliced = hasNext ? results.subList(0, size) : results;
+        List<MeetingListItem> mapped = sliced.stream()
+                .map(this::toListItem)
+                .toList();
+
+        Long nextCursorId = hasNext ? mapped.get(mapped.size() - 1).getMeetingId() : null;
+
+        PageInfo pageInfo = new PageInfo(nextCursorId, hasNext, size);
+        return new MeetingListResponse(mapped, pageInfo);
     }
 
     private MeetingListItem toListItem(MeetingListRow row) {
