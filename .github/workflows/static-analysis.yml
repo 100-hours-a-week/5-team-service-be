@@ -70,7 +70,7 @@ jobs:
           config-file: ./.github/codeql/codeql-config.yml
 
       - name: Build with Gradle
-        run: chmod +x ./gradlew && ./gradlew build -x test --no-daemon
+        run: chmod +x ./gradlew && ./gradlew build -x test --no-daemon --build-cache --scan
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
