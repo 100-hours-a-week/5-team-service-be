@@ -62,4 +62,14 @@ public class MeetingMember extends BaseTimeEntity {
                 .approvedAt(approvedAt)
                 .build();
     }
+
+    public static MeetingMember createParticipant(Meeting meeting, User user) {
+        return MeetingMember.builder()
+                .meeting(meeting)
+                .user(user)
+                .role(MeetingMemberRole.MEMBER)
+                .status(MeetingMemberStatus.PENDING)
+                .memberIntro(user.getMemberIntro())
+                .build();
+    }
 }

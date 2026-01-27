@@ -1,9 +1,12 @@
 package com.example.doktoribackend.meeting.repository;
 
 import com.example.doktoribackend.meeting.domain.Meeting;
+import com.example.doktoribackend.meeting.domain.MeetingRound;
 import com.example.doktoribackend.meeting.domain.MeetingStatus;
-import com.example.doktoribackend.meeting.dto.MeetingListItem;
+import com.example.doktoribackend.meeting.dto.MeetingListRow;
 import com.example.doktoribackend.meeting.dto.MeetingListRequest;
+import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
+import com.example.doktoribackend.book.domain.Book;
 import com.example.doktoribackend.user.domain.User;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -22,9 +25,9 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
     private EntityManager entityManager;
 
     @Override
-    public List<MeetingListItem> findMeetingList(MeetingListRequest request, int limit) {
+    public List<MeetingListRow> findMeetingList(MeetingListRequest request, int limit) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
-        CriteriaQuery<MeetingListItem> query = cb.createQuery(MeetingListItem.class);
+        CriteriaQuery<MeetingListRow> query = cb.createQuery(MeetingListRow.class);
         Root<Meeting> meeting = query.from(Meeting.class);
         Join<Meeting, User> leader = meeting.join("leaderUser", JoinType.INNER);
 
@@ -58,19 +61,20 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
         }
 
         // Join + projection to avoid N+1 when mapping leader nickname.
-        query.select(cb.construct(MeetingListItem.class,
+        query.select(cb.construct(MeetingListRow.class,
                         meeting.get("id"),
                         meeting.get("meetingImagePath"),
                         meeting.get("title"),
                         meeting.get("readingGenreId"),
                         leader.get("nickname"),
                         meeting.get("capacity"),
-                        meeting.get("currentCount")
+                        meeting.get("currentCount"),
+                        meeting.get("recruitmentDeadline")
                 ))
                 .where(predicates.toArray(new Predicate[0]))
                 .orderBy(cb.desc(meeting.get("id")));
 
-        TypedQuery<MeetingListItem> typedQuery = entityManager.createQuery(query);
+        TypedQuery<MeetingListRow> typedQuery = entityManager.createQuery(query);
         typedQuery.setMaxResults(limit);
         return typedQuery.getResultList();
     }
@@ -117,6 +121,132 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
             return null;
         }
         return null;
+    }
+
+    @Override
+    public List<MeetingListRow> searchMeetings(MeetingSearchRequest request, int limit) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<MeetingListRow> query = cb.createQuery(MeetingListRow.class);
+        Root<Meeting> meeting = query.from(Meeting.class);
+        Join<Meeting, User> leader = meeting.join("leaderUser", JoinType.INNER);
+
+        // 기본 조건
+        List<Predicate> predicates = new ArrayList<>();
+        predicates.add(cb.isNull(meeting.get("deletedAt")));
+
+        // 검색 조건: 책 제목 OR 모임 제목
+        Predicate searchCondition = buildSearchCondition(cb, query, meeting, request.getKeywordTrimmed());
+        if (searchCondition != null) {
+            predicates.add(searchCondition);
+        }
+
+        // 기존 필터 조건들
+        if (request.getCursorId() != null) {
+            predicates.add(cb.lt(meeting.get("id"), request.getCursorId()));
+        }
+        if (request.getReadingGenreId() != null) {
+            predicates.add(cb.equal(meeting.get("readingGenreId"), request.getReadingGenreId()));
+        }
+        if (request.getDayOfWeek() != null && !request.getDayOfWeek().isEmpty()) {
+            predicates.add(meeting.get("dayOfWeek").in(request.getDayOfWeek()));
+        }
+        if (request.getRoundCount() != null) {
+            int roundCount = request.getRoundCount();
+            if (roundCount == 1) {
+                predicates.add(cb.equal(meeting.get("roundCount"), 1));
+            } else if (roundCount == 3) {
+                predicates.add(cb.between(meeting.get("roundCount"), 3, 4));
+            } else if (roundCount == 5) {
+                predicates.add(cb.between(meeting.get("roundCount"), 5, 8));
+            }
+        }
+
+        Predicate startTimePredicate = buildStartTimePredicate(cb, meeting, request.getStartTimeFrom());
+        if (startTimePredicate != null) {
+            predicates.add(startTimePredicate);
+        }
+
+        query.select(cb.construct(MeetingListRow.class,
+                        meeting.get("id"),
+                        meeting.get("meetingImagePath"),
+                        meeting.get("title"),
+                        meeting.get("readingGenreId"),
+                        leader.get("nickname"),
+                        meeting.get("capacity"),
+                        meeting.get("currentCount"),
+                        meeting.get("recruitmentDeadline")
+                ))
+                .where(predicates.toArray(new Predicate[0]))
+                .orderBy(
+                        // 책 제목 매칭 우선
+                        cb.asc(buildBookTitleMatchOrder(cb, query, meeting, request.getKeywordTrimmed())),
+                        // RECRUITING 우선
+                        cb.asc(cb.selectCase()
+                                .when(cb.equal(meeting.get("status"), MeetingStatus.RECRUITING), 0)
+                                .otherwise(1)),
+                        // 최신순
+                        cb.desc(meeting.get("createdAt")),
+                        cb.desc(meeting.get("id"))
+                );
+
+        TypedQuery<MeetingListRow> typedQuery = entityManager.createQuery(query);
+        typedQuery.setMaxResults(limit);
+        return typedQuery.getResultList();
+    }
+
+    private Predicate buildSearchCondition(
+            CriteriaBuilder cb,
+            CriteriaQuery<?> query,
+            Root<Meeting> meeting,
+            String keyword
+    ) {
+        if (keyword == null || keyword.isEmpty()) {
+            return null;
+        }
+
+        // 서브쿼리: 책 제목 검색
+        Subquery<Long> bookTitleSubquery = query.subquery(Long.class);
+        Root<MeetingRound> round = bookTitleSubquery.from(MeetingRound.class);
+        Join<MeetingRound, Book> book = round.join("book", JoinType.INNER);
+        
+        bookTitleSubquery.select(cb.literal(1L))
+                .where(
+                        cb.equal(round.get("meeting"), meeting),
+                        cb.like(cb.lower(book.get("title")), "%" + keyword.toLowerCase() + "%")
+                );
+
+        // 모임 제목 검색
+        Predicate meetingTitleMatch = cb.like(cb.lower(meeting.get("title")), "%" + keyword.toLowerCase() + "%");
+
+        // OR 조건
+        return cb.or(cb.exists(bookTitleSubquery), meetingTitleMatch);
+    }
+
+    private Expression<Integer> buildBookTitleMatchOrder(
+            CriteriaBuilder cb,
+            CriteriaQuery<?> query,
+            Root<Meeting> meeting,
+            String keyword
+    ) {
+        if (keyword == null || keyword.isEmpty()) {
+            return cb.literal(1);
+        }
+
+        // 서브쿼리: 책 제목 매칭 여부
+        Subquery<Long> bookTitleSubquery = query.subquery(Long.class);
+        Root<MeetingRound> round = bookTitleSubquery.from(MeetingRound.class);
+        Join<MeetingRound, Book> book = round.join("book", JoinType.INNER);
+        
+        bookTitleSubquery.select(cb.literal(1L))
+                .where(
+                        cb.equal(round.get("meeting"), meeting),
+                        cb.like(cb.lower(book.get("title")), "%" + keyword.toLowerCase() + "%")
+                );
+
+        // 책 제목 매칭이면 0, 아니면 1
+        return cb.<Integer>selectCase()
+                .when(cb.exists(bookTitleSubquery), 0)
+                .otherwise(1);
     }
 
     

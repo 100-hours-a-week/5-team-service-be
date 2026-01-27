@@ -8,6 +8,8 @@ import lombok.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "meetings", indexes = {
@@ -78,6 +80,11 @@ public class Meeting extends BaseTimeEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @OneToMany(mappedBy = "meeting", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("roundNo ASC")
+    @Builder.Default
+    private List<MeetingRound> meetingRounds = new ArrayList<>();
+
     public static Meeting create(
             User leaderUser,
             Long readingGenreId,
@@ -112,5 +119,16 @@ public class Meeting extends BaseTimeEntity {
                 .firstRoundAt(firstRoundAt)
                 .recruitmentDeadline(recruitmentDeadline)
                 .build();
+    }
+
+    // 양방향 관계 편의 메서드
+    public void addRound(MeetingRound round) {
+        meetingRounds.add(round);
+        round.setMeeting(this);
+    }
+
+    public void removeRound(MeetingRound round) {
+        meetingRounds.remove(round);
+        round.setMeeting(null);
     }
 }

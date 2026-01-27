@@ -3,9 +3,11 @@ package com.example.doktoribackend.meeting.dto;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+import java.time.LocalDate;
+
 @Getter
 @AllArgsConstructor
-public class MeetingListItem {
+public class MeetingListRow {
     private final Long meetingId;
     private final String meetingImagePath;
     private final String title;
@@ -13,5 +15,5 @@ public class MeetingListItem {
     private final String leaderNickname;
     private final Integer capacity;
     private final Integer currentMemberCount;
-    private final Long remainingDays;
+    private final LocalDate recruitmentDeadline;
 }
