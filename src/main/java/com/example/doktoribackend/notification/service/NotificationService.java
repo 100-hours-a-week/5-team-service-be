@@ -2,6 +2,7 @@ package com.example.doktoribackend.notification.service;
 
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.exception.UserNotFoundException;
 import com.example.doktoribackend.notification.domain.Notification;
 import com.example.doktoribackend.notification.domain.NotificationType;
 import com.example.doktoribackend.notification.domain.NotificationTypeCode;
@@ -43,7 +44,7 @@ public class NotificationService {
             Map<String, String> parameters
     ) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+                .orElseThrow(UserNotFoundException::new);
 
         NotificationType type = notificationTypeRepository.findByCodeAndDeletedAtIsNull(typeCode)
                 .orElseThrow(NotificationTypeNotFoundException::new);
