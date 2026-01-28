@@ -41,7 +41,7 @@ public class AiValidationService {
         );
 
         webClient.post()
-                .uri(aiValidationBaseUrl + "/api/book-reports/{id}/validate", bookReportId)
+                .uri(aiValidationBaseUrl + "/book-reports/{id}/validate", bookReportId)
                 .header("x-api-key", apiKey)
                 .bodyValue(request)
                 .retrieve()
