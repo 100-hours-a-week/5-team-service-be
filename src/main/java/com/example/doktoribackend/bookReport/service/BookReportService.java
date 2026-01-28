@@ -8,6 +8,7 @@ import com.example.doktoribackend.bookReport.repository.BookReportRepository;
 import com.example.doktoribackend.book.domain.Book;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.exception.UserNotFoundException;
 import com.example.doktoribackend.meeting.domain.MeetingMemberStatus;
 import com.example.doktoribackend.meeting.domain.MeetingRound;
 import com.example.doktoribackend.meeting.repository.MeetingMemberRepository;
@@ -37,7 +38,7 @@ public class BookReportService {
     @Transactional
     public BookReportCreateResponse createBookReport(Long userId, Long roundId, BookReportCreateRequest request) {
         User user = userRepository.findByIdAndDeletedAtIsNull(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+                .orElseThrow(UserNotFoundException::new);
 
         MeetingRound meetingRound = meetingRoundRepository.findById(roundId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ROUND_NOT_FOUND));

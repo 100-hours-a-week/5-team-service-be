@@ -25,8 +25,11 @@ public class AiValidationService {
     private final BookReportRepository bookReportRepository;
     private final PlatformTransactionManager transactionManager;
 
-    @Value("${ai.validation.base-url}")
+    @Value("${ai.base-url}")
     private String aiValidationBaseUrl;
+
+    @Value("${ai.api-key}")
+    private String apiKey;
 
     private static final Duration TIMEOUT = Duration.ofSeconds(60);
     private static final int MAX_RETRY = 3;
@@ -39,6 +42,7 @@ public class AiValidationService {
 
         webClient.post()
                 .uri(aiValidationBaseUrl + "/api/book-reports/{id}/validate", bookReportId)
+                .header("x-api-key", apiKey)
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(AiValidationResponse.class)

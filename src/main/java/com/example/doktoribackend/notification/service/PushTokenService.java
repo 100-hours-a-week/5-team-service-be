@@ -1,7 +1,6 @@
 package com.example.doktoribackend.notification.service;
 
-import com.example.doktoribackend.common.error.ErrorCode;
-import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.exception.UserNotFoundException;
 import com.example.doktoribackend.notification.domain.Platform;
 import com.example.doktoribackend.notification.domain.PushProvider;
 import com.example.doktoribackend.notification.domain.UserPushToken;
@@ -24,7 +23,7 @@ public class PushTokenService {
     @Transactional
     public void registerToken(Long userId, String token, Platform platform) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+                .orElseThrow(UserNotFoundException::new);
 
         Optional<UserPushToken> existingToken = userPushTokenRepository.findByToken(token);
         if (existingToken.isPresent() && !existingToken.get().getUserId().equals(userId)) {
