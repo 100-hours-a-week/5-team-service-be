@@ -5,6 +5,7 @@ import com.example.doktoribackend.common.response.ApiResult;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.meeting.dto.MyMeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MyMeetingListResponse;
+import com.example.doktoribackend.meeting.dto.MyMeetingDetailResponse;
 import com.example.doktoribackend.meeting.service.MeetingService;
 import com.example.doktoribackend.security.CustomUserDetails;
 import com.example.doktoribackend.user.dto.NotificationAgreementRequest;
@@ -26,12 +27,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
 
 @Tag(name = "User", description = "사용자 API")
 @RestController
@@ -233,6 +230,45 @@ public class UserController {
         }
 
         MyMeetingListResponse response = meetingService.getMyTodayMeetings(userDetails.getId());
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Operation(summary = "나의 모임 상세 조회", description = "로그인 사용자가 참여 중인 모임의 상세 정보를 조회합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "AUTH_UNAUTHORIZED",
+                                      "message": "인증이 필요합니다."
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "404", description = "Not Found",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "MEETING_NOT_FOUND",
+                                      "message": "존재하지 않는 모임입니다."
+                                    }
+                                    """)))
+    })
+    @GetMapping("/me/meetings/{meetingId}")
+    public ResponseEntity<ApiResult<MyMeetingDetailResponse>> getMyMeetingDetail(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId
+    ) {
+        // 인증 확인
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        // meetingId 검증
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        MyMeetingDetailResponse response = meetingService.getMyMeetingDetail(userDetails.getId(), meetingId);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 }

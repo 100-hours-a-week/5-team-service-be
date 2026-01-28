@@ -2,6 +2,8 @@ package com.example.doktoribackend.meeting.service;
 
 import com.example.doktoribackend.book.domain.Book;
 import com.example.doktoribackend.book.repository.BookRepository;
+import com.example.doktoribackend.bookReport.domain.BookReport;
+import com.example.doktoribackend.bookReport.repository.BookReportRepository;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.meeting.domain.Meeting;
@@ -20,12 +22,14 @@ import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
 import com.example.doktoribackend.meeting.dto.MyMeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MyMeetingListResponse;
 import com.example.doktoribackend.meeting.dto.MyMeetingItem;
+import com.example.doktoribackend.meeting.dto.MyMeetingDetailResponse;
 import com.example.doktoribackend.meeting.dto.PageInfo;
 import com.example.doktoribackend.meeting.dto.MeetingListItem;
 import com.example.doktoribackend.meeting.dto.MeetingListRow;
 import com.example.doktoribackend.meeting.repository.MeetingMemberRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
+import com.example.doktoribackend.reading.domain.ReadingGenre;
 import com.example.doktoribackend.reading.repository.ReadingGenreRepository;
 import com.example.doktoribackend.s3.ImageUrlResolver;
 import com.example.doktoribackend.user.domain.User;
@@ -41,6 +45,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -52,6 +58,7 @@ public class MeetingService {
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
     private final ReadingGenreRepository readingGenreRepository;
+    private final BookReportRepository bookReportRepository;
     private final ImageUrlResolver imageUrlResolver;
 
     @Transactional
@@ -280,6 +287,117 @@ public class MeetingService {
         PageInfo pageInfo = new PageInfo(null, false, 10);
         
         return new MyMeetingListResponse(mapped, pageInfo);
+    }
+
+    @Transactional(readOnly = true)
+    public MyMeetingDetailResponse getMyMeetingDetail(Long userId, Long meetingId) {
+        // 1. 모임 기본 정보 조회
+        Meeting meeting = meetingRepository.findByIdWithLeader(meetingId)
+                .filter(m -> m.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+        
+        // 2. 나의 참여 상태 확인
+        MeetingMember myMember = meetingMemberRepository.findByMeetingIdAndUserId(meetingId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+        
+        // APPROVED나 PENDING이 아니면 접근 불가
+        if (myMember.getStatus() != MeetingMemberStatus.APPROVED && 
+            myMember.getStatus() != MeetingMemberStatus.PENDING) {
+            throw new BusinessException(ErrorCode.MEETING_NOT_FOUND);
+        }
+        
+        // 3. ReadingGenre 조회
+        ReadingGenre readingGenre = readingGenreRepository.findById(meeting.getReadingGenreId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT_VALUE));
+        
+        // 4. 나의 역할 판단
+        boolean isLeader = meeting.getLeaderUser().getId().equals(userId);
+        String myRole = isLeader ? "LEADER" : "MEMBER";
+        
+        // 5. 회차 정보 조회
+        List<MeetingRound> rounds = meetingRoundRepository.findByMeetingIdWithBook(meetingId);
+        
+        LocalDateTime now = LocalDateTime.now();
+        List<MyMeetingDetailResponse.RoundDetail> roundDetails = rounds.stream()
+                .map(round -> toRoundDetail(round, userId, now))
+                .collect(Collectors.toList());
+        
+        // 6. DTO 생성
+        return MyMeetingDetailResponse.builder()
+                .meetingId(meeting.getId())
+                .meetingImagePath(imageUrlResolver.toUrl(meeting.getMeetingImagePath()))
+                .title(meeting.getTitle())
+                .readingGenreName(readingGenre.getName())
+                .leaderInfo(MyMeetingDetailResponse.LeaderInfo.builder()
+                        .profileImagePath(imageUrlResolver.toUrl(meeting.getLeaderUser().getProfileImagePath()))
+                        .nickname(meeting.getLeaderUser().getNickname())
+                        .build())
+                .myRole(myRole)
+                .roundCount(meeting.getRoundCount())
+                .capacity(meeting.getCapacity())
+                .currentMemberCount(meeting.getCurrentCount())
+                .rounds(roundDetails)
+                .currentRoundNo(meeting.getCurrentRound())
+                .build();
+    }
+    
+    private MyMeetingDetailResponse.RoundDetail toRoundDetail(MeetingRound round, Long userId, LocalDateTime now) {
+        // 1. dDay 계산
+        LocalDate roundDate = round.getStartAt().toLocalDate();
+        LocalDate today = LocalDate.now();
+        int dDay = (int) ChronoUnit.DAYS.between(today, roundDate);
+        
+        // 2. 독후감 조회
+        Optional<BookReport> bookReportOpt = bookReportRepository
+                .findByUserIdAndMeetingRoundIdAndDeletedAtIsNull(userId, round.getId());
+        
+        MyMeetingDetailResponse.RoundDetail.BookReportInfo bookReportInfo;
+        if (bookReportOpt.isPresent()) {
+            BookReport bookReport = bookReportOpt.get();
+            bookReportInfo = MyMeetingDetailResponse.RoundDetail.BookReportInfo.builder()
+                    .status(bookReport.getStatus().name())
+                    .id(bookReport.getId())
+                    .writableUntil(round.getStartAt())
+                    .build();
+        } else {
+            bookReportInfo = MyMeetingDetailResponse.RoundDetail.BookReportInfo.builder()
+                    .status(null)  // 미제출
+                    .id(null)
+                    .writableUntil(round.getStartAt())
+                    .build();
+        }
+        
+        // 3. meetingLink 공개 여부 (10분 전부터)
+        LocalDateTime tenMinutesBefore = round.getStartAt().minusMinutes(10);
+        boolean isLinkAvailable = !now.isBefore(tenMinutesBefore) && now.isBefore(round.getEndAt());
+        String meetingLink = (isLinkAvailable && dDay >= 0) ? round.getMeetingLink() : null;
+        
+        // 4. canJoinMeeting 판단
+        boolean canJoinMeeting = isLinkAvailable && 
+                                 bookReportOpt.isPresent() &&
+                                 bookReportOpt.get().getStatus().name().equals("APPROVED");
+        
+        // 5. Book 정보
+        Book book = round.getBook();
+        MyMeetingDetailResponse.RoundDetail.BookInfo bookInfo = 
+                MyMeetingDetailResponse.RoundDetail.BookInfo.builder()
+                        .title(book.getTitle())
+                        .authors(book.getAuthors())
+                        .publisher(book.getPublisher())
+                        .thumbnailUrl(book.getThumbnailUrl())
+                        .publishedAt(book.getPublishedAt())
+                        .build();
+        
+        return MyMeetingDetailResponse.RoundDetail.builder()
+                .roundId(round.getId())
+                .roundNo(round.getRoundNo())
+                .meetingDate(round.getStartAt())
+                .dDay(dDay)
+                .meetingLink(meetingLink)
+                .canJoinMeeting(canJoinMeeting)
+                .book(bookInfo)
+                .bookReport(bookReportInfo)
+                .build();
     }
 
     private MyMeetingItem toMyMeetingItem(MeetingListRow row, LocalDateTime now) {
