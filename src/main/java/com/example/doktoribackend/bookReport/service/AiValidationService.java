@@ -29,7 +29,7 @@ public class AiValidationService {
     private String aiValidationBaseUrl;
 
     private static final Duration TIMEOUT = Duration.ofSeconds(60);
-    private static final int MAX_RETRY = 3;
+    private static final int MAX_RETRY = 50;
 
     public void validate(Long bookReportId, String bookTitle, String content) {
         AiValidationRequest request = new AiValidationRequest(
