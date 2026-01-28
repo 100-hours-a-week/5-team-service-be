@@ -78,5 +78,5 @@ zoom:
 firebase:
   credentials-path: ${FIREBASE_CREDENTIALS_PATH:classpath:firebase-service-account.json}
 ai:
-  base-url: ${AI_BASE_URL:http://localhost/ai}
+  base-url: ${AI_BASE_URL:http://localhost:8000/ai}
   api-key: ${AI_API_KEY}
