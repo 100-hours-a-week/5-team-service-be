@@ -12,6 +12,3 @@ app:
   cookie:
     secure: true
     same-site: None
-ai:
-  validation:
-    base-url: https://dev.doktori.kr
