@@ -8,7 +8,8 @@ public final class SecurityPaths {
             "/oauth/**",
             "/auth/**",
             "/health",
-            "/actuator/**"
+            "/actuator/**",
+            "/policies/reading-genres"
     };
 
     public static final String[] PUBLIC_DOCS = {

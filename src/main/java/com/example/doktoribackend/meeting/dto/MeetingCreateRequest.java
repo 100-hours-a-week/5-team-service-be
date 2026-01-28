@@ -19,7 +19,7 @@ import java.util.Set;
 public class MeetingCreateRequest {
 
     @NotBlank
-    @Schema(example = "https://cdn.example.com/meetings/2026/01/10/uuid-1234.png")
+    @Schema(example = "https://doktori-dev-images.s3.ap-northeast-2.amazonaws.com/images/meetings/36ba1999-7622-4275-b44e-9642d234b6bb.png")
     private String meetingImagePath;
 
     @NotBlank
@@ -193,7 +193,7 @@ public class MeetingCreateRequest {
         private String publisher;
 
         @Size(max = 500)
-        @Schema(example = "https://image.kr/book/1.jpg")
+        @Schema(example = "https://search1.kakaocdn.net/thumb/R120x174.q85/?fname=http%3A%2F%2Ft1.daumcdn.net%2Flbook%2Fimage%2F1467038")
         private String thumbnailUrl;
 
         @JsonDeserialize(using = FlexibleLocalDateDeserializer.class)
