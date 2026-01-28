@@ -12,3 +12,6 @@ app:
   cookie:
     secure: true
     same-site: None
+ai:
+  base-url: ${AI_BASE_URL:https://dev.doktori.kr/ai}
+  api-key: ${AI_API_KEY}
