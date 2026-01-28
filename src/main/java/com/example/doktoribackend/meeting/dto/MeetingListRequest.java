@@ -5,6 +5,7 @@ import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.Getter;
+import lombok.Setter;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalTime;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Set;
 
 @Getter
+@Setter
 public class MeetingListRequest {
 
     private static final int DEFAULT_SIZE = 10;
