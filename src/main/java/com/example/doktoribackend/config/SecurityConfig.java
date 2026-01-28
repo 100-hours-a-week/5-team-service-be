@@ -50,6 +50,8 @@ public class SecurityConfig {
                         .requestMatchers(PUBLIC_AUTH).permitAll()
                         .requestMatchers(PUBLIC_DOCS).permitAll()
                         .requestMatchers(HttpMethod.GET, "/meetings").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/meetings/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/meetings/search").permitAll()
                         .anyRequest().authenticated()
                 )
                 .userDetailsService(customUserDetailsService)
