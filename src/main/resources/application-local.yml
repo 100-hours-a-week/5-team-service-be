@@ -17,6 +17,3 @@ app:
   cookie:
     secure: false
     same-site: Lax
-ai:
-  base-url: ${AI_BASE_URL:https://dev.doktori.kr/ai}
-  api-key: ${AI_API_KEY}

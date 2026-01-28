@@ -68,6 +68,7 @@ public class AiValidationService {
     private void updateBookReportStatus(Long bookReportId, AiValidationResponse response) {
         BookReport bookReport = bookReportRepository.findById(bookReportId)
                 .orElse(null);
+        log.warn(response.rejectionReason());
 
         if (bookReport == null) {
             log.warn("BookReport not found for id: {}", bookReportId);
