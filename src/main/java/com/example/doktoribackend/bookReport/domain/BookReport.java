@@ -34,7 +34,7 @@ public class BookReport extends BaseTimeEntity {
     @Column(nullable = false, length = 20)
     private BookReportStatus status = BookReportStatus.PENDING_REVIEW;
 
-    @Column(name = "rejection_reason", length = 200)
+    @Column(name = "rejection_reason", length = 300)
     private String rejectionReason;
 
     @Column(name = "ai_validated_at")
