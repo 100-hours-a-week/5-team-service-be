@@ -32,6 +32,11 @@ springdoc:
     doc-expansion: list
     persistAuthorization: true
 
+docs:
+  auth:
+    username: ${DOCS_AUTH_USERNAME}
+    password: ${DOCS_AUTH_PASSWORD}
+
 kakao:
   oauth:
     client-id: ${KAKAO_CLIENT_ID}
