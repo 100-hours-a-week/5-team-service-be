@@ -76,7 +76,7 @@ public class BookReportService {
         BookReport bookReport = BookReport.create(user, meetingRound, request.content());
         bookReportRepository.save(bookReport);
 
-        aiValidationService.validate(bookReport.getId(), request.title(), request.content());
+        aiValidationService.validate(bookReport.getId(), meetingRound.getBook().getTitle(), request.content());
 
         return new BookReportCreateResponse(meetingId);
     }
