@@ -7,6 +7,7 @@ import com.example.doktoribackend.meeting.dto.MeetingListRow;
 import com.example.doktoribackend.meeting.dto.MeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
 import com.example.doktoribackend.book.domain.Book;
+import com.example.doktoribackend.reading.domain.ReadingGenre;
 import com.example.doktoribackend.user.domain.User;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -38,14 +39,15 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
         if (request.getCursorId() != null) {
             predicates.add(cb.lt(meeting.get("id"), request.getCursorId()));
         }
-        if (request.getReadingGenreId() != null) {
-            predicates.add(cb.equal(meeting.get("readingGenreId"), request.getReadingGenreId()));
+        if (request.getReadingGenre() != null) {
+            Join<Meeting, ReadingGenre> genre = meeting.join("readingGenre", JoinType.INNER);
+            predicates.add(cb.equal(genre.get("code"), request.getReadingGenre()));
         }
         if (request.getDayOfWeek() != null && !request.getDayOfWeek().isEmpty()) {
             predicates.add(meeting.get("dayOfWeek").in(request.getDayOfWeek()));
         }
         if (request.getRoundCount() != null) {
-            int roundCount = request.getRoundCount();
+            int roundCount = request.getRoundCountValue();
             if (roundCount == 1) {
                 predicates.add(cb.equal(meeting.get("roundCount"), 1));
             } else if (roundCount == 3) {
@@ -55,7 +57,7 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
             }
         }
 
-        Predicate startTimePredicate = buildStartTimePredicate(cb, meeting, request.getStartTimeFrom());
+        Predicate startTimePredicate = buildStartTimePredicate(cb, meeting, request.getStartTimeValues());
         if (startTimePredicate != null) {
             predicates.add(startTimePredicate);
         }
@@ -144,14 +146,15 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
         if (request.getCursorId() != null) {
             predicates.add(cb.lt(meeting.get("id"), request.getCursorId()));
         }
-        if (request.getReadingGenreId() != null) {
-            predicates.add(cb.equal(meeting.get("readingGenreId"), request.getReadingGenreId()));
+        if (request.getReadingGenre() != null) {
+            Join<Meeting, ReadingGenre> genre = meeting.join("readingGenre", JoinType.INNER);
+            predicates.add(cb.equal(genre.get("code"), request.getReadingGenre()));
         }
         if (request.getDayOfWeek() != null && !request.getDayOfWeek().isEmpty()) {
             predicates.add(meeting.get("dayOfWeek").in(request.getDayOfWeek()));
         }
         if (request.getRoundCount() != null) {
-            int roundCount = request.getRoundCount();
+            int roundCount = request.getRoundCountValue();
             if (roundCount == 1) {
                 predicates.add(cb.equal(meeting.get("roundCount"), 1));
             } else if (roundCount == 3) {
@@ -161,7 +164,7 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
             }
         }
 
-        Predicate startTimePredicate = buildStartTimePredicate(cb, meeting, request.getStartTimeFrom());
+        Predicate startTimePredicate = buildStartTimePredicate(cb, meeting, request.getStartTimeValues());
         if (startTimePredicate != null) {
             predicates.add(startTimePredicate);
         }

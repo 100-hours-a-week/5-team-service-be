@@ -1,6 +1,7 @@
 package com.example.doktoribackend.meeting.domain;
 
 import com.example.doktoribackend.common.domain.BaseTimeEntity;
+import com.example.doktoribackend.reading.domain.ReadingGenre;
 import com.example.doktoribackend.user.domain.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -32,6 +33,10 @@ public class Meeting extends BaseTimeEntity {
 
     @Column(name = "reading_genre_id", nullable = false)
     private Long readingGenreId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reading_genre_id", insertable = false, updatable = false)
+    private ReadingGenre readingGenre;
 
     @Column(name = "leader_intro", length = 300)
     private String leaderIntro;
