@@ -31,7 +31,7 @@ public class AiValidationService {
     @Value("${ai.api-key}")
     private String apiKey;
 
-    private static final Duration TIMEOUT = Duration.ofSeconds(60);
+    private static final Duration TIMEOUT = Duration.ofSeconds(30);
     private static final int MAX_RETRY = 3;
 
     public void validate(Long bookReportId, String bookTitle, String content) {
@@ -70,7 +70,6 @@ public class AiValidationService {
                 .orElse(null);
 
         if (bookReport == null) {
-            log.warn("BookReport not found for id: {}", bookReportId);
             return;
         }
 
@@ -81,6 +80,5 @@ public class AiValidationService {
         }
 
         bookReportRepository.save(bookReport);
-        log.info("BookReport {} validated: {}", bookReportId, response.status());
     }
 }

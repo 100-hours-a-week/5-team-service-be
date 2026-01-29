@@ -28,7 +28,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class BookReportService {
 
-    private static final int DAILY_SUBMISSION_LIMIT = 50;
+    private static final int DAILY_SUBMISSION_LIMIT = 3;
 
     private final BookReportRepository bookReportRepository;
     private final MeetingRoundRepository meetingRoundRepository;
