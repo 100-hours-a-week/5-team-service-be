@@ -67,7 +67,11 @@ management:
         include: prometheus, health, info
   endpoint:
     prometheus:
-      enabled: true
+      access: unrestricted
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
 
 zoom:
   account-id: ${ZOOM_ACCOUNT_ID}
@@ -78,5 +82,5 @@ zoom:
 firebase:
   credentials-path: ${FIREBASE_CREDENTIALS_PATH:classpath:firebase-service-account.json}
 ai:
-  base-url: ${AI_BASE_URL:http://localhost:8000/ai}
+  base-url: ${AI_BASE_URL:http://localhost/ai}
   api-key: ${AI_API_KEY}
