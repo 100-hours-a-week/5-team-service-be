@@ -5,6 +5,8 @@ import com.example.doktoribackend.bookReport.domain.BookReportStatus;
 import com.example.doktoribackend.bookReport.dto.AiValidationRequest;
 import com.example.doktoribackend.bookReport.dto.AiValidationResponse;
 import com.example.doktoribackend.bookReport.repository.BookReportRepository;
+import com.example.doktoribackend.notification.domain.NotificationTypeCode;
+import com.example.doktoribackend.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +17,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.util.retry.Retry;
 
 import java.time.Duration;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +27,7 @@ public class AiValidationService {
     private final WebClient webClient;
     private final BookReportRepository bookReportRepository;
     private final PlatformTransactionManager transactionManager;
+    private final NotificationService notificationService;
 
     @Value("${ai.base-url}")
     private String aiValidationBaseUrl;
@@ -80,5 +84,18 @@ public class AiValidationService {
         }
 
         bookReportRepository.save(bookReport);
+
+        Long userId = bookReport.getUser().getId();
+        Long meetingId = bookReport.getMeetingRound().getMeeting().getId();
+
+        try {
+            notificationService.createAndSend(
+                    userId,
+                    NotificationTypeCode.BOOK_REPORT_CHECKED,
+                    Map.of("meetingId", String.valueOf(meetingId))
+            );
+        } catch (Exception e) {
+            log.error("Failed to send notification");
+        }
     }
 }
