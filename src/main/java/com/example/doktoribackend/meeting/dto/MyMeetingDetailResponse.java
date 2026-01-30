@@ -72,6 +72,9 @@ public class MyMeetingDetailResponse {
             private Long id;
 
             @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+            private LocalDateTime writableFrom;
+
+            @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
             private LocalDateTime writableUntil;
         }
     }
