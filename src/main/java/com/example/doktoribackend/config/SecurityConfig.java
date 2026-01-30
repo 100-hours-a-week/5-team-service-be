@@ -1,4 +1,5 @@
 package com.example.doktoribackend.config;
+
 import com.example.doktoribackend.security.CustomAccessDeniedHandler;
 import com.example.doktoribackend.security.CustomAuthenticationEntryPoint;
 import com.example.doktoribackend.security.CustomUserDetailsService;
@@ -52,6 +53,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/meetings").permitAll()
                         .requestMatchers(HttpMethod.GET, "/meetings/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/meetings/search").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/recommendations/meetings").permitAll()
                         .anyRequest().authenticated()
                 )
                 .userDetailsService(customUserDetailsService)

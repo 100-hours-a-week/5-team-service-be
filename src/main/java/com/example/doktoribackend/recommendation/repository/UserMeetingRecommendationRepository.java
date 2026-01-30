@@ -11,16 +11,27 @@ import java.util.List;
 public interface UserMeetingRecommendationRepository extends JpaRepository<UserMeetingRecommendation, Long> {
 
     @Query("""
-        SELECT r
-        FROM UserMeetingRecommendation r
-        JOIN FETCH r.meeting m
-        JOIN FETCH m.leaderUser
-        WHERE r.user.id = :userId
-          AND r.weekStartDate = :weekStartDate
-        ORDER BY r.rank ASC
-        """)
+            SELECT r
+            FROM UserMeetingRecommendation r
+            JOIN FETCH r.meeting m
+            JOIN FETCH m.leaderUser
+            WHERE r.user.id = :userId
+              AND r.weekStartDate = :weekStartDate
+            ORDER BY r.rank ASC
+            """)
     List<UserMeetingRecommendation> findByUserIdAndWeekStartDateOrderByRank(
             @Param("userId") Long userId,
             @Param("weekStartDate") LocalDate weekStartDate
     );
+
+    @Query("""
+            SELECT r
+            FROM UserMeetingRecommendation r
+            JOIN FETCH r.meeting m
+            JOIN FETCH m.leaderUser
+            WHERE m.status = 'RECRUITING'
+              AND m.deletedAt IS NULL
+            ORDER BY r.createdAt DESC, r.rank ASC
+            """)
+    List<UserMeetingRecommendation> findRecruitingMeetingsOrderByLatestAndRank();
 }

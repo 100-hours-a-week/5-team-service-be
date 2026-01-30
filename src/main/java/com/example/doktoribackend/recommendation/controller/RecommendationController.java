@@ -1,8 +1,6 @@
 package com.example.doktoribackend.recommendation.controller;
 
-import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.response.ApiResult;
-import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.recommendation.dto.RecommendedMeetingDto;
 import com.example.doktoribackend.recommendation.service.RecommendationService;
 import com.example.doktoribackend.security.CustomUserDetails;
@@ -30,7 +28,7 @@ public class RecommendationController {
 
     private final RecommendationService recommendationService;
 
-    @Operation(summary = "추천 모임 조회", description = "로그인 사용자를 위한 이번 주 추천 모임을 조회합니다. 최대 4개의 모임이 순위대로 반환됩니다.")
+    @Operation(summary = "추천 모임 조회", description = "사용자를 위한 추천 모임을 조회합니다. 로그인 사용자는 개인화된 추천을, 미인증 사용자는 모집중인 인기 모임을 제공합니다. 최대 4개의 모임이 반환됩니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "OK",
                     content = @Content(mediaType = "application/json",
@@ -44,7 +42,7 @@ public class RecommendationController {
                                           "meetingId": 101,
                                           "meetingImagePath": "https://image.kr/meeting/101.jpg",
                                           "title": "함께 읽는 에세이 모임",
-                                          "readingGenreId": 4,
+                                          "readingGenreName": "에세이",
                                           "leaderNickname": "startup",
                                           "recruitmentDeadline": "2026-01-15"
                                         },
@@ -52,48 +50,29 @@ public class RecommendationController {
                                           "meetingId": 102,
                                           "meetingImagePath": "https://image.kr/meeting/102.jpg",
                                           "title": "경제/경영 스터디",
-                                          "readingGenreId": 2,
+                                          "readingGenreName": "경제/경영",
                                           "leaderNickname": "ella",
                                           "recruitmentDeadline": "2026-01-10"
-                                        },
-                                        {
-                                          "meetingId": 103,
-                                          "meetingImagePath": "https://image.kr/meeting/103.jpg",
-                                          "title": "인문 토론 모임",
-                                          "readingGenreId": 1,
-                                          "leaderNickname": "momo",
-                                          "recruitmentDeadline": "2026-01-18"
-                                        },
-                                        {
-                                          "meetingId": 104,
-                                          "meetingImagePath": "https://image.kr/meeting/104.jpg",
-                                          "title": "소설 완독 클럽",
-                                          "readingGenreId": 3,
-                                          "leaderNickname": "june",
-                                          "recruitmentDeadline": "2026-01-13"
                                         }
                                       ]
                                     }
                                     """))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(mediaType = "application/json",
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "code": "AUTH_UNAUTHORIZED",
-                                      "message": "인증이 필요합니다."
-                                    }
-                                    """)))
     })
     @GetMapping("/meetings")
     public ResponseEntity<ApiResult<List<RecommendedMeetingDto>>> getRecommendedMeetings(
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        // 인증 확인
+        List<RecommendedMeetingDto> response;
+
+        // 인증 여부에 따라 분기 처리
         if (userDetails == null) {
-            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+            // 미인증 사용자: 모집중인 모임 중 최신순, rank 우선순위로 제공
+            response = recommendationService.getRecommendedMeetingsForGuest();
+        } else {
+            // 인증 사용자: 개인화된 추천 제공
+            response = recommendationService.getRecommendedMeetings(userDetails.getId());
         }
 
-        List<RecommendedMeetingDto> response = recommendationService.getRecommendedMeetings(userDetails.getId());
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 }
