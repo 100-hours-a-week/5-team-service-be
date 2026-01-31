@@ -15,10 +15,12 @@ public interface MeetingRoundRepository extends JpaRepository<MeetingRound, Long
     @Query("SELECT mr.id FROM MeetingRound mr " +
             "JOIN mr.meeting m " +
             "WHERE m.status IN :statuses " +
-            "AND mr.startAt = :targetTime " +
+            "AND mr.startAt > :now " +
+            "AND mr.startAt <= :targetTime " +
             "AND mr.meetingLink IS NULL")
     List<Long> findMeetingRoundIdsForZoomLinkCreation(
             @Param("statuses") List<MeetingStatus> statuses,
+            @Param("now") LocalDateTime now,
             @Param("targetTime") LocalDateTime targetTime
     );
 
