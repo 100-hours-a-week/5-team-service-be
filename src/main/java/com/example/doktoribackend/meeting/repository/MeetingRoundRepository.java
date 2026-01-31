@@ -31,9 +31,13 @@ public interface MeetingRoundRepository extends JpaRepository<MeetingRound, Long
 
     @Query("SELECT mr FROM MeetingRound mr " +
             "JOIN FETCH mr.meeting m " +
-            "WHERE mr.startAt = :targetTime " +
+            "WHERE mr.startAt > :from " +
+            "AND mr.startAt <= :to " +
             "AND m.status IN ('RECRUITING', 'FINISHED')")
-    List<MeetingRound> findRoundsStartingAt(@Param("targetTime") LocalDateTime targetTime);
+    List<MeetingRound> findRoundsStartingBetween(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
 
 
     @Query("SELECT mr FROM MeetingRound mr " +

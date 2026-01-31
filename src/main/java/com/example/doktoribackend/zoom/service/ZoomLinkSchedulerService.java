@@ -2,7 +2,10 @@ package com.example.doktoribackend.zoom.service;
 
 import com.example.doktoribackend.meeting.domain.MeetingRound;
 import com.example.doktoribackend.meeting.domain.MeetingStatus;
+import com.example.doktoribackend.meeting.repository.MeetingMemberRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
+import com.example.doktoribackend.notification.domain.NotificationTypeCode;
+import com.example.doktoribackend.notification.service.NotificationService;
 import com.example.doktoribackend.zoom.exception.ZoomAuthenticationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +16,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -20,8 +24,10 @@ import java.util.List;
 public class ZoomLinkSchedulerService {
 
     private final MeetingRoundRepository meetingRoundRepository;
+    private final MeetingMemberRepository meetingMemberRepository;
     private final ZoomService zoomService;
     private final ZoomLinkUpdateService zoomLinkUpdateService;
+    private final NotificationService notificationService;
 
     private static final int BATCH_SIZE = 10;
     private static final long RATE_LIMIT_DELAY_MS = 100L;
@@ -116,6 +122,7 @@ public class ZoomLinkSchedulerService {
         try {
             String joinUrl = zoomService.createMeeting(topic, startAt, MEETING_DURATION_MINUTES);
             zoomLinkUpdateService.saveMeetingLink(meetingRoundId, joinUrl);
+            sendRoundStartNotification(meetingRound);
             return true;
         } catch (ZoomAuthenticationException e) {
             throw e;
@@ -123,6 +130,26 @@ public class ZoomLinkSchedulerService {
             log.warn("[Scheduler] Zoom 링크 생성 실패 (다음 실행에서 재시도) - MeetingRoundId: {}, MeetingId: {}, StartAt: {}, Error: {}",
                     meetingRoundId, meetingId, startAt, e.getMessage());
             return false;
+        }
+    }
+
+    private void sendRoundStartNotification(MeetingRound meetingRound) {
+        try {
+            Long meetingId = meetingRound.getMeeting().getId();
+            List<Long> memberUserIds = meetingMemberRepository.findApprovedMemberUserIds(meetingId);
+
+            if (!memberUserIds.isEmpty()) {
+                notificationService.createAndSendBatch(
+                        memberUserIds,
+                        NotificationTypeCode.ROUND_START_10M_BEFORE,
+                        Map.of("meetingId", meetingId.toString())
+                );
+                log.info("[Scheduler] 토론 시작 알림 발송 - MeetingRoundId: {}, 대상 인원: {}명",
+                        meetingRound.getId(), memberUserIds.size());
+            }
+        } catch (Exception e) {
+            log.error("[Scheduler] 토론 시작 알림 발송 실패 - MeetingRoundId: {}, Error: {}",
+                    meetingRound.getId(), e.getMessage());
         }
     }
 

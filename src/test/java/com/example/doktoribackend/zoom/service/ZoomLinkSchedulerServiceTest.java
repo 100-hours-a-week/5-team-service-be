@@ -2,7 +2,10 @@ package com.example.doktoribackend.zoom.service;
 
 import com.example.doktoribackend.meeting.domain.Meeting;
 import com.example.doktoribackend.meeting.domain.MeetingRound;
+import com.example.doktoribackend.meeting.repository.MeetingMemberRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
+import com.example.doktoribackend.notification.domain.NotificationTypeCode;
+import com.example.doktoribackend.notification.service.NotificationService;
 import com.example.doktoribackend.zoom.exception.ZoomAuthenticationException;
 import com.example.doktoribackend.zoom.exception.ZoomRetryableException;
 import org.junit.jupiter.api.DisplayName;
@@ -32,10 +35,16 @@ class ZoomLinkSchedulerServiceTest {
     private MeetingRoundRepository meetingRoundRepository;
 
     @Mock
+    private MeetingMemberRepository meetingMemberRepository;
+
+    @Mock
     private ZoomService zoomService;
 
     @Mock
     private ZoomLinkUpdateService zoomLinkUpdateService;
+
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private ZoomLinkSchedulerService schedulerService;
@@ -45,8 +54,8 @@ class ZoomLinkSchedulerServiceTest {
     class NormalCases {
 
         @Test
-        @DisplayName("Zoom 링크 생성 성공")
-        void createZoomLink_Success() {
+        @DisplayName("Zoom 링크 생성 성공 시 알림도 발송")
+        void createZoomLink_Success_SendsNotification() {
             // given
             MeetingRound mockMeetingRound = createMockMeetingRound(100L, 1, null, LocalDateTime.now().plusMinutes(5));
             String expectedJoinUrl = "https://zoom.us/j/123456789";
@@ -57,6 +66,8 @@ class ZoomLinkSchedulerServiceTest {
                     .willReturn(List.of(mockMeetingRound));
             given(zoomService.createMeeting(anyString(), any(), anyInt()))
                     .willReturn(expectedJoinUrl);
+            given(meetingMemberRepository.findApprovedMemberUserIds(1L))
+                    .willReturn(List.of(10L, 20L, 30L));
 
             // when
             schedulerService.createZoomLinksForUpcomingMeetings();
@@ -64,6 +75,11 @@ class ZoomLinkSchedulerServiceTest {
             // then
             verify(zoomService, times(1)).createMeeting(anyString(), any(), eq(30));
             verify(zoomLinkUpdateService, times(1)).saveMeetingLink(eq(100L), eq(expectedJoinUrl));
+            verify(notificationService, times(1)).createAndSendBatch(
+                    eq(List.of(10L, 20L, 30L)),
+                    eq(NotificationTypeCode.ROUND_START_10M_BEFORE),
+                    anyMap()
+            );
         }
 
         @Test
@@ -78,6 +94,7 @@ class ZoomLinkSchedulerServiceTest {
 
             // then
             verify(zoomService, never()).createMeeting(anyString(), any(), anyInt());
+            verify(notificationService, never()).createAndSendBatch(anyList(), any(), anyMap());
         }
 
         @Test
@@ -96,6 +113,7 @@ class ZoomLinkSchedulerServiceTest {
 
             // then
             verify(zoomService, never()).createMeeting(anyString(), any(), anyInt());
+            verify(notificationService, never()).createAndSendBatch(anyList(), any(), anyMap());
         }
     }
 
@@ -104,8 +122,8 @@ class ZoomLinkSchedulerServiceTest {
     class RetryOnNextExecutionTests {
 
         @Test
-        @DisplayName("실패 시 1회만 시도하고 종료 (다음 크론에서 재시도)")
-        void createZoomLink_FailOnce_NoInlineRetry() {
+        @DisplayName("실패 시 1회만 시도하고 종료 - 알림도 미발송")
+        void createZoomLink_FailOnce_NoNotification() {
             // given
             MeetingRound mockMeetingRound = createMockMeetingRound(100L, 1, null, LocalDateTime.now().plusMinutes(5));
 
@@ -119,9 +137,10 @@ class ZoomLinkSchedulerServiceTest {
             // when
             schedulerService.createZoomLinksForUpcomingMeetings();
 
-            // then - 1회만 시도 (지수 백오프 재시도 없음)
+            // then
             verify(zoomService, times(1)).createMeeting(anyString(), any(), eq(30));
             verify(zoomLinkUpdateService, never()).saveMeetingLink(anyLong(), anyString());
+            verify(notificationService, never()).createAndSendBatch(anyList(), any(), anyMap());
         }
     }
 
@@ -147,6 +166,7 @@ class ZoomLinkSchedulerServiceTest {
 
             // then
             verify(zoomService, times(1)).createMeeting(anyString(), any(), eq(30));
+            verify(notificationService, never()).createAndSendBatch(anyList(), any(), anyMap());
         }
     }
 
@@ -155,7 +175,7 @@ class ZoomLinkSchedulerServiceTest {
     class BatchProcessingTests {
 
         @Test
-        @DisplayName("여러 MeetingRound 배치 처리")
+        @DisplayName("여러 MeetingRound 배치 처리 - 각각 알림 발송")
         void createZoomLink_BatchProcessing() {
             // given
             MeetingRound mockRound1 = createMockMeetingRound(101L, 1, null, LocalDateTime.now().plusMinutes(5));
@@ -170,6 +190,8 @@ class ZoomLinkSchedulerServiceTest {
                     .willReturn("https://zoom.us/j/1")
                     .willReturn("https://zoom.us/j/2")
                     .willReturn("https://zoom.us/j/3");
+            given(meetingMemberRepository.findApprovedMemberUserIds(1L))
+                    .willReturn(List.of(10L, 20L));
 
             // when
             schedulerService.createZoomLinksForUpcomingMeetings();
@@ -177,10 +199,11 @@ class ZoomLinkSchedulerServiceTest {
             // then
             verify(zoomService, times(3)).createMeeting(anyString(), any(), eq(30));
             verify(zoomLinkUpdateService, times(3)).saveMeetingLink(anyLong(), anyString());
+            verify(notificationService, times(3)).createAndSendBatch(anyList(), eq(NotificationTypeCode.ROUND_START_10M_BEFORE), anyMap());
         }
 
         @Test
-        @DisplayName("배치 중간 실패해도 나머지 계속 처리")
+        @DisplayName("배치 중간 실패해도 나머지 계속 처리 - 성공한 건만 알림")
         void createZoomLink_PartialFailure_ContinuesProcessing() {
             // given
             MeetingRound mockRound1 = createMockMeetingRound(101L, 1, null, LocalDateTime.now().plusMinutes(5));
@@ -195,14 +218,17 @@ class ZoomLinkSchedulerServiceTest {
                     .willReturn("https://zoom.us/j/1")
                     .willThrow(new ZoomRetryableException("Failed"))
                     .willReturn("https://zoom.us/j/3");
+            given(meetingMemberRepository.findApprovedMemberUserIds(1L))
+                    .willReturn(List.of(10L, 20L));
 
             // when
             schedulerService.createZoomLinksForUpcomingMeetings();
 
             // then
-            // round1: 성공, round2: 1회 실패, round3: 성공 = 총 3회
             verify(zoomService, times(3)).createMeeting(anyString(), any(), eq(30));
             verify(zoomLinkUpdateService, times(2)).saveMeetingLink(anyLong(), anyString());
+            // round1, round3 성공 → 알림 2회 발송
+            verify(notificationService, times(2)).createAndSendBatch(anyList(), eq(NotificationTypeCode.ROUND_START_10M_BEFORE), anyMap());
         }
     }
 
@@ -226,6 +252,7 @@ class ZoomLinkSchedulerServiceTest {
 
             // then
             verify(zoomService, never()).createMeeting(anyString(), any(), anyInt());
+            verify(notificationService, never()).createAndSendBatch(anyList(), any(), anyMap());
         }
     }
 

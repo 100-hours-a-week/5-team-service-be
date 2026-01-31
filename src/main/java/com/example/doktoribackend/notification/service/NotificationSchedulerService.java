@@ -25,46 +25,16 @@ public class NotificationSchedulerService {
 
     private static final String PARAM_MEETING_ID = "meetingId";
 
-    @Scheduled(cron = "0 20,50 * * * *")
-    public void sendRoundStartNotifications() {
-        LocalDateTime executionTime = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
-        LocalDateTime targetTime = executionTime.plusMinutes(10);
-
-        log.info("[Scheduler] 토론 시작 10분 전 알림 스케줄러 시작 - 실행시간: {}, 대상 시작시간: {}",
-                executionTime, targetTime);
-
-        List<MeetingRound> rounds = meetingRoundRepository.findRoundsStartingAt(targetTime);
-
-        if (rounds.isEmpty()) {
-            return;
-        }
-
-        int totalSent = 0;
-        for (MeetingRound round : rounds) {
-            int sentCount = sendNotificationToMembers(
-                    round,
-                    NotificationTypeCode.ROUND_START_10M_BEFORE,
-                    Map.of(PARAM_MEETING_ID, round.getMeeting().getId().toString())
-            );
-            totalSent += sentCount;
-
-            log.info("[Scheduler] 토론 시작 알림 발송 - MeetingRoundId: {}, 대상 인원: {}명",
-                    round.getId(), sentCount);
-        }
-
-        log.info("[Scheduler] 토론 시작 10분 전 알림 완료 - 총 대상 회차: {}개, 총 알림 발송: {}명",
-                rounds.size(), totalSent);
-    }
-
     @Scheduled(cron = "0 0 * * * *")
     public void sendReviewDeadline24hNotifications() {
-        LocalDateTime executionTime = LocalDateTime.now().truncatedTo(ChronoUnit.HOURS);
-        LocalDateTime targetTime = executionTime.plusHours(48);
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.HOURS);
+        LocalDateTime from = now.plusHours(47);
+        LocalDateTime to = now.plusHours(48);
 
-        log.info("[Scheduler] 독후감 마감 24시간 전 알림 스케줄러 시작 - 실행시간: {}, 대상 시작시간: {}",
-                executionTime, targetTime);
+        log.info("[Scheduler] 독후감 마감 24시간 전 알림 스케줄러 시작 - 실행시간: {}, 대상 범위: {} ~ {}",
+                now, from, to);
 
-        List<MeetingRound> rounds = meetingRoundRepository.findRoundsStartingAt(targetTime);
+        List<MeetingRound> rounds = meetingRoundRepository.findRoundsStartingBetween(from, to);
 
         if (rounds.isEmpty()) {
             return;
@@ -89,13 +59,14 @@ public class NotificationSchedulerService {
 
     @Scheduled(cron = "0 0,30 * * * *")
     public void sendReviewDeadline30mNotifications() {
-        LocalDateTime executionTime = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
-        LocalDateTime targetTime = executionTime.plusHours(24).plusMinutes(30);
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
+        LocalDateTime from = now.plusHours(24);
+        LocalDateTime to = now.plusHours(24).plusMinutes(30);
 
-        log.info("[Scheduler] 독후감 마감 30분 전 알림 스케줄러 시작 - 실행시간: {}, 대상 시작시간: {}",
-                executionTime, targetTime);
+        log.info("[Scheduler] 독후감 마감 30분 전 알림 스케줄러 시작 - 실행시간: {}, 대상 범위: {} ~ {}",
+                now, from, to);
 
-        List<MeetingRound> rounds = meetingRoundRepository.findRoundsStartingAt(targetTime);
+        List<MeetingRound> rounds = meetingRoundRepository.findRoundsStartingBetween(from, to);
 
         if (rounds.isEmpty()) {
             return;
