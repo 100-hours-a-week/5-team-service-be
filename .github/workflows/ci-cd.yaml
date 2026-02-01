@@ -190,7 +190,7 @@ jobs:
         with:
           host: ${{ steps.env.outputs.ssh_host }}
           username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
+          key: ${{ steps.env.outputs.env_name == 'prod' && secrets.EC2_SSH_KEY || secrets.DEV_EC2_SSH_KEY }}
           source: "build/libs/app-*.jar"
           target: "/home/ubuntu/app/artifacts/be"
           strip_components: 2
@@ -201,7 +201,7 @@ jobs:
         with:
           host: ${{ steps.env.outputs.ssh_host }}
           username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
+          key: ${{ steps.env.outputs.env_name == 'prod' && secrets.EC2_SSH_KEY || secrets.DEV_EC2_SSH_KEY }}
           script: bash /home/ubuntu/app/deploy.sh be ${{ steps.env.outputs.env_name }} ${{ github.sha }}
 
       # [추가 4-a] DEV(EC2)만: 보안 그룹에서 IP 제거 (성공/실패 상관없이 무조건 실행)
