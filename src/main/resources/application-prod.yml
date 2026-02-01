@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: 'aws-parameterstore:/doktori/prod/'
   jpa:
     hibernate:
       ddl-auto: validate
@@ -23,3 +25,7 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+
+ai:
+  base-url: ${AI_BASE_URL:https://doktori.kr/ai}
+  api-key: ${AI_API_KEY}

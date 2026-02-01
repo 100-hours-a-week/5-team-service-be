@@ -1,4 +1,7 @@
 spring:
+  application:
+    name: doktori-backend
+
   flyway:
     enabled: true
     baseline-on-migrate: true
@@ -55,10 +58,17 @@ app:
 
 cloud:
   aws:
+    credentials:
+      instanceProfile: true
     region:
       static: ap-northeast-2
     s3:
       bucket-name: doktori-dev-images
+    parameterstore:
+      enabled: true
+      prefix: /doktori
+      profile-separator: /
+      fail-fast: true
 
 management:
   endpoints:

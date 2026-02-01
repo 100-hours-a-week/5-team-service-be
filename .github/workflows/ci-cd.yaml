@@ -53,26 +53,25 @@ jobs:
         if: github.event_name == 'push'
         run: |
           set -euo pipefail
-          
+
           echo "📂 Searching for JAR files..."
           ls -al build/libs/
-          
+
           JAR=$(ls -t build/libs/*.jar | grep -v 'plain' | head -n 1 || true)
-          
+
           if [ -z "$JAR" ]; then
             echo "❌ Error: No valid JAR found in build/libs/"
             exit 1
           fi
-          
+
           echo "✅ Found JAR: $JAR"
-          
+
           SHORT_SHA="${GITHUB_SHA:0:7}"
           TARGET="build/libs/app-${SHORT_SHA}.jar"
-          
+
           cp "$JAR" "$TARGET"
           echo "🎉 Renamed to: $TARGET"
-          
-          # 확인용 출력
+
           ls -al build/libs
 
       - name: Upload JAR artifact
@@ -86,7 +85,6 @@ jobs:
       - name: Notify Discord on failure
         if: failure()
         run: |
-
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
           COMMIT_MSG=$(echo '${{ github.event.head_commit.message }}' | head -1)
@@ -125,14 +123,26 @@ jobs:
       - name: Set environment
         id: env
         run: |
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "host=EC2_HOST" >> $GITHUB_OUTPUT
-            echo "env_name=prod" >> $GITHUB_OUTPUT
-          else
-            echo "host=DEV_EC2_HOST" >> $GITHUB_OUTPUT
-            echo "env_name=develop" >> $GITHUB_OUTPUT
-            echo "sg_id=${{ secrets.AWS_SG_ID_DEV }}" >> $GITHUB_OUTPUT
+          set -euo pipefail
 
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            # ✅ PROD = Lightsail
+            echo "env_name=prod" >> $GITHUB_OUTPUT
+            echo "deploy_target=lightsail" >> $GITHUB_OUTPUT
+
+            # SSH 대상 (Lightsail 퍼블릭 IP/도메인)
+            # 아래 두 시크릿을 repo secrets에 추가하세요:
+            # - PROD_LIGHTSAIL_HOST (예: 1.2.3.4 또는 도메인)
+            # - PROD_LIGHTSAIL_INSTANCE_NAME (Lightsail 인스턴스 이름)
+            echo "ssh_host=${{ secrets.PROD_LIGHTSAIL_HOST }}" >> $GITHUB_OUTPUT
+            echo "lightsail_instance_name=${{ secrets.PROD_LIGHTSAIL_INSTANCE_NAME }}" >> $GITHUB_OUTPUT
+          else
+            # ✅ DEV = EC2
+            echo "env_name=develop" >> $GITHUB_OUTPUT
+            echo "deploy_target=ec2" >> $GITHUB_OUTPUT
+
+            echo "ssh_host=${{ secrets.DEV_EC2_HOST }}" >> $GITHUB_OUTPUT
+            echo "sg_id=${{ secrets.AWS_SG_ID_DEV }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Download JAR artifact
@@ -144,7 +154,10 @@ jobs:
       # [추가 1] GitHub Actions 실행 서버의 IP 가져오기
       - name: Get GitHub IP
         id: ip
-        run: echo "ipv4=$(curl -s https://checkip.amazonaws.com)" >> $GITHUB_OUTPUT
+        run: |
+          set -euo pipefail
+          IPV4="$(curl -s https://checkip.amazonaws.com | tr -d '\n')"
+          echo "ipv4=$IPV4" >> $GITHUB_OUTPUT
 
       # [추가 2] AWS 인증 설정
       - name: Configure AWS credentials
@@ -154,19 +167,28 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-northeast-2
 
-      # [추가 3] 보안 그룹 22번 포트 한시적 허용
-      - name: Add GitHub IP to Security Group
+      # [추가 3-a] DEV(EC2)만: 보안 그룹 22번 포트 한시적 허용
+      - name: Add GitHub IP to EC2 Security Group (SSH)
+        if: ${{ steps.env.outputs.deploy_target == 'ec2' }}
         run: |
           aws ec2 authorize-security-group-ingress \
             --group-id ${{ steps.env.outputs.sg_id }} \
             --protocol tcp \
             --port 22 \
-            --cidr ${{ steps.ip.outputs.ipv4 }}/32
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32 || true
+
+      # [추가 3-b] PROD(Lightsail)만: Lightsail 22번 포트 한시적 허용
+      - name: Allow GitHub IP on Lightsail (SSH)
+        if: ${{ steps.env.outputs.deploy_target == 'lightsail' }}
+        run: |
+          aws lightsail open-instance-public-ports \
+            --instance-name ${{ steps.env.outputs.lightsail_instance_name }} \
+            --port-info fromPort=22,toPort=22,protocol=tcp,cidrs=${{ steps.ip.outputs.ipv4 }}/32 || true
 
       - name: Transfer to Server
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ steps.env.outputs.host == 'EC2_HOST' && secrets.EC2_HOST || secrets.DEV_EC2_HOST }}
+          host: ${{ steps.env.outputs.ssh_host }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           source: "build/libs/app-*.jar"
@@ -177,25 +199,32 @@ jobs:
       - name: Deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ steps.env.outputs.host == 'EC2_HOST' && secrets.EC2_HOST || secrets.DEV_EC2_HOST }}
+          host: ${{ steps.env.outputs.ssh_host }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          script: bash /home/ubuntu/app/deploy.sh be ${{ steps.env.outputs.env_name }}
+          script: bash /home/ubuntu/app/deploy.sh be ${{ steps.env.outputs.env_name }} ${{ github.sha }}
 
-      # [추가 4] 보안 그룹에서 IP 제거 (성공/실패 상관없이 무조건 실행)
-      - name: Remove GitHub IP from Security Group
-        if: always()
+      # [추가 4-a] DEV(EC2)만: 보안 그룹에서 IP 제거 (성공/실패 상관없이 무조건 실행)
+      - name: Remove GitHub IP from EC2 Security Group (SSH)
+        if: always() && steps.env.outputs.deploy_target == 'ec2'
         run: |
           aws ec2 revoke-security-group-ingress \
             --group-id ${{ steps.env.outputs.sg_id }} \
             --protocol tcp \
             --port 22 \
-            --cidr ${{ steps.ip.outputs.ipv4 }}/32
+            --cidr ${{ steps.ip.outputs.ipv4 }}/32 || true
+
+      # [추가 4-b] PROD(Lightsail)만: Lightsail에서 IP 제거 (성공/실패 상관없이 무조건 실행)
+      - name: Close GitHub IP on Lightsail (SSH)
+        if: always() && steps.env.outputs.deploy_target == 'lightsail'
+        run: |
+          aws lightsail close-instance-public-ports \
+            --instance-name ${{ steps.env.outputs.lightsail_instance_name }} \
+            --port-info fromPort=22,toPort=22,protocol=tcp,cidrs=${{ steps.ip.outputs.ipv4 }}/32 || true
 
       - name: Notify Discord
         if: always()
         run: |
-          # 환경별 설정
           ENV_NAME="${{ steps.env.outputs.env_name }}"
           if [ "$ENV_NAME" == "prod" ]; then
             ENV_EMOJI="🚀"
@@ -205,7 +234,6 @@ jobs:
             ENV_LABEL="Development"
           fi
 
-          # 커밋 정보
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
           COMMIT_MSG=$(echo '${{ github.event.head_commit.message }}' | head -1)
@@ -213,7 +241,6 @@ jobs:
           COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
           ACTIONS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          # 상태별 색상 및 메시지
           if [ "${{ job.status }}" == "success" ]; then
             COLOR=3066993
             STATUS_EMOJI="✅"
