@@ -38,7 +38,7 @@ jobs:
           upload-result: true
           cache-default-branch-only: false
           primary-cache-key: qodana-${{ hashFiles('build.gradle', 'settings.gradle', 'gradle.properties') }}
-          additional-cache-key: qodana-base
+          additional-cache-key: qodana
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
 
