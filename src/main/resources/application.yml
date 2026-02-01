@@ -54,7 +54,7 @@ app:
     access-exp-minutes: 60
     refresh-exp-seconds: 1209600
   s3:
-    public-base-url: https://doktori-dev-images.s3.ap-northeast-2.amazonaws.com
+    public-base-url: https://${AWS_S3_BUCKET_NAME:doktori-dev-images}.s3.ap-northeast-2.amazonaws.com
 
 cloud:
   aws:
@@ -63,7 +63,7 @@ cloud:
     region:
       static: ap-northeast-2
     s3:
-      bucket-name: doktori-dev-images
+      bucket-name: ${AWS_S3_BUCKET_NAME:doktori-dev-images}
     parameterstore:
       enabled: true
       prefix: /doktori
