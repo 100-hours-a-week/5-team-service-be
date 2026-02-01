@@ -68,14 +68,8 @@ public class MyMeetingDetailResponse {
         @AllArgsConstructor
         @Builder
         public static class BookReportInfo {
-            private String status;  // "PENDING_REVIEW", "APPROVED", "REJECTED", null
+            private String status;
             private Long id;
-
-            @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
-            private LocalDateTime writableFrom;
-
-            @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
-            private LocalDateTime writableUntil;
         }
     }
 }

@@ -1,6 +1,8 @@
 package com.example.doktoribackend.bookReport.service;
 
 import com.example.doktoribackend.bookReport.domain.BookReport;
+import com.example.doktoribackend.bookReport.domain.BookReportStatusResolver;
+import com.example.doktoribackend.bookReport.domain.UserBookReportStatus;
 import com.example.doktoribackend.bookReport.dto.BookReportCreateRequest;
 import com.example.doktoribackend.bookReport.dto.BookReportCreateResponse;
 import com.example.doktoribackend.bookReport.dto.BookReportDetailResponse;
@@ -52,7 +54,10 @@ public class BookReportService {
             throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
         }
 
-        if (!isWritablePeriod(meetingRound)) {
+        MeetingRound prevRound = findPrevRound(meetingRound);
+        UserBookReportStatus writeStatus = BookReportStatusResolver.resolveNotSubmitted(
+                LocalDateTime.now(), meetingRound, prevRound);
+        if (writeStatus != UserBookReportStatus.NOT_SUBMITTED) {
             throw new BusinessException(ErrorCode.BOOK_REPORT_NOT_WRITABLE);
         }
 
@@ -102,17 +107,20 @@ public class BookReportService {
         BookReportDetailResponse.BookReportInfo bookReportInfo;
         if (bookReportOpt.isPresent()) {
             BookReportProjection projection = bookReportOpt.get();
+            UserBookReportStatus status = BookReportStatusResolver.fromBookReportStatus(projection.getStatus());
             bookReportInfo = new BookReportDetailResponse.BookReportInfo(
                     projection.getId(),
-                    projection.getStatus().name(),
+                    status.name(),
                     projection.getContent(),
                     projection.getRejectionReason()
             );
         } else {
-            String status = isWritablePeriod(meetingRound) ? "NOT_SUBMITTED" : "DEADLINE_PASSED";
+            MeetingRound prevRound = findPrevRound(meetingRound);
+            UserBookReportStatus status = BookReportStatusResolver.resolveNotSubmitted(
+                    LocalDateTime.now(), meetingRound, prevRound);
             bookReportInfo = new BookReportDetailResponse.BookReportInfo(
                     null,
-                    status,
+                    status.name(),
                     null,
                     null
             );
@@ -121,30 +129,13 @@ public class BookReportService {
         return new BookReportDetailResponse(bookInfo, bookReportInfo);
     }
 
-    private boolean isWritablePeriod(MeetingRound meetingRound) {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime deadline = meetingRound.getStartAt().minusHours(24);
-
-        if (now.isAfter(deadline)) {
-            return false;
-        }
-
+    private MeetingRound findPrevRound(MeetingRound meetingRound) {
         int roundNo = meetingRound.getRoundNo();
-
-        if (roundNo == 1) {
-            return true;
+        if (roundNo <= 1) {
+            return null;
         }
-
-        Optional<MeetingRound> prevRoundOpt = meetingRoundRepository.findByMeetingIdAndRoundNo(
-                meetingRound.getMeeting().getId(), roundNo - 1);
-
-        if (prevRoundOpt.isEmpty()) {
-            return false;
-        }
-
-        MeetingRound prevRound = prevRoundOpt.get();
-        LocalDateTime startDate = prevRound.getEndAt().toLocalDate().plusDays(1).atStartOfDay();
-
-        return !now.isBefore(startDate);
+        return meetingRoundRepository.findByMeetingIdAndRoundNo(
+                meetingRound.getMeeting().getId(), roundNo - 1
+        ).orElse(null);
     }
 }

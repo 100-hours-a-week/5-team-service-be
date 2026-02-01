@@ -3,6 +3,8 @@ package com.example.doktoribackend.meeting.service;
 import com.example.doktoribackend.book.domain.Book;
 import com.example.doktoribackend.book.repository.BookRepository;
 import com.example.doktoribackend.bookReport.domain.BookReport;
+import com.example.doktoribackend.bookReport.domain.BookReportStatusResolver;
+import com.example.doktoribackend.bookReport.domain.UserBookReportStatus;
 import com.example.doktoribackend.bookReport.repository.BookReportRepository;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
@@ -376,42 +378,25 @@ public class MeetingService {
         Optional<BookReport> bookReportOpt = bookReportRepository
                 .findByUserIdAndMeetingRoundIdAndDeletedAtIsNull(userId, round.getId());
 
-        // 3. writableFrom 계산
-        LocalDateTime writableFrom;
-        if (round.getRoundNo() == 1) {
-            // 첫 회차: 모임 신청 승인 시점부터
-            // 현재 정책: 신청 시 즉시 승인 (approvedAt 사용)
-            // 추후 정책: 상태 기반 판단 필요
-            writableFrom = myMember.getApprovedAt();
-        } else {
-            // 이전 회차: 이전 회차 종료 시점부터
-            Optional<MeetingRound> previousRound = allRounds.stream()
-                    .filter(r -> r.getRoundNo() == round.getRoundNo() - 1)
-                    .findFirst();
-            writableFrom = previousRound
-                    .map(MeetingRound::getEndAt)
-                    .orElse(null);
-        }
+        // 3. 이전 회차 조회 (상태 판단용)
+        MeetingRound prevRound = allRounds.stream()
+                .filter(r -> r.getRoundNo() == round.getRoundNo() - 1)
+                .findFirst()
+                .orElse(null);
 
-        // 4. writableUntil 계산 (모임 시작 24시간 전까지)
-        LocalDateTime writableUntil = round.getStartAt().minusHours(24);
-
-        // 5. BookReportInfo 생성
+        // 4. BookReportInfo 생성
         MyMeetingDetailResponse.RoundDetail.BookReportInfo bookReportInfo;
         if (bookReportOpt.isPresent()) {
             BookReport bookReport = bookReportOpt.get();
+            UserBookReportStatus status = BookReportStatusResolver.fromBookReportStatus(bookReport.getStatus());
             bookReportInfo = MyMeetingDetailResponse.RoundDetail.BookReportInfo.builder()
-                    .status(bookReport.getStatus().name())
+                    .status(status.name())
                     .id(bookReport.getId())
-                    .writableFrom(writableFrom)
-                    .writableUntil(writableUntil)
                     .build();
         } else {
+            UserBookReportStatus status = BookReportStatusResolver.resolveNotSubmitted(now, round, prevRound);
             bookReportInfo = MyMeetingDetailResponse.RoundDetail.BookReportInfo.builder()
-                    .status(null)  // 미제출
-                    .id(null)
-                    .writableFrom(writableFrom)
-                    .writableUntil(writableUntil)
+                    .status(status.name())
                     .build();
         }
 
