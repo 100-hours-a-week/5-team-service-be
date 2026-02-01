@@ -1,0 +1,16 @@
+name: "Security-focused CodeQL Config"
+
+# CodeQL 설정: 보안 취약점 분석에 집중
+# 코드 품질 검사는 Qodana에서 담당
+
+# security-extended: 기본 보안 쿼리 + 추가 보안 쿼리
+# security-and-quality는 Qodana와 겹치므로 사용하지 않음
+queries:
+  - uses: security-extended
+
+# 분석 제외 경로
+paths-ignore:
+  - build
+  - .gradle
+  - '**/test/**'
+  - '**/tests/**'

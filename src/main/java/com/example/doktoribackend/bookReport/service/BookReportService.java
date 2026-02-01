@@ -1,0 +1,141 @@
+package com.example.doktoribackend.bookReport.service;
+
+import com.example.doktoribackend.bookReport.domain.BookReport;
+import com.example.doktoribackend.bookReport.domain.BookReportStatusResolver;
+import com.example.doktoribackend.bookReport.domain.UserBookReportStatus;
+import com.example.doktoribackend.bookReport.dto.BookReportCreateRequest;
+import com.example.doktoribackend.bookReport.dto.BookReportCreateResponse;
+import com.example.doktoribackend.bookReport.dto.BookReportDetailResponse;
+import com.example.doktoribackend.bookReport.dto.BookReportProjection;
+import com.example.doktoribackend.bookReport.repository.BookReportRepository;
+import com.example.doktoribackend.book.domain.Book;
+import com.example.doktoribackend.common.error.ErrorCode;
+import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.exception.UserNotFoundException;
+import com.example.doktoribackend.meeting.domain.MeetingMemberStatus;
+import com.example.doktoribackend.meeting.domain.MeetingRound;
+import com.example.doktoribackend.meeting.repository.MeetingMemberRepository;
+import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
+import com.example.doktoribackend.user.domain.User;
+import com.example.doktoribackend.user.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class BookReportService {
+
+    private static final int DAILY_SUBMISSION_LIMIT = 3;
+
+    private final BookReportRepository bookReportRepository;
+    private final MeetingRoundRepository meetingRoundRepository;
+    private final MeetingMemberRepository meetingMemberRepository;
+    private final UserRepository userRepository;
+    private final AiValidationService aiValidationService;
+
+    @Transactional
+    public BookReportCreateResponse createBookReport(Long userId, Long roundId, BookReportCreateRequest request) {
+        User user = userRepository.findByIdAndDeletedAtIsNull(userId)
+                .orElseThrow(UserNotFoundException::new);
+
+        MeetingRound meetingRound = meetingRoundRepository.findById(roundId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ROUND_NOT_FOUND));
+
+        Long meetingId = meetingRound.getMeeting().getId();
+
+        boolean isMember = meetingMemberRepository.existsByMeetingIdAndUserIdAndStatus(
+                meetingId, userId, MeetingMemberStatus.APPROVED);
+        if (!isMember) {
+            throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+        }
+
+        MeetingRound prevRound = findPrevRound(meetingRound);
+        UserBookReportStatus writeStatus = BookReportStatusResolver.resolveNotSubmitted(
+                LocalDateTime.now(), meetingRound, prevRound);
+        if (writeStatus != UserBookReportStatus.NOT_SUBMITTED) {
+            throw new BusinessException(ErrorCode.BOOK_REPORT_NOT_WRITABLE);
+        }
+
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        int todayCount = bookReportRepository.countTodaySubmissions(userId, startOfDay);
+        if (todayCount >= DAILY_SUBMISSION_LIMIT) {
+            throw new BusinessException(ErrorCode.DAILY_SUBMISSION_LIMIT_EXCEEDED);
+        }
+
+        Optional<BookReport> existingReport = bookReportRepository
+                .findByUserIdAndMeetingRoundIdAndDeletedAtIsNull(userId, roundId);
+
+        if (existingReport.isPresent()) {
+            BookReport existing = existingReport.get();
+            if (!existing.isResubmittable()) {
+                throw new BusinessException(ErrorCode.BOOK_REPORT_ALREADY_SUBMITTED);
+            }
+            existing.softDelete();
+            bookReportRepository.saveAndFlush(existing);
+        }
+        BookReport bookReport = BookReport.create(user, meetingRound, request.content());
+        bookReportRepository.save(bookReport);
+
+        aiValidationService.validate(bookReport.getId(), meetingRound.getBook().getTitle(), request.content());
+
+        return new BookReportCreateResponse(meetingId);
+    }
+
+    @Transactional(readOnly = true)
+    public BookReportDetailResponse getMyBookReport(Long userId, Long roundId) {
+        MeetingRound meetingRound = meetingRoundRepository.findByIdWithBookAndMeeting(roundId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ROUND_NOT_FOUND));
+
+        Book book = meetingRound.getBook();
+
+        Optional<BookReportProjection> bookReportOpt = bookReportRepository
+                .findProjectionByUserIdAndMeetingRoundId(userId, roundId);
+
+        BookReportDetailResponse.BookInfo bookInfo = new BookReportDetailResponse.BookInfo(
+                book.getTitle(),
+                book.getAuthors(),
+                book.getPublisher(),
+                book.getThumbnailUrl(),
+                book.getPublishedAt()
+        );
+
+        BookReportDetailResponse.BookReportInfo bookReportInfo;
+        if (bookReportOpt.isPresent()) {
+            BookReportProjection projection = bookReportOpt.get();
+            UserBookReportStatus status = BookReportStatusResolver.fromBookReportStatus(projection.getStatus());
+            bookReportInfo = new BookReportDetailResponse.BookReportInfo(
+                    projection.getId(),
+                    status.name(),
+                    projection.getContent(),
+                    projection.getRejectionReason()
+            );
+        } else {
+            MeetingRound prevRound = findPrevRound(meetingRound);
+            UserBookReportStatus status = BookReportStatusResolver.resolveNotSubmitted(
+                    LocalDateTime.now(), meetingRound, prevRound);
+            bookReportInfo = new BookReportDetailResponse.BookReportInfo(
+                    null,
+                    status.name(),
+                    null,
+                    null
+            );
+        }
+
+        return new BookReportDetailResponse(bookInfo, bookReportInfo);
+    }
+
+    private MeetingRound findPrevRound(MeetingRound meetingRound) {
+        int roundNo = meetingRound.getRoundNo();
+        if (roundNo <= 1) {
+            return null;
+        }
+        return meetingRoundRepository.findByMeetingIdAndRoundNo(
+                meetingRound.getMeeting().getId(), roundNo - 1
+        ).orElse(null);
+    }
+}

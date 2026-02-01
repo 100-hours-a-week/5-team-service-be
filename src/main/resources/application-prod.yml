@@ -1,0 +1,31 @@
+spring:
+  config:
+    import: 'aws-parameterstore:/doktori/prod/'
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+    com.example.doktoribackend: INFO
+
+app:
+  cookie:
+    secure: true
+    same-site: Lax
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+ai:
+  base-url: ${AI_BASE_URL:https://doktori.kr/ai}
+  api-key: ${AI_API_KEY}

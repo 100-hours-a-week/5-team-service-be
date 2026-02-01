@@ -1,0 +1,45 @@
+version: "1.0"
+
+# Qodana 설정: 코드 품질 및 Spring 분석에 집중
+# 보안 취약점 분석은 CodeQL에서 담당
+
+linter: jetbrains/qodana-jvm:2024.3
+
+profile:
+  name: qodana.recommended
+
+# 코드 품질에 집중하는 검사 그룹
+include:
+  - name: Java/Code style issues
+  - name: Java/Probable bugs
+  - name: Java/Code maturity
+  - name: Java/Performance
+  - name: Java/Declaration redundancy
+  - name: Java/Numeric issues
+  - name: Spring
+  - name: Spring Core
+  - name: Spring Data
+  - name: JPA issues
+
+# 보안 관련 검사는 CodeQL에서 처리하므로 제외
+exclude:
+  - name: Security
+  - name: Java/Security
+  - name: Vulnerable API usage
+
+  - name: All
+    paths:
+      - "build"                   # Gradle 빌드 디렉토리
+      - "**/generated/**"         # 일반적인 generated 소스 폴더
+      - "**/Q*.java"              # QueryDSL 생성 파일 (QMember.java 등)
+      - "src/test/resources"      # 테스트 리소스
+
+# 실패 임계값 설정
+# TODO : 협의 후 심각도 기준 조정
+failThreshold: 100
+
+## 실패 조건 (단순 개수보다 심각도 기준 추천)
+#failureConditions:
+#  severity:
+#    CRITICAL: 0  # Critical 이슈는 즉시 실패
+#    HIGH: 10     # High 이슈는 10개까지 허용 (팀 상황에 맞춰 조절)
