@@ -142,7 +142,8 @@ public class ZoomLinkSchedulerService {
                 notificationService.createAndSendBatch(
                         memberUserIds,
                         NotificationTypeCode.ROUND_START_10M_BEFORE,
-                        Map.of("meetingId", meetingId.toString())
+                        Map.of("meetingId", meetingId.toString(),
+                                "meetingTitle", meetingRound.getMeeting().getTitle())
                 );
                 log.info("[Scheduler] 토론 시작 알림 발송 - MeetingRoundId: {}, 대상 인원: {}명",
                         meetingRound.getId(), memberUserIds.size());

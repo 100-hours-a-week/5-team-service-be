@@ -89,10 +89,12 @@ public class AiValidationService {
         Long meetingId = bookReport.getMeetingRound().getMeeting().getId();
 
         try {
+            String meetingTitle = bookReport.getMeetingRound().getMeeting().getTitle();
             notificationService.createAndSend(
                     userId,
                     NotificationTypeCode.BOOK_REPORT_CHECKED,
-                    Map.of("meetingId", String.valueOf(meetingId))
+                    Map.of("meetingId", String.valueOf(meetingId),
+                            "meetingTitle", meetingTitle)
             );
         } catch (Exception e) {
             log.error("Failed to send notification");

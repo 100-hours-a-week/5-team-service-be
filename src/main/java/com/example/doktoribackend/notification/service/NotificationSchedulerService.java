@@ -45,7 +45,8 @@ public class NotificationSchedulerService {
             int sentCount = sendNotificationToMembers(
                     round,
                     NotificationTypeCode.BOOK_REPORT_DEADLINE_24H_BEFORE,
-                    Map.of(PARAM_MEETING_ID, round.getMeeting().getId().toString())
+                    Map.of(PARAM_MEETING_ID, round.getMeeting().getId().toString(),
+                            "meetingTitle", round.getMeeting().getTitle())
             );
             totalSent += sentCount;
 
@@ -77,7 +78,8 @@ public class NotificationSchedulerService {
             int sentCount = sendNotificationToMembers(
                     round,
                     NotificationTypeCode.BOOK_REPORT_DEADLINE_30M_BEFORE,
-                    Map.of(PARAM_MEETING_ID, round.getMeeting().getId().toString())
+                    Map.of(PARAM_MEETING_ID, round.getMeeting().getId().toString(),
+                            "meetingTitle", round.getMeeting().getTitle())
             );
             totalSent += sentCount;
 
