@@ -69,8 +69,8 @@ public class MeetingCreateRequest {
     private Boolean leaderIntroSavePolicy;
 
     @Min(30)
-    @Max(1440)
-    @Schema(example = "90")
+    @Max(120)
+    @Schema(example = "30")
     private Integer durationMinutes;
 
     @NotNull
@@ -133,6 +133,100 @@ public class MeetingCreateRequest {
             return true;
         }
         return durationMinutes % 30 == 0;
+    }
+
+    @AssertTrue(message = "recruitmentDeadline must be today or future")
+    @JsonIgnore
+    @Schema(hidden = true)
+    public boolean isRecruitmentDeadlineNotPast() {
+        if (recruitmentDeadline == null) {
+            return true;
+        }
+        return !recruitmentDeadline.isBefore(LocalDate.now());
+    }
+
+    @AssertTrue(message = "firstRoundAt must be after today")
+    @JsonIgnore
+    @Schema(hidden = true)
+    public boolean isFirstRoundAtAfterToday() {
+        if (firstRoundAt == null) {
+            return true;
+        }
+        return firstRoundAt.isAfter(LocalDate.now());
+    }
+
+    @AssertTrue(message = "all round dates must be after today")
+    @JsonIgnore
+    @Schema(hidden = true)
+    public boolean isAllRoundDatesAfterToday() {
+        if (rounds == null || rounds.isEmpty()) {
+            return true;
+        }
+        LocalDate today = LocalDate.now();
+        return rounds.stream()
+                .allMatch(round -> round.getDate() != null && round.getDate().isAfter(today));
+    }
+
+    @AssertTrue(message = "round dates must be in chronological order")
+    @JsonIgnore
+    @Schema(hidden = true)
+    public boolean isRoundDatesInOrder() {
+        if (rounds == null || rounds.size() < 2) {
+            return true;
+        }
+        List<RoundRequest> sorted = rounds.stream()
+                .filter(r -> r.getRoundNo() != null && r.getDate() != null)
+                .sorted((a, b) -> a.getRoundNo().compareTo(b.getRoundNo()))
+                .toList();
+        for (int i = 1; i < sorted.size(); i++) {
+            if (!sorted.get(i).getDate().isAfter(sorted.get(i - 1).getDate())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @AssertTrue(message = "first round date must match firstRoundAt")
+    @JsonIgnore
+    @Schema(hidden = true)
+    public boolean isFirstRoundDateMatchFirstRoundAt() {
+        if (rounds == null || rounds.isEmpty() || firstRoundAt == null) {
+            return true;
+        }
+        return rounds.stream()
+                .filter(r -> r.getRoundNo() != null && r.getRoundNo() == 1)
+                .findFirst()
+                .map(r -> r.getDate() != null && r.getDate().equals(firstRoundAt))
+                .orElse(false);
+    }
+
+    @AssertTrue(message = "booksByRound size must match roundCount")
+    @JsonIgnore
+    @Schema(hidden = true)
+    public boolean isBooksByRoundCountMatch() {
+        if (booksByRound == null || roundCount == null) {
+            return true;
+        }
+        return booksByRound.size() == roundCount;
+    }
+
+    @AssertTrue(message = "booksByRound must have unique roundNo within valid range")
+    @JsonIgnore
+    @Schema(hidden = true)
+    public boolean isValidBooksByRoundNumbers() {
+        if (booksByRound == null || roundCount == null) {
+            return true;
+        }
+        Set<Integer> roundNos = new HashSet<>();
+        for (BookByRoundRequest req : booksByRound) {
+            if (req.getRoundNo() == null || req.getRoundNo() < 1 || req.getRoundNo() > roundCount) {
+                return false;
+            }
+            if (!roundNos.add(req.getRoundNo())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Getter

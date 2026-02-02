@@ -81,22 +81,7 @@ public class MeetingService {
         LocalDateTime firstRoundAt = LocalDateTime.of(firstRoundDate, startTime);
         MeetingDayOfWeek dayOfWeek = MeetingDayOfWeek.from(firstRoundDate);
 
-        Map<Integer, LocalDate> roundDates = toRoundDateMap(request.getRounds());
-        if (!roundDates.containsKey(1)) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-        if (!roundDates.get(1).equals(firstRoundDate)) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
         Map<Integer, MeetingCreateRequest.BookRequest> booksByRound = toBookByRoundMap(request.getBooksByRound());
-        if (booksByRound.size() != roundDates.size()) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
-        if (request.getCapacity() < 3) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-        }
 
         String meetingImagePath = request.getMeetingImagePath();
 
@@ -485,14 +470,6 @@ public class MeetingService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
         return durationMinutes;
-    }
-
-    private Map<Integer, LocalDate> toRoundDateMap(List<MeetingCreateRequest.RoundRequest> rounds) {
-        Map<Integer, LocalDate> map = new HashMap<>();
-        for (MeetingCreateRequest.RoundRequest round : rounds) {
-            map.put(round.getRoundNo(), round.getDate());
-        }
-        return map;
     }
 
     private Map<Integer, MeetingCreateRequest.BookRequest> toBookByRoundMap(
