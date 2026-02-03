@@ -253,7 +253,7 @@ public class MeetingService {
         return new MeetingListResponse(mapped, pageInfo);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public MyMeetingListResponse getMyMeetings(Long userId, MyMeetingListRequest request) {
         int size = request.getSizeOrDefault();
         boolean activeOnly = request.isActiveFilter();
@@ -268,7 +268,10 @@ public class MeetingService {
         boolean hasNext = results.size() > size;
         List<MeetingListRow> sliced = hasNext ? results.subList(0, size) : results;
 
+        // 조회된 모임 중 종료된 모임 상태 갱신
         LocalDateTime now = LocalDateTime.now();
+        updateCompletedMeetingsStatus(sliced, now);
+
         List<MyMeetingItem> mapped = sliced.stream()
                 .map(row -> toMyMeetingItem(row, now))
                 .toList();
@@ -279,12 +282,15 @@ public class MeetingService {
         return new MyMeetingListResponse(mapped, pageInfo);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public MyMeetingListResponse getMyTodayMeetings(Long userId) {
         LocalDate today = LocalDate.now();
         List<MeetingListRow> results = meetingRepository.findMyTodayMeetings(userId, today);
 
+        // 조회된 모임 중 종료된 모임 상태 갱신
         LocalDateTime now = LocalDateTime.now();
+        updateCompletedMeetingsStatus(results, now);
+
         List<MyMeetingItem> mapped = results.stream()
                 .map(row -> toMyMeetingItem(row, now))
                 .toList();
@@ -295,7 +301,7 @@ public class MeetingService {
         return new MyMeetingListResponse(mapped, pageInfo);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public MyMeetingDetailResponse getMyMeetingDetail(Long userId, Long meetingId) {
         // 1. 모임 기본 정보 조회
         Meeting meeting = meetingRepository.findByIdWithLeader(meetingId)
@@ -312,18 +318,21 @@ public class MeetingService {
             throw new BusinessException(ErrorCode.MEETING_NOT_FOUND);
         }
 
-        // 3. ReadingGenre 조회
+        // 3. 종료된 모임 상태 갱신
+        LocalDateTime now = LocalDateTime.now();
+        updateCompletedMeetingStatus(meeting, now);
+
+        // 4. ReadingGenre 조회
         ReadingGenre readingGenre = readingGenreRepository.findById(meeting.getReadingGenreId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT_VALUE));
 
-        // 4. 나의 역할 판단
+        // 5. 나의 역할 판단
         boolean isLeader = meeting.getLeaderUser().getId().equals(userId);
         String myRole = isLeader ? "LEADER" : "MEMBER";
 
-        // 5. 회차 정보 조회
+        // 6. 회차 정보 조회
         List<MeetingRound> rounds = meetingRoundRepository.findByMeetingIdWithBook(meetingId);
 
-        LocalDateTime now = LocalDateTime.now();
         List<MyMeetingDetailResponse.RoundDetail> roundDetails = rounds.stream()
                 .map(round -> toRoundDetail(round, userId, now, meeting, myMember, rounds))
                 .collect(Collectors.toList());
@@ -529,5 +538,40 @@ public class MeetingService {
         }
         String normalized = authors.trim();
         return normalized.isBlank() ? null : normalized;
+    }
+
+    /**
+     * 조회된 모임 목록 중 모든 회차가 종료된 FINISHED 모임을 CANCELED로 변경
+     */
+    private void updateCompletedMeetingsStatus(List<MeetingListRow> rows, LocalDateTime now) {
+        if (rows.isEmpty()) {
+            return;
+        }
+
+        List<Long> meetingIds = rows.stream()
+                .map(MeetingListRow::getMeetingId)
+                .toList();
+
+        List<Meeting> completedMeetings = meetingRepository.findCompletedMeetingsInIds(meetingIds, now);
+
+        for (Meeting meeting : completedMeetings) {
+            meeting.updateStatusToCanceled();
+        }
+    }
+
+    /**
+     * 단일 모임이 모든 회차 종료된 FINISHED 상태면 CANCELED로 변경
+     */
+    private void updateCompletedMeetingStatus(Meeting meeting, LocalDateTime now) {
+        if (meeting.getStatus() != MeetingStatus.FINISHED) {
+            return;
+        }
+
+        List<Meeting> completedMeetings = meetingRepository.findCompletedMeetingsInIds(
+                List.of(meeting.getId()), now);
+
+        if (!completedMeetings.isEmpty()) {
+            meeting.updateStatusToCanceled();
+        }
     }
 }
