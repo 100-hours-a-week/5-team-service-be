@@ -3,6 +3,7 @@ package com.example.doktoribackend.meeting.service;
 import com.example.doktoribackend.book.domain.Book;
 import com.example.doktoribackend.book.repository.BookRepository;
 import com.example.doktoribackend.bookReport.domain.BookReport;
+import com.example.doktoribackend.bookReport.domain.BookReportStatus;
 import com.example.doktoribackend.bookReport.domain.BookReportStatusResolver;
 import com.example.doktoribackend.bookReport.domain.UserBookReportStatus;
 import com.example.doktoribackend.bookReport.repository.BookReportRepository;
@@ -81,22 +82,7 @@ public class MeetingService {
         LocalDateTime firstRoundAt = LocalDateTime.of(firstRoundDate, startTime);
         MeetingDayOfWeek dayOfWeek = MeetingDayOfWeek.from(firstRoundDate);
 
-        Map<Integer, LocalDate> roundDates = toRoundDateMap(request.getRounds());
-        if (!roundDates.containsKey(1)) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-        if (!roundDates.get(1).equals(firstRoundDate)) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
         Map<Integer, MeetingCreateRequest.BookRequest> booksByRound = toBookByRoundMap(request.getBooksByRound());
-        if (booksByRound.size() != roundDates.size()) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
-        if (request.getCapacity() < 3) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-        }
 
         String meetingImagePath = request.getMeetingImagePath();
 
@@ -403,12 +389,13 @@ public class MeetingService {
         // 6. meetingLink 공개 여부 (10분 전부터)
         LocalDateTime tenMinutesBefore = round.getStartAt().minusMinutes(10);
         boolean isLinkAvailable = !now.isBefore(tenMinutesBefore) && now.isBefore(round.getEndAt());
-        String meetingLink = (isLinkAvailable && dDay >= 0) ? round.getMeetingLink() : null;
 
         // 7. canJoinMeeting 판단
         boolean canJoinMeeting = isLinkAvailable &&
                 bookReportOpt.isPresent() &&
-                bookReportOpt.get().getStatus().name().equals("APPROVED");
+                bookReportOpt.get().getStatus() == BookReportStatus.APPROVED;
+
+        String meetingLink = canJoinMeeting ? round.getMeetingLink() : null;
 
         // 8. Book 정보
         Book book = round.getBook();
@@ -485,14 +472,6 @@ public class MeetingService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
         return durationMinutes;
-    }
-
-    private Map<Integer, LocalDate> toRoundDateMap(List<MeetingCreateRequest.RoundRequest> rounds) {
-        Map<Integer, LocalDate> map = new HashMap<>();
-        for (MeetingCreateRequest.RoundRequest round : rounds) {
-            map.put(round.getRoundNo(), round.getDate());
-        }
-        return map;
     }
 
     private Map<Integer, MeetingCreateRequest.BookRequest> toBookByRoundMap(

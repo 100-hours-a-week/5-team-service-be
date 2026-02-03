@@ -1,7 +1,6 @@
 package com.example.doktoribackend.bookReport.service;
 
 import com.example.doktoribackend.bookReport.domain.BookReport;
-import com.example.doktoribackend.bookReport.domain.BookReportStatus;
 import com.example.doktoribackend.bookReport.dto.AiValidationRequest;
 import com.example.doktoribackend.bookReport.dto.AiValidationResponse;
 import com.example.doktoribackend.bookReport.repository.BookReportRepository;
@@ -89,10 +88,12 @@ public class AiValidationService {
         Long meetingId = bookReport.getMeetingRound().getMeeting().getId();
 
         try {
+            String meetingTitle = bookReport.getMeetingRound().getMeeting().getTitle();
             notificationService.createAndSend(
                     userId,
                     NotificationTypeCode.BOOK_REPORT_CHECKED,
-                    Map.of("meetingId", String.valueOf(meetingId))
+                    Map.of("meetingId", String.valueOf(meetingId),
+                            "meetingTitle", meetingTitle)
             );
         } catch (Exception e) {
             log.error("Failed to send notification");

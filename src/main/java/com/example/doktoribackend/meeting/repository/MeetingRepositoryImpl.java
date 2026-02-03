@@ -15,6 +15,7 @@ import jakarta.persistence.TypedQuery;
 import jakarta.persistence.criteria.*;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +36,7 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
         List<Predicate> predicates = new ArrayList<>();
         predicates.add(cb.isNull(meeting.get("deletedAt")));
         predicates.add(cb.equal(meeting.get("status"), MeetingStatus.RECRUITING));
+        predicates.add(cb.greaterThanOrEqualTo(meeting.get("recruitmentDeadline"), LocalDate.now()));
 
         if (request.getCursorId() != null) {
             predicates.add(cb.lt(meeting.get("id"), request.getCursorId()));
@@ -135,6 +137,7 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
         // 기본 조건
         List<Predicate> predicates = new ArrayList<>();
         predicates.add(cb.isNull(meeting.get("deletedAt")));
+        predicates.add(cb.greaterThanOrEqualTo(meeting.get("recruitmentDeadline"), LocalDate.now()));
 
         // 검색 조건: 책 제목 OR 모임 제목
         Predicate searchCondition = buildSearchCondition(cb, query, meeting, request.getKeywordTrimmed());
