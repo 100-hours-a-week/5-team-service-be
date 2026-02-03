@@ -146,6 +146,10 @@ public class Meeting extends BaseTimeEntity {
         this.status = MeetingStatus.FINISHED;
     }
 
+    public void updateStatusToCanceled() {
+        this.status = MeetingStatus.CANCELED;
+    }
+
     public boolean isRecruitmentClosed() {
         // 모집 마감일이 지났거나 정원이 가득 찬 경우
         LocalDate today = LocalDate.now();

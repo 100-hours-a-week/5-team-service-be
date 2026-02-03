@@ -145,6 +145,24 @@ public class MeetingCreateRequest {
         return !recruitmentDeadline.isBefore(LocalDate.now());
     }
 
+    @AssertTrue(message = "recruitmentDeadline must be before last round date")
+    @JsonIgnore
+    @Schema(hidden = true)
+    public boolean isRecruitmentDeadlineBeforeLastRound() {
+        if (recruitmentDeadline == null || rounds == null || rounds.isEmpty()) {
+            return true;
+        }
+        LocalDate lastRoundDate = rounds.stream()
+                .filter(r -> r.getDate() != null)
+                .map(RoundRequest::getDate)
+                .max(LocalDate::compareTo)
+                .orElse(null);
+        if (lastRoundDate == null) {
+            return true;
+        }
+        return recruitmentDeadline.isBefore(lastRoundDate);
+    }
+
     @AssertTrue(message = "firstRoundAt must be after today")
     @JsonIgnore
     @Schema(hidden = true)
