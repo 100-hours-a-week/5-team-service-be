@@ -66,4 +66,12 @@ public interface MeetingRoundRepository extends JpaRepository<MeetingRound, Long
            "AND mr.startAt >= :now " +
            "ORDER BY mr.startAt ASC")
     List<LocalDateTime> findNextRoundDate(@Param("meetingId") Long meetingId, @Param("now") LocalDateTime now);
+
+    // 아직 종료되지 않은 회차가 있는 모임 ID 목록 조회
+    @Query("SELECT DISTINCT mr.meeting.id FROM MeetingRound mr " +
+           "WHERE mr.meeting.id IN :meetingIds " +
+           "AND mr.endAt > :now")
+    List<Long> findMeetingIdsWithOngoingRounds(
+            @Param("meetingIds") List<Long> meetingIds,
+            @Param("now") LocalDateTime now);
 }
