@@ -6,9 +6,10 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record BookRequest(
+        @NotBlank
         @Pattern(
-                regexp = "^(\\d{10}|\\d{13})$",
-                message = "isbn은 10자리 또는 13자리 숫자여야 합니다"
+                regexp = "^(\\d{9}[\\dX]|\\d{13})(\\s\\d{13})?$",
+                message = "isbn 형식이 올바르지 않습니다"
         )
         @Schema(example = "9781234567890")
         String isbn,
