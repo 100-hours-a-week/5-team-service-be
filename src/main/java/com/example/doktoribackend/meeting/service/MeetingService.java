@@ -1,6 +1,8 @@
 package com.example.doktoribackend.meeting.service;
 
+import com.example.doktoribackend.book.client.KakaoBookClient;
 import com.example.doktoribackend.book.domain.Book;
+import com.example.doktoribackend.book.dto.KakaoBookResponse;
 import com.example.doktoribackend.book.repository.BookRepository;
 import com.example.doktoribackend.bookReport.domain.BookReport;
 import com.example.doktoribackend.bookReport.domain.BookReportStatus;
@@ -15,6 +17,7 @@ import com.example.doktoribackend.meeting.domain.MeetingMember;
 import com.example.doktoribackend.meeting.domain.MeetingMemberStatus;
 import com.example.doktoribackend.meeting.domain.MeetingRound;
 import com.example.doktoribackend.meeting.domain.MeetingStatus;
+import com.example.doktoribackend.meeting.dto.BookRequest;
 import com.example.doktoribackend.meeting.dto.MeetingCreateRequest;
 import com.example.doktoribackend.meeting.dto.MeetingCreateResponse;
 import com.example.doktoribackend.meeting.dto.MeetingDetailResponse;
@@ -45,9 +48,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -59,6 +60,7 @@ public class MeetingService {
     private final MeetingRoundRepository meetingRoundRepository;
     private final MeetingMemberRepository meetingMemberRepository;
     private final BookRepository bookRepository;
+    private final KakaoBookClient kakaoBookClient;
     private final UserRepository userRepository;
     private final ReadingGenreRepository readingGenreRepository;
     private final BookReportRepository bookReportRepository;
@@ -69,37 +71,34 @@ public class MeetingService {
         User leader = userRepository.findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        if (!readingGenreRepository.existsByIdAndDeletedAtIsNull(request.getReadingGenreId())) {
+        if (!readingGenreRepository.existsByIdAndDeletedAtIsNull(request.readingGenreId())) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        MeetingCreateRequest.TimeRequest time = request.getTime();
-        LocalTime startTime = time.getStartTime();
-        LocalTime endTime = time.getEndTime();
-        int durationMinutes = resolveDurationMinutes(request.getDurationMinutes(), startTime, endTime);
+        LocalTime startTime = request.startTime();
+        int durationMinutes = request.durationMinutes();
 
-        LocalDate firstRoundDate = request.getFirstRoundAt();
+        LocalDate firstRoundDate = request.firstRoundAt();
+        if (firstRoundDate == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
         LocalDateTime firstRoundAt = LocalDateTime.of(firstRoundDate, startTime);
         MeetingDayOfWeek dayOfWeek = MeetingDayOfWeek.from(firstRoundDate);
 
-        Map<Integer, MeetingCreateRequest.BookRequest> booksByRound = toBookByRoundMap(request.getBooksByRound());
-
-        String meetingImagePath = request.getMeetingImagePath();
-
         Meeting meeting = Meeting.create(
                 leader,
-                request.getReadingGenreId(),
-                request.getLeaderIntro(),
-                meetingImagePath,
-                request.getTitle(),
-                request.getDescription(),
-                request.getCapacity(),
-                request.getRoundCount(),
+                request.readingGenreId(),
+                request.leaderIntro(),
+                request.meetingImagePath(),
+                request.title(),
+                request.description(),
+                request.capacity(),
+                request.roundCount(),
                 dayOfWeek,
                 startTime,
                 durationMinutes,
                 firstRoundAt,
-                request.getRecruitmentDeadline(),
+                request.recruitmentDeadline(),
                 1
         );
         meetingRepository.save(meeting);
@@ -108,23 +107,18 @@ public class MeetingService {
         MeetingMember leaderMember = MeetingMember.createLeader(meeting, leader, approvedAt);
         meetingMemberRepository.save(leaderMember);
 
-        List<MeetingRound> rounds = request.getRounds().stream()
+        List<MeetingRound> rounds = request.rounds().stream()
                 .map(round -> {
-                    int roundNo = round.getRoundNo();
-                    MeetingCreateRequest.BookRequest bookRequest = booksByRound.get(roundNo);
-                    if (bookRequest == null) {
-                        throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-                    }
-                    Book book = resolveBook(bookRequest);
-                    LocalDateTime startAt = LocalDateTime.of(round.getDate(), startTime);
+                    Book book = resolveBook(round.book());
+                    LocalDateTime startAt = LocalDateTime.of(round.date(), startTime);
                     LocalDateTime endAt = startAt.plusMinutes(durationMinutes);
-                    return MeetingRound.create(meeting, book, roundNo, startAt, endAt);
+                    return MeetingRound.create(meeting, book, round.roundNo(), startAt, endAt);
                 })
                 .toList();
         meetingRoundRepository.saveAll(rounds);
 
-        if (Boolean.TRUE.equals(request.getLeaderIntroSavePolicy())) {
-            leader.updateLeaderIntro(request.getLeaderIntro());
+        if (Boolean.TRUE.equals(request.leaderIntroSavePolicy())) {
+            leader.updateLeaderIntro(request.leaderIntro());
         }
 
         return new MeetingCreateResponse(meeting.getId());
@@ -469,40 +463,14 @@ public class MeetingService {
         );
     }
 
-    private int resolveDurationMinutes(Integer durationMinutes, LocalTime startTime, LocalTime endTime) {
-        long diff = ChronoUnit.MINUTES.between(startTime, endTime);
-        if (diff < 30 || diff % 30 != 0) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-        if (durationMinutes == null) {
-            return (int) diff;
-        }
-        if (durationMinutes < 30 || durationMinutes % 30 != 0 || durationMinutes != (int) diff) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-        return durationMinutes;
-    }
+    private Book resolveBook(BookRequest request) {
+        String isbn = request.isbn();
 
-    private Map<Integer, MeetingCreateRequest.BookRequest> toBookByRoundMap(
-            List<MeetingCreateRequest.BookByRoundRequest> bookRequests
-    ) {
-        Map<Integer, MeetingCreateRequest.BookRequest> map = new HashMap<>();
-        for (MeetingCreateRequest.BookByRoundRequest request : bookRequests) {
-            if (map.putIfAbsent(request.getRoundNo(), request.getBook()) != null) {
-                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-            }
-        }
-        return map;
-    }
-
-    private Book resolveBook(MeetingCreateRequest.BookRequest request) {
-        String isbn13 = normalizeIsbn(request.getIsbn13());
-        if (isbn13 != null) {
-            return bookRepository.findByIsbn13(isbn13)
-                    .map(this::reviveIfDeleted)
-                    .orElseGet(() -> bookRepository.save(toBook(request, isbn13)));
-        }
-        return bookRepository.save(toBook(request, null));
+        return bookRepository.findByIsbn(isbn)
+                .map(this::reviveIfDeleted)
+                .orElseGet(() -> kakaoBookClient.searchByIsbn(isbn)
+                        .map(doc -> bookRepository.save(toBookFromKakao(doc, isbn)))
+                        .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND)));
     }
 
     private Book reviveIfDeleted(Book existing) {
@@ -512,32 +480,29 @@ public class MeetingService {
         return existing;
     }
 
-    private Book toBook(MeetingCreateRequest.BookRequest request, String isbn13) {
-        String authors = normalizeAuthors(request.getAuthors());
+    private Book toBookFromKakao(KakaoBookResponse.KakaoBookDocument doc, String isbn) {
+        String authors = doc.authors() != null ? String.join(", ", doc.authors()) : null;
+        LocalDate publishedAt = parsePublishedAt(doc.datetime());
+
         return Book.create(
-                isbn13,
-                request.getTitle(),
+                isbn,
+                doc.title(),
                 authors,
-                request.getPublisher(),
-                request.getThumbnailUrl(),
-                request.getPublishedAt()
+                doc.publisher(),
+                doc.thumbnail(),
+                publishedAt
         );
     }
 
-    private String normalizeIsbn(String isbn13) {
-        if (isbn13 == null) {
+    private LocalDate parsePublishedAt(String datetime) {
+        if (datetime == null || datetime.isBlank()) {
             return null;
         }
-        String normalized = isbn13.trim();
-        return normalized.isBlank() ? null : normalized;
-    }
-
-    private String normalizeAuthors(String authors) {
-        if (authors == null) {
+        try {
+            return LocalDate.parse(datetime.substring(0, 10));
+        } catch (Exception e) {
             return null;
         }
-        String normalized = authors.trim();
-        return normalized.isBlank() ? null : normalized;
     }
 
     /**
