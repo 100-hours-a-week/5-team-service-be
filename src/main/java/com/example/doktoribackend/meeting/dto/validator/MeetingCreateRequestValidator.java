@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 public class MeetingCreateRequestValidator
@@ -156,8 +157,8 @@ public class MeetingCreateRequestValidator
             return true;
         }
         LocalDate lastRoundDate = req.rounds().stream()
-                .filter(r -> r.date() != null)
                 .map(RoundRequest::date)
+                .filter(Objects::nonNull)
                 .max(LocalDate::compareTo)
                 .orElse(null);
         if (lastRoundDate == null) {
