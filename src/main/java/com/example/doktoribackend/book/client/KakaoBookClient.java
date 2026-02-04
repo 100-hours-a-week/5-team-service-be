@@ -6,6 +6,8 @@ import com.example.doktoribackend.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+
+import java.util.Optional;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -47,4 +49,32 @@ public class KakaoBookClient {
             throw new BusinessException(ErrorCode.UPSTREAM_KAKAO_FAILED);
         }
     }
+
+    public Optional<KakaoBookResponse.KakaoBookDocument> searchByIsbn(String isbn) {
+        try {
+            KakaoBookResponse response = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .scheme("https")
+                            .host("dapi.kakao.com")
+                            .path("/v3/search/book")
+                            .queryParam("query", isbn)
+                            .queryParam("target", "isbn")
+                            .queryParam("size", 1)
+                            .build())
+                    .header("Authorization", "KakaoAK " + restApiKey)
+                    .retrieve()
+                    .bodyToMono(KakaoBookResponse.class)
+                    .blockOptional()
+                    .orElse(null);
+
+            if (response == null || response.documents() == null || response.documents().isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(response.documents().getFirst());
+        } catch (Exception ex) {
+            log.warn("Kakao book search by ISBN failed: isbn={}, error={}", isbn, ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
 }
