@@ -41,7 +41,7 @@ public class MeetingListRequest {
     private List<StartTimeCode> startTimeFrom;
 
     @Parameter(description = "독서 장르 필터 (복수 선택 가능)", schema = @Schema(type = "array",
-            allowableValues = {"ESSAY", "NOVEL", "SELF_HELP", "HUMANITIES", "SCIENCE", "ECONOMY", "POETRY", "ETC"}))
+            allowableValues = {"NOVEL", "ECONOMY_BUSINESS", "ESSAY", "HUMANITIES_PHIL", "SOCIETY_POLITICS", "SELF_DEVELOPMENT", "SCIENCE_TECH", "HISTORY"}))
     private List<String> readingGenres;
 
     @Parameter(hidden = true)
