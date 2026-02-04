@@ -15,7 +15,7 @@ public record BookSearchResponse(
             String publisher,
             String thumbnailUrl,
             @JsonFormat(pattern = "yyyy-MM-dd") LocalDate publishedAt,
-            String isbn13
+            String isbn
     ) {
     }
 
