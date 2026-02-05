@@ -9,13 +9,14 @@ import com.example.doktoribackend.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.util.retry.Retry;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
 
-import java.time.Duration;
 import java.util.Map;
 
 @Service
@@ -23,7 +24,7 @@ import java.util.Map;
 @Slf4j
 public class AiValidationService {
 
-    private final WebClient webClient;
+    private final RestTemplate restTemplate;
     private final BookReportRepository bookReportRepository;
     private final PlatformTransactionManager transactionManager;
     private final NotificationService notificationService;
@@ -34,38 +35,62 @@ public class AiValidationService {
     @Value("${ai.api-key}")
     private String apiKey;
 
-    private static final Duration TIMEOUT = Duration.ofSeconds(30);
     private static final int MAX_RETRY = 3;
+    private static final long RETRY_DELAY_MS = 2000;
 
+    @Async("aiValidationExecutor")
     public void validate(Long bookReportId, String bookTitle, String content) {
-        AiValidationRequest request = new AiValidationRequest(
-                bookTitle,
-                content
-        );
+        AiValidationRequest request = new AiValidationRequest(bookTitle, content);
 
-        webClient.post()
-                .uri(aiValidationBaseUrl + "/book-reports/{id}/validate", bookReportId)
-                .header("x-api-key", apiKey)
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono(AiValidationResponse.class)
-                .timeout(TIMEOUT)
-                .retryWhen(Retry.backoff(MAX_RETRY, Duration.ofSeconds(2))
-                        .maxBackoff(Duration.ofSeconds(10))
-                        .doBeforeRetry(signal -> log.warn("Retrying AI validation for bookReportId: {}, attempt: {}",
-                                bookReportId, signal.totalRetries() + 1)))
-                .doOnSuccess(response -> {
-                    if (response != null) {
-                        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
-                        transactionTemplate.execute(status -> {
-                            updateBookReportStatus(bookReportId, response);
-                            return null;
-                        });
+        String url = aiValidationBaseUrl + "/book-reports/" + bookReportId + "/validate";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("x-api-key", apiKey);
+
+        HttpEntity<AiValidationRequest> httpRequest = new HttpEntity<>(request, headers);
+
+        AiValidationResponse response = executeWithRetry(url, httpRequest, bookReportId);
+
+        if (response != null) {
+            TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+            transactionTemplate.execute(status -> {
+                updateBookReportStatus(bookReportId, response);
+                return null;
+            });
+        }
+    }
+
+    private AiValidationResponse executeWithRetry(String url, HttpEntity<AiValidationRequest> request, Long bookReportId) {
+        int attempt = 0;
+        while (attempt < MAX_RETRY) {
+            try {
+                ResponseEntity<AiValidationResponse> response = restTemplate.exchange(
+                        url,
+                        HttpMethod.POST,
+                        request,
+                        AiValidationResponse.class
+                );
+                return response.getBody();
+            } catch (RestClientException ex) {
+                attempt++;
+                log.warn("Retrying AI validation for bookReportId: {}, attempt: {}, error: {}",
+                        bookReportId, attempt, ex.getMessage());
+
+                if (attempt < MAX_RETRY) {
+                    try {
+                        Thread.sleep(RETRY_DELAY_MS * attempt);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.error("AI validation retry interrupted for bookReportId: {}", bookReportId);
+                        return null;
                     }
-                })
-                .doOnError(e -> log.error("AI validation failed for bookReportId: {} after {} retries. Error: {}",
-                        bookReportId, MAX_RETRY, e.getMessage()))
-                .subscribe();
+                }
+            }
+        }
+
+        log.error("AI validation failed for bookReportId: {} after {} retries", bookReportId, MAX_RETRY);
+        return null;
     }
 
     private void updateBookReportStatus(Long bookReportId, AiValidationResponse response) {
