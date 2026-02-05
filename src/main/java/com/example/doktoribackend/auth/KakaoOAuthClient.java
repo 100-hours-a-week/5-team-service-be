@@ -7,12 +7,12 @@ import com.example.doktoribackend.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
+import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Component
@@ -20,7 +20,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Slf4j
 public class KakaoOAuthClient {
 
-    private final WebClient webClient;
+    private final RestTemplate restTemplate;
 
     @Value("${kakao.oauth.client-id}")
     private String clientId;
@@ -61,37 +61,48 @@ public class KakaoOAuthClient {
             form.add("client_secret", clientSecret);
         }
 
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(form, headers);
+
         try {
-            return webClient.post()
-                    .uri(tokenUrl)
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .bodyValue(form)
-                    .retrieve()
-                    .bodyToMono(KakaoTokenResponse.class)
-                    .blockOptional()
-                    .orElseThrow(() -> new BusinessException(ErrorCode.KAKAO_TOKEN_FETCH_FAILED));
-        } catch (WebClientResponseException ex) {
-            log.warn("Kakao token exchange failed: status={}, body={}", ex.getStatusCode(), ex.getResponseBodyAsString());
-            throw new BusinessException(ErrorCode.KAKAO_TOKEN_FETCH_FAILED);
-        } catch (Exception ex) {
+            ResponseEntity<KakaoTokenResponse> response = restTemplate.exchange(
+                    tokenUrl,
+                    HttpMethod.POST,
+                    request,
+                    KakaoTokenResponse.class
+            );
+
+            if (response.getBody() == null) {
+                throw new BusinessException(ErrorCode.KAKAO_TOKEN_FETCH_FAILED);
+            }
+            return response.getBody();
+        } catch (RestClientException ex) {
             log.warn("Kakao token exchange failed: {}", ex.getMessage());
             throw new BusinessException(ErrorCode.KAKAO_TOKEN_FETCH_FAILED);
         }
     }
 
     public KakaoUserResponse fetchUser(String accessToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+
+        HttpEntity<Void> request = new HttpEntity<>(headers);
+
         try {
-            return webClient.get()
-                    .uri(userInfoUrl)
-                    .headers(h -> h.setBearerAuth(accessToken))
-                    .retrieve()
-                    .bodyToMono(KakaoUserResponse.class)
-                    .blockOptional()
-                    .orElseThrow(() -> new BusinessException(ErrorCode.KAKAO_USER_INFO_FETCH_FAILED));
-        } catch (WebClientResponseException ex) {
-            log.warn("Kakao user info failed: status={}, body={}", ex.getStatusCode(), ex.getResponseBodyAsString());
-            throw new BusinessException(ErrorCode.KAKAO_USER_INFO_FETCH_FAILED);
-        } catch (Exception ex) {
+            ResponseEntity<KakaoUserResponse> response = restTemplate.exchange(
+                    userInfoUrl,
+                    HttpMethod.GET,
+                    request,
+                    KakaoUserResponse.class
+            );
+
+            if (response.getBody() == null) {
+                throw new BusinessException(ErrorCode.KAKAO_USER_INFO_FETCH_FAILED);
+            }
+            return response.getBody();
+        } catch (RestClientException ex) {
             log.warn("Kakao user info failed: {}", ex.getMessage());
             throw new BusinessException(ErrorCode.KAKAO_USER_INFO_FETCH_FAILED);
         }
