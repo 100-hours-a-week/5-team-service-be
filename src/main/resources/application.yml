@@ -24,6 +24,9 @@ spring:
 server:
   servlet:
     context-path: /api
+  tomcat:
+    mbeanregistry:
+      enabled: true
 
 springdoc:
   api-docs:
