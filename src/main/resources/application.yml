@@ -36,6 +36,8 @@ server:
       max: 100
       min-spare: 20
     accept-count: 50
+    mbeanregistry:
+      enabled: true
 
 springdoc:
   api-docs:
