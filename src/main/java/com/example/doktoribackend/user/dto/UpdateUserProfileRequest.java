@@ -1,5 +1,6 @@
 package com.example.doktoribackend.user.dto;
 
+import com.example.doktoribackend.common.validator.ValidImageUrl;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -19,8 +20,9 @@ public record UpdateUserProfileRequest(
         )
         String nickname,
 
-        @Schema(description = "프로필 이미지 경로", example = "https://image.kr/img.jpg", nullable = true)
+        @Schema(description = "프로필 이미지 경로", example = "https://k.kakaocdn.net/dn/profile/img.jpg", nullable = true)
         @Size(max = PROFILE_IMAGE_PATH_MAX_LENGTH, message = "프로필 이미지 경로는 512자를 초과할 수 없습니다")
+        @ValidImageUrl
         String profileImagePath,
 
         @Schema(description = "리더 소개", nullable = true, example = "리더 소개입니다")
