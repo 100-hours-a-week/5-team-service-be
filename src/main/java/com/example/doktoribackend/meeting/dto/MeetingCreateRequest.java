@@ -1,5 +1,6 @@
 package com.example.doktoribackend.meeting.dto;
 
+import com.example.doktoribackend.common.validator.ValidImageUrl;
 import com.example.doktoribackend.meeting.dto.validator.ValidMeetingCreateRequest;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -13,7 +14,8 @@ import java.util.List;
 @ValidMeetingCreateRequest
 public record MeetingCreateRequest(
         @NotBlank
-        @Schema(example = "https://doktori-dev-images.s3.ap-northeast-2.amazonaws.com/images/meetings/36ba1999-7622-4275-b44e-9642d234b6bb.png")
+        @ValidImageUrl
+        @Schema(example = "images/meetings/36ba1999-7622-4275-b44e-9642d234b6bb.png")
         String meetingImagePath,
 
         @NotBlank
