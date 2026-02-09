@@ -1,0 +1,11 @@
+.git
+.gitignore
+.idea
+.vscode
+.gradle
+build
+out
+*.md
+*.log
+docker-compose*.yml
+load-test-scenarios.md
