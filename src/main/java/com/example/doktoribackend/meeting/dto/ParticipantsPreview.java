@@ -1,6 +1,7 @@
 package com.example.doktoribackend.meeting.dto;
 
 import com.example.doktoribackend.meeting.domain.MeetingMember;
+import com.example.doktoribackend.s3.ImageUrlResolver;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -15,10 +16,11 @@ public class ParticipantsPreview {
 
     public static ParticipantsPreview from(
             List<MeetingMember> approvedMembers,
-            String myParticipationStatus
+            String myParticipationStatus,
+            ImageUrlResolver imageUrlResolver
     ) {
         List<String> profileImages = approvedMembers.stream()
-                .map(mm -> mm.getUser().getProfileImagePath())
+                .map(mm -> imageUrlResolver.toUrl(mm.getUser().getProfileImagePath()))
                 .toList();
 
         return ParticipantsPreview.builder()

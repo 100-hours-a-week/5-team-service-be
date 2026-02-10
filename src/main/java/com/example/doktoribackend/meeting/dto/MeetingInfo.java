@@ -1,6 +1,7 @@
 package com.example.doktoribackend.meeting.dto;
 
 import com.example.doktoribackend.meeting.domain.Meeting;
+import com.example.doktoribackend.s3.ImageUrlResolver;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Builder;
 import lombok.Getter;
@@ -31,12 +32,12 @@ public class MeetingInfo {
     private TimeInfo time;
     private LeaderInfo leader;
 
-    public static MeetingInfo from(Meeting meeting) {
+    public static MeetingInfo from(Meeting meeting, ImageUrlResolver imageUrlResolver) {
         return MeetingInfo.builder()
                 .meetingId(meeting.getId())
                 .createdAt(meeting.getCreatedAt())
                 .status(meeting.getStatus().name())
-                .meetingImagePath(meeting.getMeetingImagePath())
+                .meetingImagePath(imageUrlResolver.toUrl(meeting.getMeetingImagePath()))
                 .title(meeting.getTitle())
                 .description(meeting.getDescription())
                 .readingGenreId(meeting.getReadingGenreId())
@@ -45,7 +46,7 @@ public class MeetingInfo {
                 .recruitmentDeadline(meeting.getRecruitmentDeadline())
                 .roundCount(meeting.getRoundCount())
                 .time(TimeInfo.from(meeting.getStartTime(), meeting.getDurationMinutes()))
-                .leader(LeaderInfo.from(meeting.getLeaderUser(), meeting.getLeaderIntro()))
+                .leader(LeaderInfo.from(meeting.getLeaderUser(), meeting.getLeaderIntro(), imageUrlResolver))
                 .build();
     }
 }
