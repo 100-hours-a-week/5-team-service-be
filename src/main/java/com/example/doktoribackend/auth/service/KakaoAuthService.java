@@ -50,10 +50,15 @@ public class KakaoAuthService implements OAuthService {
                 .findByProviderAndProviderId(OAuthProvider.KAKAO, String.valueOf(kakaoId))
                 .orElse(null);
 
+        if (existingAccount != null && !existingAccount.getUser().isDeleted()) {
+            return handleExistingUser(existingAccount);
+        }
+
         String nickname = extractNickname(userResponse, kakaoId);
         String profileImagePath = extractProfileImage(userResponse);
+
         if (existingAccount != null) {
-            return handleExistingUser(existingAccount, nickname, profileImagePath);
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 
         return handleNewUser(userResponse, nickname, profileImagePath);
@@ -74,19 +79,9 @@ public class KakaoAuthService implements OAuthService {
     }
 
 
-    private TokenResponse handleExistingUser(UserAccount userAccount,
-                                             String nickname,
-                                             String profileImagePath) {
+    private TokenResponse handleExistingUser(UserAccount userAccount) {
         User user = userAccount.getUser();
 
-        if (user.isDeleted()) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
-        }
-
-        user.updateNickname(nickname);
-        if (profileImagePath != null && !profileImagePath.isBlank()) {
-            user.updateProfileImage(profileImagePath);
-        }
         ensurePreference(user);
 
         return tokenService.issueTokens(user);
