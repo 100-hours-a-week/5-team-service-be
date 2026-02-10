@@ -1,6 +1,8 @@
 package com.example.doktoribackend.meeting.repository;
 
 import com.example.doktoribackend.meeting.domain.Meeting;
+import com.example.doktoribackend.meeting.domain.MeetingMember;
+import com.example.doktoribackend.meeting.domain.MeetingMemberStatus;
 import com.example.doktoribackend.meeting.domain.MeetingRound;
 import com.example.doktoribackend.meeting.domain.MeetingStatus;
 import com.example.doktoribackend.meeting.dto.MeetingListRow;
@@ -19,6 +21,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+
+import static com.example.doktoribackend.meeting.domain.MeetingMemberStatus.APPROVED;
 
 @Repository
 public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
@@ -264,8 +268,8 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
 
         // MeetingMember 서브쿼리로 나의 모임만 필터링
         Subquery<Long> memberSubquery = query.subquery(Long.class);
-        Root<com.example.doktoribackend.meeting.domain.MeetingMember> memberRoot = 
-                memberSubquery.from(com.example.doktoribackend.meeting.domain.MeetingMember.class);
+        Root<MeetingMember> memberRoot =
+                memberSubquery.from(MeetingMember.class);
         
         // APPROVED와 PENDING 모두 포함
         memberSubquery.select(memberRoot.get("meeting").get("id"))
@@ -273,9 +277,9 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
                         cb.equal(memberRoot.get("user").get("id"), userId),
                         cb.or(
                                 cb.equal(memberRoot.get("status"), 
-                                        com.example.doktoribackend.meeting.domain.MeetingMemberStatus.APPROVED),
+                                        APPROVED),
                                 cb.equal(memberRoot.get("status"), 
-                                        com.example.doktoribackend.meeting.domain.MeetingMemberStatus.PENDING)
+                                        MeetingMemberStatus.PENDING)
                         )
                 );
 
@@ -325,17 +329,17 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
 
         // MeetingMember 서브쿼리: 나의 모임 (APPROVED + PENDING)
         Subquery<Long> memberSubquery = query.subquery(Long.class);
-        Root<com.example.doktoribackend.meeting.domain.MeetingMember> memberRoot = 
-                memberSubquery.from(com.example.doktoribackend.meeting.domain.MeetingMember.class);
+        Root<MeetingMember> memberRoot =
+                memberSubquery.from(MeetingMember.class);
         
         memberSubquery.select(memberRoot.get("meeting").get("id"))
                 .where(
                         cb.equal(memberRoot.get("user").get("id"), userId),
                         cb.or(
                                 cb.equal(memberRoot.get("status"), 
-                                        com.example.doktoribackend.meeting.domain.MeetingMemberStatus.APPROVED),
+                                        APPROVED),
                                 cb.equal(memberRoot.get("status"), 
-                                        com.example.doktoribackend.meeting.domain.MeetingMemberStatus.PENDING)
+                                        MeetingMemberStatus.PENDING)
                         )
                 );
 
