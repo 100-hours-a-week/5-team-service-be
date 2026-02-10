@@ -60,12 +60,23 @@ public interface MeetingRoundRepository extends JpaRepository<MeetingRound, Long
             "WHERE mr.id = :id")
     Optional<MeetingRound> findByIdWithBookAndMeeting(@Param("id") Long id);
 
-    // 나의 모임 리스트: 다음 회차 날짜 조회
+    // 나의 모임 리스트: 다음 회차 날짜 조회 (단일 모임)
     @Query("SELECT mr.startAt FROM MeetingRound mr " +
            "WHERE mr.meeting.id = :meetingId " +
            "AND mr.startAt >= :now " +
            "ORDER BY mr.startAt ASC")
     List<LocalDateTime> findNextRoundDate(@Param("meetingId") Long meetingId, @Param("now") LocalDateTime now);
+
+    // 나의 모임 리스트: 다음 회차 날짜 일괄 조회 (여러 모임) - N+1 해결
+    @Query("SELECT mr.meeting.id as meetingId, MIN(mr.startAt) as nextRoundDate " +
+           "FROM MeetingRound mr " +
+           "WHERE mr.meeting.id IN :meetingIds " +
+           "AND mr.startAt >= :now " +
+           "GROUP BY mr.meeting.id")
+    List<NextRoundProjection> findNextRoundDatesByMeetingIds(
+            @Param("meetingIds") List<Long> meetingIds,
+            @Param("now") LocalDateTime now
+    );
 
     // 아직 종료되지 않은 회차가 있는 모임 ID 목록 조회
     @Query("SELECT DISTINCT mr.meeting.id FROM MeetingRound mr " +

@@ -35,6 +35,7 @@ import com.example.doktoribackend.meeting.dto.MeetingListRow;
 import com.example.doktoribackend.meeting.repository.MeetingMemberRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
+import com.example.doktoribackend.meeting.repository.NextRoundProjection;
 import com.example.doktoribackend.reading.domain.ReadingGenre;
 import com.example.doktoribackend.reading.repository.ReadingGenreRepository;
 import com.example.doktoribackend.s3.ImageUrlResolver;
@@ -49,6 +50,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -266,8 +268,21 @@ public class MeetingService {
         LocalDateTime now = LocalDateTime.now();
         updateCompletedMeetingsStatus(sliced, now);
 
+        // N+1 해결: 다음 회차 일괄 조회
+        List<Long> meetingIds = sliced.stream()
+                .map(MeetingListRow::getMeetingId)
+                .toList();
+        
+        Map<Long, LocalDateTime> nextRoundMap = meetingRoundRepository
+                .findNextRoundDatesByMeetingIds(meetingIds, now)
+                .stream()
+                .collect(Collectors.toMap(
+                        NextRoundProjection::getMeetingId,
+                        NextRoundProjection::getNextRoundDate
+                ));
+
         List<MyMeetingItem> mapped = sliced.stream()
-                .map(row -> toMyMeetingItem(row, now))
+                .map(row -> toMyMeetingItem(row, now, nextRoundMap))
                 .toList();
 
         Long nextCursorId = hasNext ? mapped.getLast().getMeetingId() : null;
@@ -431,6 +446,31 @@ public class MeetingService {
         // 다음 회차 날짜 조회
         List<LocalDateTime> nextRounds = meetingRoundRepository.findNextRoundDate(row.getMeetingId(), now);
         LocalDate meetingDate = nextRounds.isEmpty() ? null : nextRounds.getFirst().toLocalDate();
+
+        return MyMeetingItem.builder()
+                .meetingId(row.getMeetingId())
+                .meetingImagePath(imageUrlResolver.toUrl(row.getMeetingImagePath()))
+                .title(row.getTitle())
+                .readingGenreId(row.getReadingGenreId())
+                .leaderNickname(row.getLeaderNickname())
+                .currentRound(meeting.getCurrentRound())
+                .meetingDate(meetingDate)
+                .build();
+    }
+
+    // N+1 해결 버전: Map을 사용한 toMyMeetingItem
+    private MyMeetingItem toMyMeetingItem(
+            MeetingListRow row, 
+            LocalDateTime now, 
+            Map<Long, LocalDateTime> nextRoundMap
+    ) {
+        // Meeting 조회 (currentRound 필요)
+        Meeting meeting = meetingRepository.findById(row.getMeetingId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+
+        // Map에서 다음 회차 날짜 조회 (O(1))
+        LocalDateTime nextRound = nextRoundMap.get(row.getMeetingId());
+        LocalDate meetingDate = nextRound != null ? nextRound.toLocalDate() : null;
 
         return MyMeetingItem.builder()
                 .meetingId(row.getMeetingId())
