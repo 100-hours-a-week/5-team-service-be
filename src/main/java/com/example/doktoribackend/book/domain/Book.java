@@ -21,8 +21,8 @@ public class Book extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(length = 13, unique = true)
-    private String isbn13;
+    @Column(name = "isbn13", length = 13, unique = true)
+    private String isbn;
 
     @Column(nullable = false)
     private String title;
@@ -44,7 +44,7 @@ public class Book extends BaseTimeEntity {
     private LocalDateTime deletedAt;
 
     public static Book create(
-            String isbn13,
+            String isbn,
             String title,
             String authors,
             String publisher,
@@ -52,7 +52,7 @@ public class Book extends BaseTimeEntity {
             LocalDate publishedAt
     ) {
         return Book.builder()
-                .isbn13(isbn13)
+                .isbn(isbn)
                 .title(title)
                 .authors(authors)
                 .publisher(publisher)
