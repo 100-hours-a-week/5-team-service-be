@@ -165,7 +165,7 @@ public class MeetingService {
         }
 
         // 5. DTO 변환 및 반환
-        return MeetingDetailResponse.from(meeting, rounds, approvedMembers, myParticipationStatus);
+        return MeetingDetailResponse.from(meeting, rounds, approvedMembers, myParticipationStatus, imageUrlResolver);
     }
 
     @Transactional
