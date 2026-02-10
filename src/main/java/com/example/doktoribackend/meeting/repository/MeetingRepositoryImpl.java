@@ -41,9 +41,9 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
         if (request.getCursorId() != null) {
             predicates.add(cb.lt(meeting.get("id"), request.getCursorId()));
         }
-        if (request.getReadingGenre() != null) {
+        if (request.getReadingGenres() != null && !request.getReadingGenres().isEmpty()) {
             Join<Meeting, ReadingGenre> genre = meeting.join("readingGenre", JoinType.INNER);
-            predicates.add(cb.equal(genre.get("code"), request.getReadingGenre()));
+            predicates.add(genre.get("code").in(request.getReadingGenres()));
         }
         if (request.getDayOfWeek() != null && !request.getDayOfWeek().isEmpty()) {
             predicates.add(meeting.get("dayOfWeek").in(request.getDayOfWeek()));
@@ -149,9 +149,9 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
         if (request.getCursorId() != null) {
             predicates.add(cb.lt(meeting.get("id"), request.getCursorId()));
         }
-        if (request.getReadingGenre() != null) {
+        if (request.getReadingGenres() != null && !request.getReadingGenres().isEmpty()) {
             Join<Meeting, ReadingGenre> genre = meeting.join("readingGenre", JoinType.INNER);
-            predicates.add(cb.equal(genre.get("code"), request.getReadingGenre()));
+            predicates.add(genre.get("code").in(request.getReadingGenres()));
         }
         if (request.getDayOfWeek() != null && !request.getDayOfWeek().isEmpty()) {
             predicates.add(meeting.get("dayOfWeek").in(request.getDayOfWeek()));

@@ -17,4 +17,9 @@ public class AsyncConfig {
     public Executor notificationExecutor() {
         return Executors.newVirtualThreadPerTaskExecutor();
     }
+
+    @Bean(name = "aiValidationExecutor")
+    public Executor aiValidationExecutor() {
+        return Executors.newVirtualThreadPerTaskExecutor();
+    }
 }

@@ -3,6 +3,7 @@ package com.example.doktoribackend.meeting.dto;
 import com.example.doktoribackend.meeting.domain.Meeting;
 import com.example.doktoribackend.meeting.domain.MeetingMember;
 import com.example.doktoribackend.meeting.domain.MeetingRound;
+import com.example.doktoribackend.s3.ImageUrlResolver;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -19,14 +20,15 @@ public class MeetingDetailResponse {
             Meeting meeting,
             List<MeetingRound> rounds,
             List<MeetingMember> approvedMembers,
-            String myParticipationStatus
+            String myParticipationStatus,
+            ImageUrlResolver imageUrlResolver
     ) {
         return MeetingDetailResponse.builder()
-                .meeting(MeetingInfo.from(meeting))
+                .meeting(MeetingInfo.from(meeting, imageUrlResolver))
                 .rounds(rounds.stream()
                         .map(RoundInfo::from)
                         .toList())
-                .participantsPreview(ParticipantsPreview.from(approvedMembers, myParticipationStatus))
+                .participantsPreview(ParticipantsPreview.from(approvedMembers, myParticipationStatus, imageUrlResolver))
                 .build();
     }
 }

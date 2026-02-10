@@ -45,14 +45,14 @@ public class BookSearchServiceImpl implements BookSearchService {
                 ? null
                 : String.join(", ", doc.authors());
         LocalDate publishedAt = parsePublishedAt(doc.datetime());
-        String isbn13 = extractIsbn13(doc.isbn());
+        String isbn = extractIsbn(doc.isbn());
         return new BookSearchResponse.BookSearchItem(
                 doc.title(),
                 authors,
                 doc.publisher(),
                 doc.thumbnail(),
                 publishedAt,
-                isbn13
+                isbn
         );
     }
 
@@ -67,16 +67,20 @@ public class BookSearchServiceImpl implements BookSearchService {
         }
     }
 
-    private String extractIsbn13(String isbn) {
+    private String extractIsbn(String isbn) {
         if (isbn == null || isbn.isBlank()) {
             return null;
         }
         String[] tokens = isbn.trim().split("\\s+");
+        String isbn10 = null;
         for (String token : tokens) {
             if (token.length() == 13 && token.chars().allMatch(Character::isDigit)) {
                 return token;
             }
+            if (token.length() == 10 && token.chars().allMatch(Character::isDigit)) {
+                isbn10 = token;
+            }
         }
-        return null;
+        return isbn10;
     }
 }
