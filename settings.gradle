@@ -1,1 +1,5 @@
 rootProject.name = 'doktori-backend'
+
+include 'common'
+include 'api'
+include 'chat'

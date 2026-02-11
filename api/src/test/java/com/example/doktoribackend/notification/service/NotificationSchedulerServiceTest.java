@@ -63,7 +63,7 @@ class NotificationSchedulerServiceTest {
             verify(notificationService).createAndSendBatch(
                     memberIds,
                     NotificationTypeCode.BOOK_REPORT_DEADLINE_24H_BEFORE,
-                    Map.of("meetingId", "100")
+                    Map.of("meetingId", "100", "meetingTitle", "테스트 모임")
             );
         }
 
@@ -105,7 +105,7 @@ class NotificationSchedulerServiceTest {
             verify(notificationService).createAndSendBatch(
                     memberIds,
                     NotificationTypeCode.BOOK_REPORT_DEADLINE_30M_BEFORE,
-                    Map.of("meetingId", "100")
+                    Map.of("meetingId", "100", "meetingTitle", "테스트 모임")
             );
         }
 
@@ -127,6 +127,7 @@ class NotificationSchedulerServiceTest {
     private MeetingRound createMockMeetingRound(Long roundId, Long meetingId) {
         Meeting meeting = mock(Meeting.class);
         given(meeting.getId()).willReturn(meetingId);
+        given(meeting.getTitle()).willReturn("테스트 모임");
 
         MeetingRound round = mock(MeetingRound.class);
         given(round.getId()).willReturn(roundId);
