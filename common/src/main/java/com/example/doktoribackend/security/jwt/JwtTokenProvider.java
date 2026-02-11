@@ -2,7 +2,6 @@ package com.example.doktoribackend.security.jwt;
 
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
-import com.example.doktoribackend.user.domain.User;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import lombok.Getter;
@@ -32,32 +31,37 @@ public class JwtTokenProvider {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String createAccessToken(User user) {
+    public String createAccessToken(Long userId, String nickname) {
         Instant now = Instant.now();
         Instant exp = now.plus(accessExpMinutes, ChronoUnit.MINUTES);
 
         return Jwts.builder()
-                .setSubject(user.getId().toString())
-                .claim("userId", user.getId())
-                .claim("nickname", user.getNickname())
+                .setSubject(userId.toString())
+                .claim("userId", userId)
+                .claim("nickname", nickname)
                 .setIssuedAt(Date.from(now))
                 .setExpiration(Date.from(exp))
                 .signWith(getKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    public String createRefreshToken(User user, String tokenId) {
+    public String createRefreshToken(Long userId, String tokenId) {
         Instant now = Instant.now();
         Instant exp = now.plusSeconds(refreshExpSeconds);
 
         return Jwts.builder()
                 .setId(tokenId)
-                .setSubject(user.getId().toString())
+                .setSubject(userId.toString())
                 .claim("type", "refresh")
                 .setIssuedAt(Date.from(now))
                 .setExpiration(Date.from(exp))
                 .signWith(getKey(), SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    public String getNicknameFromAccessToken(String accessToken) {
+        Claims claims = parseClaims(accessToken);
+        return claims.get("nickname", String.class);
     }
 
     private Claims parseClaims(String token) {

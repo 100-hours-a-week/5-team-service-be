@@ -211,8 +211,6 @@ class NotificationControllerTest {
     }
 
     private CustomUserDetails createUserDetails(Long userId) {
-        User user = User.builder().nickname("testUser").build();
-        ReflectionTestUtils.setField(user, "id", userId);
-        return CustomUserDetails.from(user);
+        return CustomUserDetails.of(userId, "testUser");
     }
 }

@@ -102,10 +102,10 @@ public class TokenService {
     }
 
     private TokenResponse createTokenPair(User user) {
-        String accessToken = jwtTokenProvider.createAccessToken(user);
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getNickname());
 
         String tokenId = TsidCreator.getTsid().toString();
-        String refreshToken = jwtTokenProvider.createRefreshToken(user, tokenId);
+        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId(), tokenId);
 
         saveRefreshToken(tokenId, user);
 

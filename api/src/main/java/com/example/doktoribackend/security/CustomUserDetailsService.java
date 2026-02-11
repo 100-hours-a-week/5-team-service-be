@@ -30,7 +30,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         User user = userRepository.findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(UserNotFoundException::new);
 
-        return CustomUserDetails.from(user);
+        return CustomUserDetails.of(user.getId(), user.getNickname());
     }
 }
 

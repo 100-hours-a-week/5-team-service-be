@@ -1,6 +1,5 @@
 package com.example.doktoribackend.security;
 
-import com.example.doktoribackend.user.domain.User;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -16,7 +15,7 @@ public class CustomUserDetails implements UserDetails {
     private final String nickname;
     private final Collection<? extends GrantedAuthority> authorities;
 
-    private CustomUserDetails(
+    public CustomUserDetails(
             Long id,
             String nickname,
             Collection<? extends GrantedAuthority> authorities
@@ -26,15 +25,11 @@ public class CustomUserDetails implements UserDetails {
         this.authorities = authorities;
     }
 
-    public static CustomUserDetails from(User user) {
+    public static CustomUserDetails of(Long id, String nickname) {
         List<GrantedAuthority> authorities =
                 List.of(new SimpleGrantedAuthority("ROLE_USER"));
 
-        return new CustomUserDetails(
-                user.getId(),
-                user.getNickname(),
-                authorities
-        );
+        return new CustomUserDetails(id, nickname, authorities);
     }
 
     @Override
