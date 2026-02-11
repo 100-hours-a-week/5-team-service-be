@@ -44,19 +44,6 @@ springdoc:
   swagger-ui:
     path: /swagger-ui/index.html
 
-kakao:
-  oauth:
-    client-id: ${KAKAO_CLIENT_ID}
-    client-secret: ${KAKAO_CLIENT_SECRET}
-    redirect-uri: ${KAKAO_REDIRECT_URI}
-    authorize-url: https://kauth.kakao.com/oauth/authorize
-    token-url: https://kauth.kakao.com/oauth/token
-    user-info-url: https://kapi.kakao.com/v2/user/me
-    frontend-redirect: ${KAKAO_FRONTEND_REDIRECT}
-  book:
-    base-url: https://dapi.kakao.com/v3/search/book
-    rest-api-key: ${KAKAO_REST_API_KEY:}
-
 app:
   jwt:
     secret: ${JWT_SECRET}
@@ -64,9 +51,6 @@ app:
     refresh-exp-seconds: 1209600
   s3:
     public-base-url: https://${AWS_S3_BUCKET_NAME:doktori-dev-images}.s3.ap-northeast-2.amazonaws.com
-  cookie:
-    secure: false
-    same-site: Lax
 
 management:
   endpoints:

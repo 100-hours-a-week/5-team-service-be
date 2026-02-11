@@ -2,7 +2,6 @@ package com.example.doktoribackend.config;
 
 import com.example.doktoribackend.security.CustomAccessDeniedHandler;
 import com.example.doktoribackend.security.CustomAuthenticationEntryPoint;
-import com.example.doktoribackend.security.CustomUserDetailsService;
 import com.example.doktoribackend.security.jwt.JwtAuthenticationFilter;
 import com.example.doktoribackend.security.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +26,6 @@ import static com.example.doktoribackend.security.SecurityPaths.PUBLIC_DOCS;
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final CustomUserDetailsService customUserDetailsService;
     private final CorsConfigurationSource corsConfigurationSource;
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
     private final CustomAccessDeniedHandler customAccessDeniedHandler;
@@ -56,9 +54,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/recommendations/meetings").permitAll()
                         .anyRequest().authenticated()
                 )
-                .userDetailsService(customUserDetailsService)
                 // JWT 인증 필터 추가
-                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider, customUserDetailsService),
+                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
                         UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

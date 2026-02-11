@@ -3,7 +3,6 @@ package com.example.doktoribackend.security.jwt;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.security.CustomUserDetails;
-import com.example.doktoribackend.security.CustomUserDetailsService;
 import com.example.doktoribackend.security.SecurityPaths;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -24,7 +23,6 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final CustomUserDetailsService userDetailsService;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     @Override
@@ -51,12 +49,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = header.substring(7);
         try {
             Long userId = jwtTokenProvider.getUserIdFromAccessToken(token);
+            String nickname = jwtTokenProvider.getNicknameFromAccessToken(token);
 
             if (userId != null &&
                     SecurityContextHolder.getContext().getAuthentication() == null) {
 
-                CustomUserDetails userDetails = (CustomUserDetails)
-                        userDetailsService.loadUserByUsername(userId.toString());
+                CustomUserDetails userDetails = CustomUserDetails.of(userId, nickname);
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
