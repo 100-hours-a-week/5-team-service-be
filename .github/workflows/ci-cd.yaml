@@ -54,19 +54,20 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "📂 Searching for JAR files..."
-          ls -al build/libs/
+          echo "📂 Searching for JAR files in api module..."
+          ls -al api/build/libs/
 
-          JAR=$(ls -t build/libs/*.jar | grep -v 'plain' | head -n 1 || true)
+          JAR=$(ls -t api/build/libs/*.jar | grep -v 'plain' | head -n 1 || true)
 
           if [ -z "$JAR" ]; then
-            echo "❌ Error: No valid JAR found in build/libs/"
+            echo "❌ Error: No valid JAR found in api/build/libs/"
             exit 1
           fi
 
           echo "✅ Found JAR: $JAR"
 
           SHORT_SHA="${GITHUB_SHA:0:7}"
+          mkdir -p build/libs
           TARGET="build/libs/app-${SHORT_SHA}.jar"
 
           cp "$JAR" "$TARGET"
