@@ -1,6 +1,7 @@
 package com.example.doktoribackend.meeting.repository;
 
 import com.example.doktoribackend.meeting.domain.MeetingRound;
+import com.example.doktoribackend.meeting.domain.MeetingRoundStatus;
 import com.example.doktoribackend.meeting.domain.MeetingStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -84,5 +85,12 @@ public interface MeetingRoundRepository extends JpaRepository<MeetingRound, Long
            "AND mr.endAt > :now")
     List<Long> findMeetingIdsWithOngoingRounds(
             @Param("meetingIds") List<Long> meetingIds,
+            @Param("now") LocalDateTime now);
+
+    @Query("SELECT mr FROM MeetingRound mr " +
+           "WHERE mr.status = :status " +
+           "AND mr.endAt < :now")
+    List<MeetingRound> findByStatusAndEndAtBefore(
+            @Param("status") MeetingRoundStatus status,
             @Param("now") LocalDateTime now);
 }
