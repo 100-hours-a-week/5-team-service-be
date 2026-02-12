@@ -27,7 +27,7 @@ CREATE TABLE room_rounds (
 CREATE TABLE chatting_room_members (
     id              BIGINT UNSIGNED     NOT NULL AUTO_INCREMENT,
     room_id         BIGINT UNSIGNED     NOT NULL,
-    user_id         BIGINT UNSIGNED     NOT NULL,
+    user_id         BIGINT              NOT NULL,
     status          VARCHAR(20)         NOT NULL COMMENT 'WAITING, JOINED, DISCONNECTED, LEFT',
     role            VARCHAR(20)         NOT NULL COMMENT 'HOST, PARTICIPANT',
     position        VARCHAR(20)         NOT NULL COMMENT 'AGREE, DISAGREE',
@@ -63,7 +63,7 @@ CREATE TABLE messages (
     id                  BIGINT UNSIGNED     NOT NULL AUTO_INCREMENT,
     room_id             BIGINT UNSIGNED     NOT NULL COMMENT '방별 최근 메시지 조회용',
     round_id            BIGINT UNSIGNED     NOT NULL COMMENT '라운드별 메시지 분리용',
-    sender_id           BIGINT UNSIGNED     NOT NULL,
+    sender_id           BIGINT              NOT NULL,
     client_message_id   VARCHAR(50)         NOT NULL COMMENT '클라이언트 메시지 ID (중복 방지)',
     message_type        VARCHAR(20)         NOT NULL COMMENT 'TEXT, FILE',
     text_message        VARCHAR(300)        NULL COMMENT '텍스트 메시지 본문',
