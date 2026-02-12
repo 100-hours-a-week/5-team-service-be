@@ -1,4 +1,4 @@
-package com.example.doktoribackend;
+package doktoribackend;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
