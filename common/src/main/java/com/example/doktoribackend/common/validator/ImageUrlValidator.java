@@ -8,7 +8,8 @@ import java.util.regex.Pattern;
 public class ImageUrlValidator implements ConstraintValidator<ValidImageUrl, String> {
 
     private static final Pattern KAKAO_CDN_PATTERN = Pattern.compile(
-            "^https://k\\.kakaocdn\\.net/.+"
+            "^https?://([a-zA-Z0-9-]+\\.)?kakaocdn\\.net/.+",
+            Pattern.CASE_INSENSITIVE
     );
 
     private static final Pattern S3_KEY_PATTERN = Pattern.compile(
