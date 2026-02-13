@@ -36,6 +36,8 @@ public class ChatRoomService {
         createQuiz(room, request.quiz());
         chattingRoomRepository.save(room);
 
+        room.increaseMemberCount();
+
         ChattingRoomMember member = ChattingRoomMember.createHost(room, userId, request);
         chattingRoomMemberRepository.save(member);
 

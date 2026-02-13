@@ -34,6 +34,9 @@ public class ChattingRoom {
     @Column(nullable = false, columnDefinition = "TINYINT UNSIGNED")
     private Integer capacity;
 
+    @Column(name = "current_member_count", nullable = false, columnDefinition = "TINYINT UNSIGNED")
+    private Integer currentMemberCount = 0;
+
     @Column(nullable = false, columnDefinition = "SMALLINT UNSIGNED")
     private Integer duration = 30;
 
@@ -75,6 +78,16 @@ public class ChattingRoom {
 
     public void cancel() {
         this.status = RoomStatus.CANCELLED;
+    }
+
+    public void increaseMemberCount() {
+        this.currentMemberCount++;
+    }
+
+    public void decreaseMemberCount() {
+        if (this.currentMemberCount > 0) {
+            this.currentMemberCount--;
+        }
     }
 
     public void linkQuiz(Quiz quiz) {
