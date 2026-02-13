@@ -1,6 +1,7 @@
 package com.example.doktoribackend.room.domain;
 
 import com.example.doktoribackend.quiz.domain.Quiz;
+import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -52,8 +53,12 @@ public class ChattingRoom {
     @OneToMany(mappedBy = "chattingRoom", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     private final List<ChattingRoomMember> members = new ArrayList<>();
 
+    public static ChattingRoom create(ChatRoomCreateRequest request) {
+        return new ChattingRoom(request.topic(), request.description(), request.capacity(), null);
+    }
+
     @Builder
-    public ChattingRoom(String topic, String description, Integer capacity, Integer duration) {
+    private ChattingRoom(String topic, String description, Integer capacity, Integer duration) {
         this.topic = topic;
         this.description = description;
         this.capacity = capacity;

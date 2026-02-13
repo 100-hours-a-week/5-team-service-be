@@ -1,5 +1,6 @@
 package com.example.doktoribackend.quiz.domain;
 
+import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -28,8 +29,12 @@ public class QuizChoice {
     @Column(name = "choice_text", nullable = false, length = 100)
     private String choiceText;
 
+    public static QuizChoice create(Quiz quiz, ChatRoomCreateRequest.QuizChoiceRequest request) {
+        return new QuizChoice(quiz.getRoomId(), quiz, request.choiceNumber(), request.text());
+    }
+
     @Builder
-    public QuizChoice(Long roomId, Quiz quiz, Integer choiceNumber, String choiceText) {
+    private QuizChoice(Long roomId, Quiz quiz, Integer choiceNumber, String choiceText) {
         this.roomId = roomId;
         this.quiz = quiz;
         this.choiceNumber = choiceNumber;
