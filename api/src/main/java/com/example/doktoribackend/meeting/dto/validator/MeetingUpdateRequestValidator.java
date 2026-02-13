@@ -1,6 +1,6 @@
 package com.example.doktoribackend.meeting.dto.validator;
 
-import com.example.doktoribackend.meeting.dto.MeetingCreateRequest;
+import com.example.doktoribackend.meeting.dto.MeetingUpdateRequest;
 import com.example.doktoribackend.meeting.dto.RoundRequest;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-public class MeetingCreateRequestValidator
-        implements ConstraintValidator<ValidMeetingCreateRequest, MeetingCreateRequest> {
+public class MeetingUpdateRequestValidator
+        implements ConstraintValidator<ValidMeetingUpdateRequest, MeetingUpdateRequest> {
 
     private static final String FIELD_ROUNDS = "rounds";
     private static final String FIELD_ROUND_COUNT = "roundCount";
@@ -21,7 +21,7 @@ public class MeetingCreateRequestValidator
     private static final String FIELD_RECRUITMENT_DEADLINE = "recruitmentDeadline";
 
     @Override
-    public boolean isValid(MeetingCreateRequest req, ConstraintValidatorContext ctx) {
+    public boolean isValid(MeetingUpdateRequest req, ConstraintValidatorContext ctx) {
         if (req == null) {
             return true;
         }
@@ -44,21 +44,6 @@ public class MeetingCreateRequestValidator
             valid = false;
         }
 
-        if (!isRecruitmentDeadlineNotPast(req)) {
-            addViolation(ctx, FIELD_RECRUITMENT_DEADLINE, "모집 마감일은 오늘 이후여야 합니다");
-            valid = false;
-        }
-
-        if (!isAllRoundDatesAfterToday(req)) {
-            addViolation(ctx, FIELD_ROUNDS, "모든 회차 날짜는 오늘 이후여야 합니다");
-            valid = false;
-        }
-
-        if (!isFirstRoundWithin30Days(req)) {
-            addViolation(ctx, FIELD_ROUNDS, "첫 회차 날짜는 오늘로부터 30일 이내여야 합니다");
-            valid = false;
-        }
-
         if (!isRoundDatesInOrder(req)) {
             addViolation(ctx, FIELD_ROUNDS, "회차 날짜는 순서대로 증가해야 합니다");
             valid = false;
@@ -78,14 +63,14 @@ public class MeetingCreateRequestValidator
                 .addConstraintViolation();
     }
 
-    private boolean isValidRoundCount(MeetingCreateRequest req) {
+    private boolean isValidRoundCount(MeetingUpdateRequest req) {
         if (req.roundCount() == null || req.rounds() == null) {
             return true;
         }
         return req.roundCount().equals(req.rounds().size());
     }
 
-    private boolean isValidRoundNumbers(MeetingCreateRequest req) {
+    private boolean isValidRoundNumbers(MeetingUpdateRequest req) {
         if (req.roundCount() == null || req.rounds() == null) {
             return true;
         }
@@ -104,39 +89,14 @@ public class MeetingCreateRequestValidator
         return true;
     }
 
-    private boolean isValidDurationMinutes(MeetingCreateRequest req) {
+    private boolean isValidDurationMinutes(MeetingUpdateRequest req) {
         if (req.durationMinutes() == null) {
             return true;
         }
         return req.durationMinutes() == 30;
     }
 
-    private boolean isRecruitmentDeadlineNotPast(MeetingCreateRequest req) {
-        if (req.recruitmentDeadline() == null) {
-            return true;
-        }
-        return !req.recruitmentDeadline().isBefore(LocalDate.now());
-    }
-
-    private boolean isAllRoundDatesAfterToday(MeetingCreateRequest req) {
-        if (req.rounds() == null || req.rounds().isEmpty()) {
-            return true;
-        }
-        LocalDate today = LocalDate.now();
-        return req.rounds().stream()
-                .allMatch(round -> round.date() != null && round.date().isAfter(today));
-    }
-
-    private boolean isFirstRoundWithin30Days(MeetingCreateRequest req) {
-        LocalDate firstRoundAt = req.firstRoundAt();
-        if (firstRoundAt == null) {
-            return true;
-        }
-        LocalDate maxDate = LocalDate.now().plusDays(30);
-        return !firstRoundAt.isAfter(maxDate);
-    }
-
-    private boolean isRoundDatesInOrder(MeetingCreateRequest req) {
+    private boolean isRoundDatesInOrder(MeetingUpdateRequest req) {
         if (req.rounds() == null || req.rounds().size() < 2) {
             return true;
         }
@@ -152,7 +112,7 @@ public class MeetingCreateRequestValidator
         return true;
     }
 
-    private boolean isRecruitmentDeadlineBeforeLastRound(MeetingCreateRequest req) {
+    private boolean isRecruitmentDeadlineBeforeLastRound(MeetingUpdateRequest req) {
         if (req.recruitmentDeadline() == null || req.rounds() == null || req.rounds().isEmpty()) {
             return true;
         }

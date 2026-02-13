@@ -67,6 +67,9 @@ public enum ErrorCode {
     JOIN_REQUEST_BLOCKED(HttpStatus.FORBIDDEN, "JOIN_REQUEST_BLOCKED", "해당 모임에 참여할 수 없습니다."),
     RECRUITMENT_CLOSED(HttpStatus.CONFLICT, "RECRUITMENT_CLOSED", "모집이 마감된 모임입니다."),
     CAPACITY_FULL(HttpStatus.CONFLICT, "CAPACITY_FULL", "모집 정원이 가득 찼습니다."),
+    MEETING_UPDATE_FORBIDDEN(HttpStatus.FORBIDDEN, "MEETING_UPDATE_FORBIDDEN", "모임을 수정할 권한이 없습니다."),
+    MEETING_UPDATE_NOT_ALLOWED(HttpStatus.CONFLICT, "MEETING_UPDATE_NOT_ALLOWED", "취소된 모임은 수정할 수 없습니다."),
+    MEETING_ROUND_UPDATE_NOT_ALLOWED(HttpStatus.CONFLICT, "MEETING_ROUND_UPDATE_NOT_ALLOWED", "진행된 회차 또는 진행 중인 회차는 수정할 수 없습니다."),
 
     // Pagination
     PAGINATION_INVALID_CURSOR(HttpStatus.BAD_REQUEST, "PAGINATION_INVALID_CURSOR", "cursorId는 1 이상의 정수여야 합니다."),

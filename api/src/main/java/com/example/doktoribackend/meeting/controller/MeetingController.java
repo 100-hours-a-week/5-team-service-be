@@ -10,6 +10,7 @@ import com.example.doktoribackend.meeting.dto.JoinMeetingResponse;
 import com.example.doktoribackend.meeting.dto.MeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MeetingListResponse;
 import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
+import com.example.doktoribackend.meeting.dto.MeetingUpdateRequest;
 import com.example.doktoribackend.meeting.service.MeetingService;
 import com.example.doktoribackend.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -353,5 +354,80 @@ public class MeetingController {
     ) {
         MeetingListResponse response = meetingService.searchMeetings(request);
         return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Operation(summary = "모임 수정", description = "모임장이 모임 정보를 수정합니다. 진행된 회차와 진행 중인 회차는 수정할 수 없습니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResult.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "message": "독서 모임이 성공적으로 수정되었습니다.",
+                                      "data": {
+                                        "meetingId": 123
+                                      }
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "AUTH_UNAUTHORIZED",
+                                      "message": "인증이 필요합니다."
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "MEETING_UPDATE_FORBIDDEN",
+                                      "message": "모임을 수정할 권한이 없습니다."
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "404", description = "Meeting not found",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "MEETING_NOT_FOUND",
+                                      "message": "존재하지 않는 모임입니다."
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "409", description = "Conflict",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "MEETING_ROUND_UPDATE_NOT_ALLOWED",
+                                      "message": "진행된 회차 또는 진행 중인 회차는 수정할 수 없습니다."
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "422", description = "Validation failed",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "VALIDATION_FAILED",
+                                      "message": "요청 값이 유효하지 않습니다.",
+                                      "errors": [
+                                        { "field": "durationMinutes", "reason": "ValidMeetingUpdateRequest", "message": "진행 시간은 30분이어야 합니다" }
+                                      ]
+                                    }
+                                    """)))
+    })
+    @PutMapping("/{meetingId}")
+    public ResponseEntity<ApiResult<MeetingCreateResponse>> updateMeeting(
+            @PathVariable Long meetingId,
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody MeetingUpdateRequest request
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        MeetingCreateResponse response = meetingService.updateMeeting(userDetails.getId(), meetingId, request);
+        return ResponseEntity.ok(ApiResult.ok("독서 모임이 성공적으로 수정되었습니다.", response));
     }
 }
