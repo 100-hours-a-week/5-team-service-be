@@ -83,7 +83,10 @@ public enum ErrorCode {
     // BookReport
     BOOK_REPORT_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "BOOK_REPORT_ALREADY_SUBMITTED", "이미 독후감을 제출했습니다."),
     BOOK_REPORT_NOT_WRITABLE(HttpStatus.CONFLICT, "BOOK_REPORT_NOT_WRITABLE", "독후감 작성 가능 시간이 아닙니다."),
-    DAILY_SUBMISSION_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "DAILY_SUBMISSION_LIMIT_EXCEEDED", "일일 독후감 제출 횟수(3회)를 초과했습니다.");
+    DAILY_SUBMISSION_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "DAILY_SUBMISSION_LIMIT_EXCEEDED", "일일 독후감 제출 횟수(3회)를 초과했습니다."),
+
+    // ChatRoom
+    CHAT_ROOM_ALREADY_JOINED(HttpStatus.CONFLICT, "CHAT_ROOM_ALREADY_JOINED", "이미 참여 중인 채팅방이 있어 새 채팅방을 생성할 수 없습니다.");
 
 
     private final HttpStatus status;

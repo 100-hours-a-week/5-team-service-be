@@ -66,6 +66,7 @@ class UserServiceTest {
         // then
         assertThat(response.nickname()).isEqualTo("nickname");
         assertThat(response.profileImagePath()).isEqualTo("https://bucket.s3.amazonaws.com/images/profiles/test.png");
+        assertThat(response.profileImageKey()).isEqualTo("images/profiles/test.png");
         assertThat(response.profileCompleted()).isTrue();
         assertThat(response.leaderIntro()).isEqualTo("leader intro");
         assertThat(response.memberIntro()).isEqualTo("member intro");

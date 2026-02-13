@@ -16,6 +16,7 @@ public final class UserMapper {
         return new UserProfileResponse(
                 user.getNickname(),
                 resolver.toUrl(user.getProfileImagePath()),
+                user.getProfileImagePath(),
                 user.isProfileCompleted(),
                 user.isOnboardingCompleted(),
                 user.getLeaderIntro(),
