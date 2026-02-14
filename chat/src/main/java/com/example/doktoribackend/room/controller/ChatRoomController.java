@@ -23,13 +23,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/chat-rooms")
-public class ChatRoomController {
+public class ChatRoomController implements ChatRoomApi {
 
     private static final int MAX_SIZE = 20;
 
     private final ChatRoomService chatRoomService;
 
     @GetMapping
+    @Override
     public ResponseEntity<ApiResult<ChatRoomListResponse>> getChatRooms(
             @RequestParam(required = false) Long cursorId,
             @RequestParam(defaultValue = "10") Integer size
@@ -39,6 +40,18 @@ public class ChatRoomController {
 
         ChatRoomListResponse response = chatRoomService.getChatRooms(cursorId, size);
         return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @PostMapping
+    @Override
+    public ResponseEntity<ApiResult<ChatRoomCreateResponse>> createChatRoom(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody ChatRoomCreateRequest request
+    ) {
+        ChatRoomCreateResponse response = chatRoomService.createChatRoom(
+                userDetails.getId(), request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResult.ok(response));
     }
 
     private void validateSize(int size) {
@@ -51,16 +64,5 @@ public class ChatRoomController {
         if (cursorId != null && cursorId < 1) {
             throw new BusinessException(ErrorCode.PAGINATION_INVALID_CURSOR);
         }
-    }
-
-    @PostMapping
-    public ResponseEntity<ApiResult<ChatRoomCreateResponse>> createChatRoom(
-            @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Valid @RequestBody ChatRoomCreateRequest request
-    ) {
-        ChatRoomCreateResponse response = chatRoomService.createChatRoom(
-                userDetails.getId(), request);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResult.ok(response));
     }
 }
