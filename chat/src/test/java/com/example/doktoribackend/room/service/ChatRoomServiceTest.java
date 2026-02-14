@@ -7,8 +7,10 @@ import com.example.doktoribackend.room.domain.ChattingRoomMember;
 import com.example.doktoribackend.room.domain.MemberRole;
 import com.example.doktoribackend.room.domain.MemberStatus;
 import com.example.doktoribackend.room.domain.Position;
+import com.example.doktoribackend.room.domain.RoomStatus;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
+import com.example.doktoribackend.room.dto.ChatRoomListResponse;
 import com.example.doktoribackend.room.repository.ChattingRoomMemberRepository;
 import com.example.doktoribackend.room.repository.ChattingRoomRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -21,8 +23,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -193,6 +199,134 @@ class ChatRoomServiceTest {
                     .isEqualTo(ErrorCode.CHAT_ROOM_ALREADY_JOINED);
 
             then(chattingRoomRepository).should(never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("채팅방 목록 조회")
+    class GetChatRooms {
+
+        private ChattingRoom createRoom(Long id, String topic, int capacity, int currentMemberCount) {
+            ChattingRoom room = ChattingRoom.builder()
+                    .topic(topic)
+                    .description("설명")
+                    .capacity(capacity)
+                    .build();
+            ReflectionTestUtils.setField(room, "id", id);
+            ReflectionTestUtils.setField(room, "currentMemberCount", currentMemberCount);
+            return room;
+        }
+
+        @Test
+        @DisplayName("WAITING 상태의 방 목록을 반환한다")
+        void getChatRooms_returnsWaitingRooms() {
+            // given
+            int size = 10;
+            List<ChattingRoom> rooms = List.of(
+                    createRoom(3L, "주제3", 4, 2),
+                    createRoom(2L, "주제2", 6, 1)
+            );
+            given(chattingRoomRepository.findByStatusWithCursor(
+                    eq(RoomStatus.WAITING), eq(null), any(PageRequest.class)))
+                    .willReturn(rooms);
+
+            // when
+            ChatRoomListResponse response = chatRoomService.getChatRooms(null, size);
+
+            // then
+            assertThat(response.items()).hasSize(2);
+            assertThat(response.items().get(0).roomId()).isEqualTo(3L);
+            assertThat(response.items().get(0).topic()).isEqualTo("주제3");
+            assertThat(response.items().get(0).capacity()).isEqualTo(4);
+            assertThat(response.items().get(0).currentMemberCount()).isEqualTo(2);
+            assertThat(response.items().get(1).roomId()).isEqualTo(2L);
+        }
+
+        @Test
+        @DisplayName("다음 페이지가 있으면 hasNext=true, nextCursorId가 마지막 항목의 id이다")
+        void getChatRooms_hasNext_true() {
+            // given
+            int size = 2;
+            List<ChattingRoom> rooms = List.of(
+                    createRoom(5L, "주제5", 4, 1),
+                    createRoom(4L, "주제4", 4, 2),
+                    createRoom(3L, "주제3", 4, 0)
+            );
+            given(chattingRoomRepository.findByStatusWithCursor(
+                    eq(RoomStatus.WAITING), eq(null), any(PageRequest.class)))
+                    .willReturn(rooms);
+
+            // when
+            ChatRoomListResponse response = chatRoomService.getChatRooms(null, size);
+
+            // then
+            assertThat(response.items()).hasSize(2);
+            assertThat(response.pageInfo().hasNext()).isTrue();
+            assertThat(response.pageInfo().nextCursorId()).isEqualTo(4L);
+            assertThat(response.pageInfo().size()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("다음 페이지가 없으면 hasNext=false, nextCursorId는 null이다")
+        void getChatRooms_hasNext_false() {
+            // given
+            int size = 10;
+            List<ChattingRoom> rooms = List.of(
+                    createRoom(2L, "주제2", 4, 1),
+                    createRoom(1L, "주제1", 6, 3)
+            );
+            given(chattingRoomRepository.findByStatusWithCursor(
+                    eq(RoomStatus.WAITING), eq(null), any(PageRequest.class)))
+                    .willReturn(rooms);
+
+            // when
+            ChatRoomListResponse response = chatRoomService.getChatRooms(null, size);
+
+            // then
+            assertThat(response.items()).hasSize(2);
+            assertThat(response.pageInfo().hasNext()).isFalse();
+            assertThat(response.pageInfo().nextCursorId()).isNull();
+        }
+
+        @Test
+        @DisplayName("결과가 없으면 빈 리스트를 반환한다")
+        void getChatRooms_emptyResult() {
+            // given
+            given(chattingRoomRepository.findByStatusWithCursor(
+                    eq(RoomStatus.WAITING), eq(null), any(PageRequest.class)))
+                    .willReturn(Collections.emptyList());
+
+            // when
+            ChatRoomListResponse response = chatRoomService.getChatRooms(null, 10);
+
+            // then
+            assertThat(response.items()).isEmpty();
+            assertThat(response.pageInfo().hasNext()).isFalse();
+            assertThat(response.pageInfo().nextCursorId()).isNull();
+        }
+
+        @Test
+        @DisplayName("cursorId가 주어지면 해당 id 이전의 방만 조회한다")
+        void getChatRooms_withCursorId() {
+            // given
+            Long cursorId = 5L;
+            int size = 10;
+            List<ChattingRoom> rooms = List.of(
+                    createRoom(4L, "주제4", 4, 1),
+                    createRoom(3L, "주제3", 6, 2)
+            );
+            given(chattingRoomRepository.findByStatusWithCursor(
+                    eq(RoomStatus.WAITING), eq(cursorId), any(PageRequest.class)))
+                    .willReturn(rooms);
+
+            // when
+            ChatRoomListResponse response = chatRoomService.getChatRooms(cursorId, size);
+
+            // then
+            assertThat(response.items()).hasSize(2);
+            assertThat(response.items().get(0).roomId()).isEqualTo(4L);
+            then(chattingRoomRepository).should().findByStatusWithCursor(
+                    eq(RoomStatus.WAITING), eq(cursorId), any(PageRequest.class));
         }
     }
 }

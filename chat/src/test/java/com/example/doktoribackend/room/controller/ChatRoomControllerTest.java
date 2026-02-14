@@ -5,6 +5,9 @@ import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest.QuizChoiceRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest.QuizRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
+import com.example.doktoribackend.room.dto.ChatRoomListItem;
+import com.example.doktoribackend.room.dto.ChatRoomListResponse;
+import com.example.doktoribackend.room.dto.PageInfo;
 import com.example.doktoribackend.room.service.ChatRoomService;
 import com.example.doktoribackend.security.CustomUserDetails;
 import com.example.doktoribackend.security.jwt.JwtTokenProvider;
@@ -31,6 +34,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -100,7 +104,7 @@ class ChatRoomControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validRequest())))
                     .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.message").value("채팅 토론방이 생성되었습니다."))
+                    .andExpect(jsonPath("$.message").value("OK"))
                     .andExpect(jsonPath("$.data.roomId").value(100));
         }
     }
@@ -230,6 +234,85 @@ class ChatRoomControllerTest {
             ChatRoomCreateRequest request = new ChatRoomCreateRequest(
                     "토론 주제", "주제에 대한 설명", 4, Position.AGREE, quiz);
             performPostAndExpectUnprocessable(request);
+        }
+    }
+
+    @Nested
+    @DisplayName("채팅방 목록 조회 - 성공")
+    class GetChatRoomsSuccess {
+
+        @Test
+        @DisplayName("파라미터 없이 요청하면 200 OK와 목록을 반환한다")
+        void getChatRooms_noParams_success() throws Exception {
+            ChatRoomListResponse response = new ChatRoomListResponse(
+                    List.of(new ChatRoomListItem(3L, "주제3", "설명3", 4, 2),
+                            new ChatRoomListItem(2L, "주제2", "설명2", 6, 1)),
+                    new PageInfo(null, false, 10)
+            );
+            given(chatRoomService.getChatRooms(null, 10)).willReturn(response);
+
+            mockMvc.perform(get("/chat-rooms")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.items").isArray())
+                    .andExpect(jsonPath("$.data.items.length()").value(2))
+                    .andExpect(jsonPath("$.data.items[0].roomId").value(3))
+                    .andExpect(jsonPath("$.data.items[0].topic").value("주제3"))
+                    .andExpect(jsonPath("$.data.items[0].capacity").value(4))
+                    .andExpect(jsonPath("$.data.items[0].currentMemberCount").value(2))
+                    .andExpect(jsonPath("$.data.pageInfo.hasNext").value(false))
+                    .andExpect(jsonPath("$.data.pageInfo.nextCursorId").isEmpty());
+        }
+
+        @Test
+        @DisplayName("cursorId와 size를 지정하면 해당 파라미터로 조회한다")
+        void getChatRooms_withParams_success() throws Exception {
+            ChatRoomListResponse response = new ChatRoomListResponse(
+                    List.of(new ChatRoomListItem(4L, "주제4", "설명4", 4, 1)),
+                    new PageInfo(4L, true, 1)
+            );
+            given(chatRoomService.getChatRooms(10L, 1)).willReturn(response);
+
+            mockMvc.perform(get("/chat-rooms")
+                            .param("cursorId", "10")
+                            .param("size", "1")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.items.length()").value(1))
+                    .andExpect(jsonPath("$.data.pageInfo.hasNext").value(true))
+                    .andExpect(jsonPath("$.data.pageInfo.nextCursorId").value(4));
+        }
+    }
+
+    @Nested
+    @DisplayName("채팅방 목록 조회 - size 검증")
+    class GetChatRoomsSizeValidation {
+
+        @ParameterizedTest(name = "size={0}이면 400 Bad Request")
+        @ValueSource(ints = {0, 21})
+        void invalidSize_returns400(int size) throws Exception {
+            mockMvc.perform(get("/chat-rooms")
+                            .param("size", String.valueOf(size))
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    @DisplayName("채팅방 목록 조회 - cursorId 검증")
+    class GetChatRoomsCursorValidation {
+
+        @ParameterizedTest(name = "cursorId={0}이면 400 Bad Request")
+        @ValueSource(ints = {0, -1})
+        void invalidCursorId_returns400(int cursorId) throws Exception {
+            mockMvc.perform(get("/chat-rooms")
+                            .param("cursorId", String.valueOf(cursorId))
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isBadRequest());
         }
     }
 }
