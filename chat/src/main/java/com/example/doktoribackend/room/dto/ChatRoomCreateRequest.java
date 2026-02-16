@@ -29,6 +29,11 @@ public record ChatRoomCreateRequest(
         @Pattern(regexp = TEXT_PATTERN, message = "설명에 특수문자나 이모지를 사용할 수 없습니다.")
         String description,
 
+        @Schema(description = "도서 ISBN", example = "9781234567890")
+        @NotBlank(message = "ISBN은 필수입니다.")
+        @Pattern(regexp = "^(\\d{10}|\\d{13})$", message = "ISBN 형식이 올바르지 않습니다.")
+        String isbn,
+
         @Schema(description = "모집 정원 (2, 4, 6 중 선택)", example = "4")
         @NotNull(message = "정원은 필수입니다.")
         Integer capacity,
