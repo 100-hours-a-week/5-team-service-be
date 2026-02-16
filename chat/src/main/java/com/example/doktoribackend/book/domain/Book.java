@@ -25,10 +25,8 @@ public class Book extends BaseTimeEntity {
     @Column(nullable = false)
     private String title;
 
-    @Column(length = 255)
     private String authors;
 
-    @Column(length = 255)
     private String publisher;
 
     @Column(name = "thumbnail_url", length = 512)
