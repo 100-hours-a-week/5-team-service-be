@@ -5,6 +5,10 @@ on:
     branches:
       - develop
       - main
+    paths-ignore:
+      - '.github/**'
+      - '*.md'
+      - 'docs/**'
   pull_request:
     branches:
       - develop
@@ -29,8 +33,6 @@ jobs:
           echo "✅ Source branch validation passed: ${{ github.head_ref }}"
 
   ci:
-    needs: [check-source-branch]
-    if: always() && (needs.check-source-branch.result == 'success' || needs.check-source-branch.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -81,7 +83,7 @@ jobs:
 
   build-and-push:
     needs: ci
-    if: always() && needs.ci.result == 'success' && github.event_name == 'push'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
