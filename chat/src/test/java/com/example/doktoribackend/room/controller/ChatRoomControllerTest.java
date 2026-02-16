@@ -75,7 +75,7 @@ class ChatRoomControllerTest {
 
     private ChatRoomCreateRequest validRequest() {
         return new ChatRoomCreateRequest(
-                "토론 주제", "주제에 대한 설명", 4, Position.AGREE, validQuiz()
+                "토론 주제", "주제에 대한 설명", "9781234567890", 4, Position.AGREE, validQuiz()
         );
     }
 
@@ -118,7 +118,7 @@ class ChatRoomControllerTest {
         @ValueSource(strings = {"가", "주제!@#$"})
         void invalidTopic_fails(String topic) throws Exception {
             ChatRoomCreateRequest request = new ChatRoomCreateRequest(
-                    topic, "주제에 대한 설명", 4, Position.AGREE, validQuiz());
+                    topic, "주제에 대한 설명", "9781234567890", 4, Position.AGREE, validQuiz());
             performPostAndExpectUnprocessable(request);
         }
     }
@@ -131,7 +131,7 @@ class ChatRoomControllerTest {
         @DisplayName("description이 null이면 검증 실패")
         void description_null() throws Exception {
             ChatRoomCreateRequest request = new ChatRoomCreateRequest(
-                    "토론 주제", null, 4, Position.AGREE, validQuiz());
+                    "토론 주제", null, "9781234567890", 4, Position.AGREE, validQuiz());
             performPostAndExpectUnprocessable(request);
         }
 
@@ -139,7 +139,7 @@ class ChatRoomControllerTest {
         @DisplayName("capacity가 null이면 검증 실패")
         void capacity_null() throws Exception {
             ChatRoomCreateRequest request = new ChatRoomCreateRequest(
-                    "토론 주제", "주제에 대한 설명", null, Position.AGREE, validQuiz());
+                    "토론 주제", "주제에 대한 설명", "9781234567890", null, Position.AGREE, validQuiz());
             performPostAndExpectUnprocessable(request);
         }
 
@@ -147,7 +147,7 @@ class ChatRoomControllerTest {
         @DisplayName("position이 null이면 검증 실패")
         void position_null() throws Exception {
             ChatRoomCreateRequest request = new ChatRoomCreateRequest(
-                    "토론 주제", "주제에 대한 설명", 4, null, validQuiz());
+                    "토론 주제", "주제에 대한 설명", "9781234567890", 4, null, validQuiz());
             performPostAndExpectUnprocessable(request);
         }
 
@@ -155,7 +155,7 @@ class ChatRoomControllerTest {
         @DisplayName("quiz가 null이면 검증 실패")
         void quiz_null() throws Exception {
             ChatRoomCreateRequest request = new ChatRoomCreateRequest(
-                    "토론 주제", "주제에 대한 설명", 4, Position.AGREE, null);
+                    "토론 주제", "주제에 대한 설명", "9781234567890", 4, Position.AGREE, null);
             performPostAndExpectUnprocessable(request);
         }
     }
@@ -169,7 +169,7 @@ class ChatRoomControllerTest {
         void quiz_question_null() throws Exception {
             QuizRequest quiz = new QuizRequest(null, validChoices(), 1);
             ChatRoomCreateRequest request = new ChatRoomCreateRequest(
-                    "토론 주제", "주제에 대한 설명", 4, Position.AGREE, quiz);
+                    "토론 주제", "주제에 대한 설명", "9781234567890", 4, Position.AGREE, quiz);
             performPostAndExpectUnprocessable(request);
         }
 
@@ -183,7 +183,7 @@ class ChatRoomControllerTest {
             );
             QuizRequest quiz = new QuizRequest("퀴즈 질문입니다", threeChoices, 1);
             ChatRoomCreateRequest request = new ChatRoomCreateRequest(
-                    "토론 주제", "주제에 대한 설명", 4, Position.AGREE, quiz);
+                    "토론 주제", "주제에 대한 설명", "9781234567890", 4, Position.AGREE, quiz);
             performPostAndExpectUnprocessable(request);
         }
 
@@ -212,7 +212,7 @@ class ChatRoomControllerTest {
             );
             QuizRequest quiz = new QuizRequest("퀴즈 질문입니다", choices, correctChoiceNumber);
             ChatRoomCreateRequest request = new ChatRoomCreateRequest(
-                    "토론 주제", "주제에 대한 설명", 4, Position.AGREE, quiz);
+                    "토론 주제", "주제에 대한 설명", "9781234567890", 4, Position.AGREE, quiz);
             performPostAndExpectUnprocessable(request);
         }
     }
@@ -232,7 +232,7 @@ class ChatRoomControllerTest {
             );
             QuizRequest quiz = new QuizRequest("퀴즈 질문입니다", choices, 1);
             ChatRoomCreateRequest request = new ChatRoomCreateRequest(
-                    "토론 주제", "주제에 대한 설명", 4, Position.AGREE, quiz);
+                    "토론 주제", "주제에 대한 설명", "9781234567890", 4, Position.AGREE, quiz);
             performPostAndExpectUnprocessable(request);
         }
     }
@@ -245,8 +245,8 @@ class ChatRoomControllerTest {
         @DisplayName("파라미터 없이 요청하면 200 OK와 목록을 반환한다")
         void getChatRooms_noParams_success() throws Exception {
             ChatRoomListResponse response = new ChatRoomListResponse(
-                    List.of(new ChatRoomListItem(3L, "주제3", "설명3", 4, 2),
-                            new ChatRoomListItem(2L, "주제2", "설명2", 6, 1)),
+                    List.of(new ChatRoomListItem(3L, "주제3", "설명3", 4, 2, "책제목3", "저자3", "http://thumb3.url"),
+                            new ChatRoomListItem(2L, "주제2", "설명2", 6, 1, "책제목2", "저자2", "http://thumb2.url")),
                     new PageInfo(null, false, 10)
             );
             given(chatRoomService.getChatRooms(null, 10)).willReturn(response);
@@ -269,7 +269,7 @@ class ChatRoomControllerTest {
         @DisplayName("cursorId와 size를 지정하면 해당 파라미터로 조회한다")
         void getChatRooms_withParams_success() throws Exception {
             ChatRoomListResponse response = new ChatRoomListResponse(
-                    List.of(new ChatRoomListItem(4L, "주제4", "설명4", 4, 1)),
+                    List.of(new ChatRoomListItem(4L, "주제4", "설명4", 4, 1, "책제목4", "저자4", "http://thumb4.url")),
                     new PageInfo(4L, true, 1)
             );
             given(chatRoomService.getChatRooms(10L, 1)).willReturn(response);

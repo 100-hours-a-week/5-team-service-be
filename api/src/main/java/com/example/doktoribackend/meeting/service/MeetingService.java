@@ -1,8 +1,8 @@
 package com.example.doktoribackend.meeting.service;
 
-import com.example.doktoribackend.book.client.KakaoBookClient;
+import com.example.doktoribackend.common.client.KakaoBookClient;
 import com.example.doktoribackend.book.domain.Book;
-import com.example.doktoribackend.book.dto.KakaoBookResponse;
+import com.example.doktoribackend.common.client.KakaoBookResponse;
 import com.example.doktoribackend.book.repository.BookRepository;
 import com.example.doktoribackend.bookReport.domain.BookReport;
 import com.example.doktoribackend.bookReport.domain.BookReportStatus;

@@ -1,5 +1,9 @@
 package com.example.doktoribackend.room.service;
 
+import com.example.doktoribackend.book.domain.Book;
+import com.example.doktoribackend.book.repository.BookRepository;
+import com.example.doktoribackend.common.client.KakaoBookClient;
+import com.example.doktoribackend.common.client.KakaoBookResponse;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.quiz.domain.Quiz;
@@ -20,6 +24,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -30,6 +35,8 @@ public class ChatRoomService {
 
     private final ChattingRoomRepository chattingRoomRepository;
     private final ChattingRoomMemberRepository chattingRoomMemberRepository;
+    private final BookRepository bookRepository;
+    private final KakaoBookClient kakaoBookClient;
 
     @Transactional(readOnly = true)
     public ChatRoomListResponse getChatRooms(Long cursorId, int size) {
@@ -53,7 +60,9 @@ public class ChatRoomService {
         validateCapacity(request.capacity());
         validateNotAlreadyJoined(userId);
 
-        ChattingRoom room = ChattingRoom.create(request);
+        Book book = resolveBook(request.isbn());
+
+        ChattingRoom room = ChattingRoom.create(request, book);
         chattingRoomRepository.save(room);
 
         createQuiz(room, request.quiz());
@@ -86,6 +95,30 @@ public class ChatRoomService {
 
         for (ChatRoomCreateRequest.QuizChoiceRequest choiceRequest : quizRequest.choices()) {
             quiz.addChoice(QuizChoice.create(quiz, choiceRequest));
+        }
+    }
+
+    private Book resolveBook(String isbn) {
+        return bookRepository.findByIsbn(isbn)
+                .orElseGet(() -> kakaoBookClient.searchByIsbn(isbn)
+                        .map(doc -> bookRepository.save(toBookFromKakao(doc, isbn)))
+                        .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND)));
+    }
+
+    private Book toBookFromKakao(KakaoBookResponse.KakaoBookDocument doc, String isbn) {
+        String authors = doc.authors() != null ? String.join(", ", doc.authors()) : null;
+        LocalDate publishedAt = parsePublishedAt(doc.datetime());
+        return Book.create(isbn, doc.title(), authors, doc.publisher(), doc.thumbnail(), publishedAt);
+    }
+
+    private LocalDate parsePublishedAt(String datetime) {
+        if (datetime == null || datetime.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(datetime.substring(0, 10));
+        } catch (Exception e) {
+            return null;
         }
     }
 }
