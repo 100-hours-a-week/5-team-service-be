@@ -28,6 +28,8 @@ import com.example.doktoribackend.meeting.dto.MeetingListResponse;
 import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
 import com.example.doktoribackend.meeting.dto.MeetingUpdateRequest;
 import com.example.doktoribackend.meeting.dto.MyMeetingListRequest;
+import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateRequest;
+import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateResponse;
 import com.example.doktoribackend.meeting.dto.RoundRequest;
 import com.example.doktoribackend.meeting.dto.MyMeetingListResponse;
 import com.example.doktoribackend.meeting.dto.MyMeetingItem;
@@ -220,19 +222,11 @@ public class MeetingService {
                     // REJECTED, LEFT: 재신청 가능 (if문 통과)
                 });
 
-        // 7. 참여 요청 생성
+        // 7. 참여 요청 생성 (PENDING 상태)
         MeetingMember member = MeetingMember.createParticipant(meeting, user);
         meetingMemberRepository.save(member);
 
-        // 8. 현재 인원수 증가
-        meeting.incrementCurrentCount();
-
-        // 9. 모집 완료 상태 확인 및 업데이트
-        if (meeting.isRecruitmentClosed()) {
-            meeting.updateStatusToFinished();
-        }
-
-        // 10. 응답 반환
+        // 8. 응답 반환 (current_count 증가는 승인 시점에 수행)
         return JoinMeetingResponse.from(member);
     }
 
@@ -737,5 +731,67 @@ public class MeetingService {
                 throw new BusinessException(ErrorCode.MEETING_ROUND_UPDATE_NOT_ALLOWED);
             }
         }
+    }
+
+    @Transactional
+    public ParticipationStatusUpdateResponse updateParticipationStatus(
+            Long userId,
+            Long meetingId,
+            Long joinRequestId,
+            ParticipationStatusUpdateRequest request
+    ) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. 모임 조회
+        Meeting meeting = meetingRepository.findByIdWithLeader(meetingId)
+                .filter(m -> m.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+
+        // 2. 권한 체크 (모임장만 처리 가능)
+        if (!meeting.isLeader(userId)) {
+            throw new BusinessException(ErrorCode.PARTICIPATION_UPDATE_FORBIDDEN);
+        }
+
+        // 3. 참여 요청 조회
+        MeetingMember joinRequest = meetingMemberRepository.findById(joinRequestId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.JOIN_REQUEST_NOT_FOUND));
+
+        // 4. 참여 요청이 해당 모임에 속하는지 확인
+        if (!joinRequest.belongsTo(meetingId)) {
+            throw new BusinessException(ErrorCode.JOIN_REQUEST_NOT_FOUND);
+        }
+
+        // 5. PENDING 상태인지 확인
+        if (!joinRequest.isPending()) {
+            throw new BusinessException(ErrorCode.JOIN_REQUEST_ALREADY_PROCESSED);
+        }
+
+        // 6. 상태 변경 처리
+        MeetingMemberStatus newStatus = MeetingMemberStatus.valueOf(request.status());
+
+        if (newStatus == MeetingMemberStatus.APPROVED) {
+            // 정원 체크
+            if (meeting.getCurrentCount() >= meeting.getCapacity()) {
+                throw new BusinessException(ErrorCode.CAPACITY_FULL);
+            }
+
+            // 승인 처리
+            joinRequest.approve(now);
+            meeting.incrementCurrentCount();
+
+            // 모집 완료 상태 확인 및 업데이트
+            if (meeting.isRecruitmentClosed()) {
+                meeting.updateStatusToFinished();
+            }
+        } else if (newStatus == MeetingMemberStatus.REJECTED) {
+            // 거절 처리
+            joinRequest.reject(now);
+        }
+
+        return ParticipationStatusUpdateResponse.builder()
+                .meetingId(meetingId)
+                .joinRequestId(joinRequestId)
+                .status(newStatus.name())
+                .build();
     }
 }
