@@ -11,6 +11,8 @@ import com.example.doktoribackend.meeting.dto.MeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MeetingListResponse;
 import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
 import com.example.doktoribackend.meeting.dto.MeetingUpdateRequest;
+import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateRequest;
+import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateResponse;
 import com.example.doktoribackend.meeting.service.MeetingService;
 import com.example.doktoribackend.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,7 +36,7 @@ import java.net.URI;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/meetings")
-public class MeetingController {
+public class MeetingController implements MeetingParticipationApi {
 
     private final MeetingService meetingService;
 
@@ -429,5 +431,30 @@ public class MeetingController {
 
         MeetingCreateResponse response = meetingService.updateMeeting(userDetails.getId(), meetingId, request);
         return ResponseEntity.ok(ApiResult.ok("독서 모임이 성공적으로 수정되었습니다.", response));
+    }
+
+    @Override
+    @PatchMapping("/{meetingId}/participations/{joinRequestId}")
+    public ResponseEntity<ApiResult<ParticipationStatusUpdateResponse>> updateParticipationStatus(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId,
+            @PathVariable Long joinRequestId,
+            @Valid @RequestBody ParticipationStatusUpdateRequest request
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        if (joinRequestId == null || joinRequestId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        ParticipationStatusUpdateResponse response = meetingService.updateParticipationStatus(
+                userDetails.getId(), meetingId, joinRequestId, request);
+        return ResponseEntity.ok(ApiResult.ok(response));
     }
 }
