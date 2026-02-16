@@ -32,7 +32,10 @@ public interface ChatRoomApi {
                                     "topic": "AI가 인간의 일자리를 대체할 수 있는가",
                                     "description": "AI 기술 발전에 따른 고용 시장 변화를 토론합니다",
                                     "capacity": 4,
-                                    "currentMemberCount": 2
+                                    "currentMemberCount": 2,
+                                    "bookTitle": "아몬드",
+                                    "bookAuthors": "손원평",
+                                    "bookThumbnailUrl": "https://example.com/thumb.jpg"
                                   }
                                 ],
                                 "pageInfo": {
@@ -91,6 +94,11 @@ public interface ChatRoomApi {
                                   "field": "topic",
                                   "reason": "NotBlank",
                                   "message": "주제는 필수입니다."
+                                },
+                                {
+                                  "field": "isbn",
+                                  "reason": "NotBlank",
+                                  "message": "ISBN은 필수입니다."
                                 },
                                 {
                                   "field": "capacity",
