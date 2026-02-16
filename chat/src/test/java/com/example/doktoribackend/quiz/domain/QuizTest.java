@@ -60,7 +60,7 @@ class QuizTest {
     }
 
     @Test
-    @DisplayName("QuizChoice 생성 시 Quiz의 choices에 추가된다")
+    @DisplayName("addChoice로 Quiz의 choices에 추가할 수 있다")
     void addChoice() {
         ChattingRoom room = createRoom();
         Quiz quiz = Quiz.builder()
@@ -69,12 +69,12 @@ class QuizTest {
                 .correctChoiceNumber(1)
                 .build();
 
-        QuizChoice.builder()
-                .roomId(1L)
+        QuizChoice choice = QuizChoice.builder()
                 .quiz(quiz)
                 .choiceNumber(1)
                 .choiceText("선택지 1")
                 .build();
+        quiz.addChoice(choice);
 
         assertThat(quiz.getChoices()).hasSize(1);
         assertThat(quiz.getChoices().getFirst().getChoiceText()).isEqualTo("선택지 1");

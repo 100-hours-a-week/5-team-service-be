@@ -1,6 +1,7 @@
 package com.example.doktoribackend.room.domain;
 
 import com.example.doktoribackend.quiz.domain.Quiz;
+import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -33,6 +34,9 @@ public class ChattingRoom {
     @Column(nullable = false, columnDefinition = "TINYINT UNSIGNED")
     private Integer capacity;
 
+    @Column(name = "current_member_count", nullable = false, columnDefinition = "TINYINT UNSIGNED")
+    private Integer currentMemberCount = 0;
+
     @Column(nullable = false, columnDefinition = "SMALLINT UNSIGNED")
     private Integer duration = 30;
 
@@ -40,7 +44,7 @@ public class ChattingRoom {
     @Column(nullable = false, length = 20)
     private RoomStatus status = RoomStatus.WAITING;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
     private LocalDateTime createdAt;
 
     @OneToOne(mappedBy = "chattingRoom", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
@@ -52,8 +56,12 @@ public class ChattingRoom {
     @OneToMany(mappedBy = "chattingRoom", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     private final List<ChattingRoomMember> members = new ArrayList<>();
 
+    public static ChattingRoom create(ChatRoomCreateRequest request) {
+        return new ChattingRoom(request.topic(), request.description(), request.capacity(), null);
+    }
+
     @Builder
-    public ChattingRoom(String topic, String description, Integer capacity, Integer duration) {
+    private ChattingRoom(String topic, String description, Integer capacity, Integer duration) {
         this.topic = topic;
         this.description = description;
         this.capacity = capacity;
@@ -70,6 +78,16 @@ public class ChattingRoom {
 
     public void cancel() {
         this.status = RoomStatus.CANCELLED;
+    }
+
+    public void increaseMemberCount() {
+        this.currentMemberCount++;
+    }
+
+    public void decreaseMemberCount() {
+        if (this.currentMemberCount > 0) {
+            this.currentMemberCount--;
+        }
     }
 
     public void linkQuiz(Quiz quiz) {

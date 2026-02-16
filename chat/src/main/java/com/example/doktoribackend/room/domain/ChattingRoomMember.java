@@ -1,6 +1,7 @@
 package com.example.doktoribackend.room.domain;
 
 import com.example.doktoribackend.common.domain.BaseTimeEntity;
+import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -46,8 +47,12 @@ public class ChattingRoomMember extends BaseTimeEntity {
     @Column(nullable = false, length = 20)
     private Position position;
 
+    public static ChattingRoomMember createHost(ChattingRoom room, Long userId, ChatRoomCreateRequest request) {
+        return new ChattingRoomMember(room, userId, MemberRole.HOST, request.position());
+    }
+
     @Builder
-    public ChattingRoomMember(ChattingRoom chattingRoom, Long userId, MemberRole role, Position position) {
+    private ChattingRoomMember(ChattingRoom chattingRoom, Long userId, MemberRole role, Position position) {
         this.chattingRoom = chattingRoom;
         this.userId = userId;
         this.role = role;

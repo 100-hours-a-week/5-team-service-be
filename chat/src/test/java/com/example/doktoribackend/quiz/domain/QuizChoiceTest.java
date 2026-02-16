@@ -30,48 +30,33 @@ class QuizChoiceTest {
     @DisplayName("Builder로 QuizChoice를 생성한다")
     void create() {
         QuizChoice choice = QuizChoice.builder()
-                .roomId(1L)
                 .quiz(quiz)
                 .choiceNumber(1)
                 .choiceText("선택지 1")
                 .build();
 
-        assertThat(choice.getRoomId()).isEqualTo(1L);
         assertThat(choice.getQuiz()).isEqualTo(quiz);
         assertThat(choice.getChoiceNumber()).isEqualTo(1);
         assertThat(choice.getChoiceText()).isEqualTo("선택지 1");
     }
 
     @Test
-    @DisplayName("QuizChoice 생성 시 Quiz의 choices 리스트에 자동으로 추가된다")
+    @DisplayName("addChoice로 Quiz의 choices 리스트에 추가할 수 있다")
     void addedToQuizChoices() {
         QuizChoice choice1 = QuizChoice.builder()
-                .roomId(1L)
                 .quiz(quiz)
                 .choiceNumber(1)
                 .choiceText("선택지 1")
                 .build();
+        quiz.addChoice(choice1);
 
         QuizChoice choice2 = QuizChoice.builder()
-                .roomId(1L)
                 .quiz(quiz)
                 .choiceNumber(2)
                 .choiceText("선택지 2")
                 .build();
+        quiz.addChoice(choice2);
 
         assertThat(quiz.getChoices()).hasSize(2).containsExactly(choice1, choice2);
-    }
-
-    @Test
-    @DisplayName("roomId를 직접 파라미터로 받아 설정한다")
-    void roomIdSetDirectly() {
-        QuizChoice choice = QuizChoice.builder()
-                .roomId(99L)
-                .quiz(quiz)
-                .choiceNumber(1)
-                .choiceText("선택지")
-                .build();
-
-        assertThat(choice.getRoomId()).isEqualTo(99L);
     }
 }

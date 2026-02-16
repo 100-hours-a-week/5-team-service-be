@@ -1,6 +1,7 @@
 package com.example.doktoribackend.quiz.domain;
 
 import com.example.doktoribackend.room.domain.ChattingRoom;
+import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -31,11 +32,16 @@ public class Quiz {
     @Column(name = "correct_choice_number", nullable = false, columnDefinition = "TINYINT")
     private Integer correctChoiceNumber;
 
-    @OneToMany(mappedBy = "quiz", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "quiz", cascade = CascadeType.ALL)
     private final List<QuizChoice> choices = new ArrayList<>();
 
+    public static Quiz create(ChattingRoom room, ChatRoomCreateRequest.QuizRequest request) {
+        return new Quiz(room, request.question(), request.correctChoiceNumber());
+    }
+
     @Builder
-    public Quiz(ChattingRoom chattingRoom, String question, Integer correctChoiceNumber) {
+    private Quiz(ChattingRoom chattingRoom, String question, Integer correctChoiceNumber) {
+        this.roomId = chattingRoom.getId();
         this.chattingRoom = chattingRoom;
         this.question = question;
         this.correctChoiceNumber = correctChoiceNumber;

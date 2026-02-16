@@ -70,6 +70,9 @@ public enum ErrorCode {
     MEETING_UPDATE_FORBIDDEN(HttpStatus.FORBIDDEN, "MEETING_UPDATE_FORBIDDEN", "모임을 수정할 권한이 없습니다."),
     MEETING_UPDATE_NOT_ALLOWED(HttpStatus.CONFLICT, "MEETING_UPDATE_NOT_ALLOWED", "취소된 모임은 수정할 수 없습니다."),
     MEETING_ROUND_UPDATE_NOT_ALLOWED(HttpStatus.CONFLICT, "MEETING_ROUND_UPDATE_NOT_ALLOWED", "진행된 회차 또는 진행 중인 회차는 수정할 수 없습니다."),
+    JOIN_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "JOIN_REQUEST_NOT_FOUND", "존재하지 않는 참여 요청입니다."),
+    JOIN_REQUEST_ALREADY_PROCESSED(HttpStatus.CONFLICT, "JOIN_REQUEST_ALREADY_PROCESSED", "이미 처리된 참여 요청입니다."),
+    PARTICIPATION_UPDATE_FORBIDDEN(HttpStatus.FORBIDDEN, "PARTICIPATION_UPDATE_FORBIDDEN", "참여 요청을 처리할 권한이 없습니다."),
 
     // Pagination
     PAGINATION_INVALID_CURSOR(HttpStatus.BAD_REQUEST, "PAGINATION_INVALID_CURSOR", "cursorId는 1 이상의 정수여야 합니다."),
@@ -89,6 +92,7 @@ public enum ErrorCode {
     DAILY_SUBMISSION_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "DAILY_SUBMISSION_LIMIT_EXCEEDED", "일일 독후감 제출 횟수(3회)를 초과했습니다."),
 
     // ChatRoom
+    CHAT_ROOM_INVALID_CAPACITY(HttpStatus.BAD_REQUEST, "CHAT_ROOM_INVALID_CAPACITY", "채팅방 정원은 2, 4, 6명만 가능합니다."),
     CHAT_ROOM_ALREADY_JOINED(HttpStatus.CONFLICT, "CHAT_ROOM_ALREADY_JOINED", "이미 참여 중인 채팅방이 있어 새 채팅방을 생성할 수 없습니다.");
 
 

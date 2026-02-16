@@ -1,0 +1,68 @@
+package com.example.doktoribackend.room.controller;
+
+import com.example.doktoribackend.common.error.ErrorCode;
+import com.example.doktoribackend.common.response.ApiResult;
+import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
+import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
+import com.example.doktoribackend.room.dto.ChatRoomListResponse;
+import com.example.doktoribackend.room.service.ChatRoomService;
+import com.example.doktoribackend.security.CustomUserDetails;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/chat-rooms")
+public class ChatRoomController implements ChatRoomApi {
+
+    private static final int MAX_SIZE = 20;
+
+    private final ChatRoomService chatRoomService;
+
+    @GetMapping
+    @Override
+    public ResponseEntity<ApiResult<ChatRoomListResponse>> getChatRooms(
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "10") Integer size
+    ) {
+        validateSize(size);
+        validateCursorId(cursorId);
+
+        ChatRoomListResponse response = chatRoomService.getChatRooms(cursorId, size);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @PostMapping
+    @Override
+    public ResponseEntity<ApiResult<ChatRoomCreateResponse>> createChatRoom(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody ChatRoomCreateRequest request
+    ) {
+        ChatRoomCreateResponse response = chatRoomService.createChatRoom(
+                userDetails.getId(), request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResult.ok(response));
+    }
+
+    private void validateSize(int size) {
+        if (size < 1 || size > MAX_SIZE) {
+            throw new BusinessException(ErrorCode.PAGINATION_SIZE_OUT_OF_RANGE);
+        }
+    }
+
+    private void validateCursorId(Long cursorId) {
+        if (cursorId != null && cursorId < 1) {
+            throw new BusinessException(ErrorCode.PAGINATION_INVALID_CURSOR);
+        }
+    }
+}
