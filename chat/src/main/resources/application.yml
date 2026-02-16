@@ -52,6 +52,18 @@ app:
   s3:
     public-base-url: https://${AWS_S3_BUCKET_NAME:doktori-dev-images}.s3.ap-northeast-2.amazonaws.com
 
+cloud:
+  aws:
+    credentials:
+      instanceProfile: true
+    region:
+      static: ap-northeast-2
+    parameterstore:
+      enabled: true
+      prefix: /doktori
+      profile-separator: /
+      fail-fast: true
+
 management:
   endpoints:
     web:

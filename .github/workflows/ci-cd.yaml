@@ -49,40 +49,6 @@ jobs:
       - name: Build (includes compile check)
         run: ./gradlew build -x test --no-daemon
 
-      - name: Prepare JAR artifact (rename with SHA)
-        if: github.event_name == 'push'
-        run: |
-          set -euo pipefail
-
-          echo "📂 Searching for JAR files in api module..."
-          ls -al api/build/libs/
-
-          JAR=$(ls -t api/build/libs/*.jar | grep -v 'plain' | head -n 1 || true)
-
-          if [ -z "$JAR" ]; then
-            echo "❌ Error: No valid JAR found in api/build/libs/"
-            exit 1
-          fi
-
-          echo "✅ Found JAR: $JAR"
-
-          SHORT_SHA="${GITHUB_SHA:0:7}"
-          mkdir -p build/libs
-          TARGET="build/libs/app-${SHORT_SHA}.jar"
-
-          cp "$JAR" "$TARGET"
-          echo "🎉 Renamed to: $TARGET"
-
-          ls -al build/libs
-
-      - name: Upload JAR artifact
-        if: github.event_name == 'push'
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-jar
-          path: build/libs/app-*.jar
-          retention-days: 1
-
       - name: Notify Discord on failure
         if: failure()
         run: |
@@ -113,128 +79,144 @@ jobs:
                }" \
                ${{ secrets.DISCORD_WEBHOOK_URL }} || true
 
-  deploy:
+  build-and-push:
     needs: ci
-    if: |
-      always() &&
-      needs.ci.result == 'success' &&
-      github.event_name == 'push'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      image-tag: ${{ steps.meta.outputs.image-tag }}
     steps:
-      - name: Set environment
-        id: env
-        run: |
-          set -euo pipefail
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            # ✅ PROD = Lightsail
-            echo "env_name=prod" >> $GITHUB_OUTPUT
-            echo "deploy_target=lightsail" >> $GITHUB_OUTPUT
-
-            # SSH 대상 (Lightsail 퍼블릭 IP/도메인)
-            # 아래 두 시크릿을 repo secrets에 추가하세요:
-            # - PROD_LIGHTSAIL_HOST (예: 1.2.3.4 또는 도메인)
-            # - PROD_LIGHTSAIL_INSTANCE_NAME (Lightsail 인스턴스 이름)
-            echo "ssh_host=${{ secrets.PROD_LIGHTSAIL_HOST }}" >> $GITHUB_OUTPUT
-            echo "lightsail_instance_name=${{ secrets.PROD_LIGHTSAIL_INSTANCE_NAME }}" >> $GITHUB_OUTPUT
-          else
-            # ✅ DEV = EC2
-            echo "env_name=develop" >> $GITHUB_OUTPUT
-            echo "deploy_target=ec2" >> $GITHUB_OUTPUT
-
-            echo "ssh_host=${{ secrets.DEV_EC2_HOST }}" >> $GITHUB_OUTPUT
-            echo "sg_id=${{ secrets.AWS_SG_ID_DEV }}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Download JAR artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: backend-jar
-          path: build/libs
-
-      # [추가 1] GitHub Actions 실행 서버의 IP 가져오기
-      - name: Get GitHub IP
-        id: ip
-        run: |
-          set -euo pipefail
-          IPV4="$(curl -s https://checkip.amazonaws.com | tr -d '\n')"
-          echo "ipv4=$IPV4" >> $GITHUB_OUTPUT
-
-      # [추가 2] AWS 인증 설정
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ap-northeast-2
 
-      # [추가 3-a] DEV(EC2)만: 보안 그룹 22번 포트 한시적 허용
-      - name: Add GitHub IP to EC2 Security Group (SSH)
-        if: ${{ steps.env.outputs.deploy_target == 'ec2' }}
-        run: |
-          aws ec2 authorize-security-group-ingress \
-            --group-id ${{ steps.env.outputs.sg_id }} \
-            --protocol tcp \
-            --port 22 \
-            --cidr ${{ steps.ip.outputs.ipv4 }}/32 || true
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
 
-      # [추가 3-b] PROD(Lightsail)만: Lightsail 22번 포트 한시적 허용
-      - name: Allow GitHub IP on Lightsail (SSH)
-        if: ${{ steps.env.outputs.deploy_target == 'lightsail' }}
+      - name: Set image metadata
+        id: meta
         run: |
-          aws lightsail open-instance-public-ports \
-            --instance-name ${{ steps.env.outputs.lightsail_instance_name }} \
-            --port-info fromPort=22,toPort=22,protocol=tcp,cidrs=${{ steps.ip.outputs.ipv4 }}/32 || true
+          REGISTRY="${{ secrets.ECR_REGISTRY }}"
+          if [ "${{ github.ref }}" == "refs/heads/develop" ]; then
+            TAG="develop"
+            echo "api-tags=${REGISTRY}/doktori/backend-api:develop" >> $GITHUB_OUTPUT
+            echo "chat-tags=${REGISTRY}/doktori/backend-chat:develop" >> $GITHUB_OUTPUT
+          else
+            SHORT_SHA="${GITHUB_SHA:0:7}"
+            TAG="sha-${SHORT_SHA}"
 
-      - name: Transfer to Server
-        uses: appleboy/scp-action@v0.1.7
+            {
+              echo "api-tags<<EOF"
+              echo "${REGISTRY}/doktori/backend-api:sha-${SHORT_SHA}"
+              echo "${REGISTRY}/doktori/backend-api:latest"
+              echo "EOF"
+            } >> $GITHUB_OUTPUT
+
+            {
+              echo "chat-tags<<EOF"
+              echo "${REGISTRY}/doktori/backend-chat:sha-${SHORT_SHA}"
+              echo "${REGISTRY}/doktori/backend-chat:latest"
+              echo "EOF"
+            } >> $GITHUB_OUTPUT
+          fi
+          echo "image-tag=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Set up QEMU (for ARM64 cross-build)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
         with:
-          host: ${{ steps.env.outputs.ssh_host }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ steps.env.outputs.env_name == 'prod' && secrets.EC2_SSH_KEY || secrets.DEV_EC2_SSH_KEY }}
-          source: "build/libs/app-*.jar"
-          target: "/home/ubuntu/app/artifacts/be"
-          strip_components: 2
-          overwrite: false
+          context: .
+          target: api
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.api-tags }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
 
-      - name: Deploy
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Build and push Chat image
+        uses: docker/build-push-action@v6
         with:
-          host: ${{ steps.env.outputs.ssh_host }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ steps.env.outputs.env_name == 'prod' && secrets.EC2_SSH_KEY || secrets.DEV_EC2_SSH_KEY }}
-          script: bash /home/ubuntu/app/deploy.sh be ${{ steps.env.outputs.env_name }} ${{ github.sha }}
+          context: .
+          target: chat
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.chat-tags }}
+          cache-from: |
+            type=gha,scope=chat
+            type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=chat
 
-      # [추가 4-a] DEV(EC2)만: 보안 그룹에서 IP 제거 (성공/실패 상관없이 무조건 실행)
-      - name: Remove GitHub IP from EC2 Security Group (SSH)
-        if: always() && steps.env.outputs.deploy_target == 'ec2'
-        run: |
-          aws ec2 revoke-security-group-ingress \
-            --group-id ${{ steps.env.outputs.sg_id }} \
-            --protocol tcp \
-            --port 22 \
-            --cidr ${{ steps.ip.outputs.ipv4 }}/32 || true
+  deploy-dev:
+    needs: build-and-push
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-northeast-2
 
-      # [추가 4-b] PROD(Lightsail)만: Lightsail에서 IP 제거 (성공/실패 상관없이 무조건 실행)
-      - name: Close GitHub IP on Lightsail (SSH)
-        if: always() && steps.env.outputs.deploy_target == 'lightsail'
+      - name: Deploy to Dev via SSM
         run: |
-          aws lightsail close-instance-public-ports \
-            --instance-name ${{ steps.env.outputs.lightsail_instance_name }} \
-            --port-info fromPort=22,toPort=22,protocol=tcp,cidrs=${{ steps.ip.outputs.ipv4 }}/32 || true
+          COMMANDS=$(jq -n --arg registry "${{ secrets.ECR_REGISTRY }}" '[
+            "set -e",
+            ("aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin " + $registry),
+            ("export ECR_REGISTRY=" + $registry),
+            "export DB_PASSWORD=$(aws ssm get-parameter --name /doktori/dev/DB_PASSWORD --with-decryption --query Parameter.Value --output text 2>/dev/null || echo changeme)",
+            "docker compose -f /home/ubuntu/app/docker-compose.yml pull",
+            "docker compose -f /home/ubuntu/app/docker-compose.yml up -d",
+            "docker image prune -f"
+          ]')
+
+          CMD_ID=$(aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Environment,Values=dev" "Key=tag:Service,Values=backend" \
+            --parameters "{\"commands\": $COMMANDS}" \
+            --timeout-seconds 300 \
+            --comment "deploy dev ${{ github.sha }}" \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command: $CMD_ID"
+
+          for i in $(seq 1 60); do
+            sleep 5
+            STATUS=$(aws ssm list-command-invocations \
+              --command-id "$CMD_ID" \
+              --query "CommandInvocations[0].Status" \
+              --output text 2>/dev/null || echo "Pending")
+            echo "[$i/60] $STATUS"
+            case "$STATUS" in
+              Success) exit 0 ;;
+              Failed|Cancelled|TimedOut|DeliveryTimedOut)
+                aws ssm list-command-invocations --command-id "$CMD_ID" --details \
+                  --query "CommandInvocations[0].CommandPlugins[0].Output" --output text || true
+                exit 1 ;;
+            esac
+          done
+          echo "::error::SSM command timed out"
+          exit 1
 
       - name: Notify Discord
         if: always()
         run: |
-          ENV_NAME="${{ steps.env.outputs.env_name }}"
-          if [ "$ENV_NAME" == "prod" ]; then
-            ENV_EMOJI="🚀"
-            ENV_LABEL="Production"
-          else
-            ENV_EMOJI="🔧"
-            ENV_LABEL="Development"
-          fi
-
           COMMIT_SHA="${{ github.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
           COMMIT_MSG=$(echo '${{ github.event.head_commit.message }}' | head -1)
@@ -243,21 +225,139 @@ jobs:
           ACTIONS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
           if [ "${{ job.status }}" == "success" ]; then
-            COLOR=3066993
-            STATUS_EMOJI="✅"
-            STATUS_TEXT="배포 성공"
+            COLOR=3066993; STATUS_EMOJI="✅"; STATUS_TEXT="배포 성공"
           else
-            COLOR=15158528
-            STATUS_EMOJI="❌"
-            STATUS_TEXT="배포 실패"
+            COLOR=15158528; STATUS_EMOJI="❌"; STATUS_TEXT="배포 실패"
           fi
 
           curl -H "Content-Type: application/json" \
                -X POST \
                -d "{
-                 \"content\": \"$STATUS_EMOJI **Backend $ENV_LABEL 배포 알림**\",
+                 \"content\": \"$STATUS_EMOJI **Backend Development 배포 알림**\",
                  \"embeds\": [{
-                   \"title\": \"$ENV_EMOJI [$ENV_LABEL] $STATUS_TEXT\",
+                   \"title\": \"🔧 [Development] $STATUS_TEXT\",
+                   \"color\": $COLOR,
+                   \"fields\": [
+                     {\"name\": \"📦 저장소\", \"value\": \"\`${{ github.repository }}\`\", \"inline\": true},
+                     {\"name\": \"🌿 브랜치\", \"value\": \"\`${{ github.ref_name }}\`\", \"inline\": true},
+                     {\"name\": \"🔖 커밋\", \"value\": \"[\`$SHORT_SHA\`]($COMMIT_URL)\", \"inline\": true},
+                     {\"name\": \"💬 커밋 메시지\", \"value\": \"$COMMIT_MSG\", \"inline\": false},
+                     {\"name\": \"👤 작성자\", \"value\": \"$COMMIT_AUTHOR\", \"inline\": true},
+                     {\"name\": \"📋 상세 로그\", \"value\": \"[Actions에서 확인]($ACTIONS_URL)\", \"inline\": true}
+                   ],
+                   \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+                 }]
+               }" \
+               ${{ secrets.DISCORD_WEBHOOK_URL }} || true
+
+  deploy-prod:
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-northeast-2
+
+      - name: Deploy to Prod via SSM
+        run: |
+          REGISTRY="${{ secrets.ECR_REGISTRY }}"
+          TAG="${{ needs.build-and-push.outputs.image-tag }}"
+
+          wait_ssm() {
+            local cmd_id=$1 label=$2
+            for i in $(seq 1 60); do
+              sleep 5
+              STATUS=$(aws ssm list-command-invocations \
+                --command-id "$cmd_id" \
+                --query "CommandInvocations[0].Status" \
+                --output text 2>/dev/null || echo "Pending")
+              echo "[$label $i/60] $STATUS"
+              case "$STATUS" in
+                Success) return 0 ;;
+                Failed|Cancelled|TimedOut|DeliveryTimedOut)
+                  aws ssm list-command-invocations --command-id "$cmd_id" --details \
+                    --query "CommandInvocations[0].CommandPlugins[0].Output" --output text || true
+                  return 1 ;;
+              esac
+            done
+            echo "::error::SSM $label timed out"
+            return 1
+          }
+
+          # Deploy API server
+          API_CMDS=$(jq -n --arg r "$REGISTRY" --arg t "$TAG" '[
+            "set -e",
+            ("aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin " + $r),
+            ("docker pull " + $r + "/doktori/backend-api:" + $t),
+            "docker stop backend-api 2>/dev/null || true",
+            "docker rm backend-api 2>/dev/null || true",
+            ("docker run -d --name backend-api --restart unless-stopped --env-file /home/ubuntu/app/.env -p 8080:8080 " + $r + "/doktori/backend-api:" + $t),
+            "docker image prune -f"
+          ]')
+
+          API_CMD_ID=$(aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Environment,Values=prod" "Key=tag:Service,Values=backend-api" \
+            --parameters "{\"commands\": $API_CMDS}" \
+            --timeout-seconds 300 \
+            --comment "deploy prod api ${{ github.sha }}" \
+            --query "Command.CommandId" \
+            --output text)
+
+          # Deploy Chat server
+          CHAT_CMDS=$(jq -n --arg r "$REGISTRY" --arg t "$TAG" '[
+            "set -e",
+            ("aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin " + $r),
+            ("docker pull " + $r + "/doktori/backend-chat:" + $t),
+            "docker stop backend-chat 2>/dev/null || true",
+            "docker rm backend-chat 2>/dev/null || true",
+            ("docker run -d --name backend-chat --restart unless-stopped --env-file /home/ubuntu/app/.env -p 8081:8081 " + $r + "/doktori/backend-chat:" + $t),
+            "docker image prune -f"
+          ]')
+
+          CHAT_CMD_ID=$(aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Environment,Values=prod" "Key=tag:Service,Values=backend-chat" \
+            --parameters "{\"commands\": $CHAT_CMDS}" \
+            --timeout-seconds 300 \
+            --comment "deploy prod chat ${{ github.sha }}" \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "API CMD: $API_CMD_ID / Chat CMD: $CHAT_CMD_ID"
+
+          # Wait for both (parallel send, sequential wait)
+          wait_ssm "$API_CMD_ID" "api"
+          wait_ssm "$CHAT_CMD_ID" "chat"
+
+      - name: Notify Discord
+        if: always()
+        run: |
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          COMMIT_MSG=$(echo '${{ github.event.head_commit.message }}' | head -1)
+          COMMIT_AUTHOR="${{ github.event.head_commit.author.name }}"
+          COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+          ACTIONS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          if [ "${{ job.status }}" == "success" ]; then
+            COLOR=3066993; STATUS_EMOJI="✅"; STATUS_TEXT="배포 성공"
+          else
+            COLOR=15158528; STATUS_EMOJI="❌"; STATUS_TEXT="배포 실패"
+          fi
+
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "{
+                 \"content\": \"$STATUS_EMOJI **Backend Production 배포 알림**\",
+                 \"embeds\": [{
+                   \"title\": \"🚀 [Production] $STATUS_TEXT\",
                    \"color\": $COLOR,
                    \"fields\": [
                      {\"name\": \"📦 저장소\", \"value\": \"\`${{ github.repository }}\`\", \"inline\": true},
