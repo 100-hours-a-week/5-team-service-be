@@ -1,5 +1,6 @@
 package com.example.doktoribackend.room.domain;
 
+import com.example.doktoribackend.book.domain.Book;
 import com.example.doktoribackend.quiz.domain.Quiz;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import jakarta.persistence.*;
@@ -37,6 +38,10 @@ public class ChattingRoom {
     @Column(name = "current_member_count", nullable = false, columnDefinition = "TINYINT UNSIGNED")
     private Integer currentMemberCount = 0;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "book_id")
+    private Book book;
+
     @Column(nullable = false, columnDefinition = "SMALLINT UNSIGNED")
     private Integer duration = 30;
 
@@ -56,16 +61,17 @@ public class ChattingRoom {
     @OneToMany(mappedBy = "chattingRoom", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     private final List<ChattingRoomMember> members = new ArrayList<>();
 
-    public static ChattingRoom create(ChatRoomCreateRequest request) {
-        return new ChattingRoom(request.topic(), request.description(), request.capacity(), null);
+    public static ChattingRoom create(ChatRoomCreateRequest request, Book book) {
+        return new ChattingRoom(request.topic(), request.description(), request.capacity(), null, book);
     }
 
     @Builder
-    private ChattingRoom(String topic, String description, Integer capacity, Integer duration) {
+    private ChattingRoom(String topic, String description, Integer capacity, Integer duration, Book book) {
         this.topic = topic;
         this.description = description;
         this.capacity = capacity;
         this.duration = duration != null ? duration : 30;
+        this.book = book;
     }
 
     public void startChatting() {

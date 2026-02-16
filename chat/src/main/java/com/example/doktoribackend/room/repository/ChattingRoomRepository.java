@@ -11,6 +11,6 @@ import java.util.List;
 
 public interface ChattingRoomRepository extends JpaRepository<ChattingRoom, Long> {
 
-    @Query("SELECT r FROM ChattingRoom r WHERE r.status = :status AND (:cursorId IS NULL OR r.id < :cursorId) ORDER BY r.id DESC")
+    @Query("SELECT r FROM ChattingRoom r LEFT JOIN FETCH r.book WHERE r.status = :status AND (:cursorId IS NULL OR r.id < :cursorId) ORDER BY r.id DESC")
     List<ChattingRoom> findByStatusWithCursor(@Param("status") RoomStatus status, @Param("cursorId") Long cursorId, Pageable pageable);
 }

@@ -1,4 +1,4 @@
-package com.example.doktoribackend.book.dto;
+package com.example.doktoribackend.common.client;
 
 import java.util.List;
 

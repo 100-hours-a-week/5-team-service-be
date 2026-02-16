@@ -1,8 +1,8 @@
 package com.example.doktoribackend.book.service;
 
-import com.example.doktoribackend.book.client.KakaoBookClient;
+import com.example.doktoribackend.common.client.KakaoBookClient;
 import com.example.doktoribackend.book.dto.BookSearchResponse;
-import com.example.doktoribackend.book.dto.KakaoBookResponse;
+import com.example.doktoribackend.common.client.KakaoBookResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

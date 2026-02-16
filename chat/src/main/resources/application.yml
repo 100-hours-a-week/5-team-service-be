@@ -44,6 +44,11 @@ springdoc:
   swagger-ui:
     path: /swagger-ui/index.html
 
+kakao:
+  book:
+    base-url: https://dapi.kakao.com/v3/search/book
+    rest-api-key: ${KAKAO_REST_API_KEY}
+
 app:
   jwt:
     secret: ${JWT_SECRET}

@@ -1,6 +1,5 @@
-package com.example.doktoribackend.book.client;
+package com.example.doktoribackend.common.client;
 
-import com.example.doktoribackend.book.dto.KakaoBookResponse;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
