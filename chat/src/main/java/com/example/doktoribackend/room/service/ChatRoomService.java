@@ -29,6 +29,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -46,6 +48,7 @@ public class ChatRoomService {
     private final BookRepository bookRepository;
     private final KakaoBookClient kakaoBookClient;
     private final UserInfoRepository userInfoRepository;
+    private final WaitingRoomSseService waitingRoomSseService;
 
     @Transactional(readOnly = true)
     public ChatRoomListResponse getChatRooms(Long cursorId, int size) {
@@ -108,6 +111,10 @@ public class ChatRoomService {
         if (room.getStatus() == RoomStatus.WAITING && member.isHost()) {
             room.cancel();
             leaveAllActiveMembers(roomId);
+            broadcastCancelledAfterCommit(roomId);
+        } else {
+            WaitingRoomResponse response = buildWaitingRoomResponse(room);
+            broadcastAfterCommit(roomId, response);
         }
     }
 
@@ -134,7 +141,9 @@ public class ChatRoomService {
 
         room.increaseMemberCount();
 
-        return buildWaitingRoomResponse(room);
+        WaitingRoomResponse response = buildWaitingRoomResponse(room);
+        broadcastAfterCommit(roomId, response);
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -188,6 +197,24 @@ public class ChatRoomService {
                 .toList();
 
         return new WaitingRoomResponse(room.getId(), agreeCount, disagreeCount, maxPerPosition, members);
+    }
+
+    private void broadcastAfterCommit(Long roomId, WaitingRoomResponse response) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                waitingRoomSseService.broadcast(roomId, response);
+            }
+        });
+    }
+
+    private void broadcastCancelledAfterCommit(Long roomId) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                waitingRoomSseService.broadcastCancelledAndClose(roomId);
+            }
+        });
     }
 
     private void validateRoomNotEnded(ChattingRoom room) {

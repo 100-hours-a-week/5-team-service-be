@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Tag(name = "ChatRoom", description = "채팅방 API")
 public interface ChatRoomApi {
@@ -297,6 +298,33 @@ public interface ChatRoomApi {
                                             """)
                     }))
     ResponseEntity<ApiResult<WaitingRoomResponse>> getWaitingRoom(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
+            @Parameter(description = "채팅방 ID", example = "1") Long roomId);
+
+    @AuthErrorResponses
+    @Operation(summary = "대기실 SSE 구독",
+            description = "대기실 실시간 업데이트를 SSE로 구독합니다. "
+                    + "멤버 입장/퇴장 시 `waiting-room-update` 이벤트가 전송됩니다.")
+    @ApiResponse(responseCode = "200", description = "SSE 스트림 연결")
+    @ApiResponse(responseCode = "404", description = "Not Found",
+            content = @Content(mediaType = "application/json",
+                    examples = {
+                            @ExampleObject(name = "채팅방 없음",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_NOT_FOUND",
+                                              "message": "존재하지 않는 채팅방입니다."
+                                            }
+                                            """),
+                            @ExampleObject(name = "멤버 아님",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_MEMBER_NOT_FOUND",
+                                              "message": "채팅방 멤버가 아닙니다."
+                                            }
+                                            """)
+                    }))
+    SseEmitter subscribeWaitingRoom(
             @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(description = "채팅방 ID", example = "1") Long roomId);
 }
