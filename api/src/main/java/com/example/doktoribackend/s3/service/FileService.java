@@ -2,7 +2,7 @@ package com.example.doktoribackend.s3.service;
 
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
-import com.example.doktoribackend.s3.ImageUrlResolver;
+import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.s3.dto.PresignUploadResponse;
 import com.example.doktoribackend.s3.dto.UploadDirectory;
 import lombok.RequiredArgsConstructor;
