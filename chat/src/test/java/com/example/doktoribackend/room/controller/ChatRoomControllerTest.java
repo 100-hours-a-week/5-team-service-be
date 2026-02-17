@@ -334,7 +334,7 @@ class ChatRoomControllerTest {
             mockMvc.perform(delete("/chat-rooms/10/members/me")
                             .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
                             .with(csrf()))
-                    .andExpect(status().isOk());
+                    .andExpect(status().isNoContent());
 
             then(chatRoomService).should().leaveChatRoom(10L, USER_ID);
         }

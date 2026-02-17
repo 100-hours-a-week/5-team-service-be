@@ -58,12 +58,12 @@ public class ChatRoomController implements ChatRoomApi {
 
     @DeleteMapping("/{roomId}/members/me")
     @Override
-    public ResponseEntity<ApiResult<Void>> leaveChatRoom(
+    public ResponseEntity<Void> leaveChatRoom(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long roomId
     ) {
         chatRoomService.leaveChatRoom(roomId, userDetails.getId());
-        return ResponseEntity.ok(ApiResult.ok(null));
+        return ResponseEntity.noContent().build();
     }
 
     private void validateSize(int size) {

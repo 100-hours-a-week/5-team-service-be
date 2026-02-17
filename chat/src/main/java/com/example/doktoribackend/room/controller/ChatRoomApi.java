@@ -120,14 +120,7 @@ public interface ChatRoomApi {
     @CommonErrorResponses
     @AuthErrorResponses
     @Operation(summary = "채팅방 나가기", description = "현재 참여 중인 채팅방에서 나갑니다. 대기 중인 방의 방장이 나가면 방이 취소됩니다.")
-    @ApiResponse(responseCode = "200", description = "OK",
-            content = @Content(mediaType = "application/json",
-                    examples = @ExampleObject(value = """
-                            {
-                              "message": "OK",
-                              "data": null
-                            }
-                            """)))
+    @ApiResponse(responseCode = "204", description = "No Content")
     @ApiResponse(responseCode = "404", description = "Not Found",
             content = @Content(mediaType = "application/json",
                     examples = {
@@ -164,7 +157,7 @@ public interface ChatRoomApi {
                                             }
                                             """)
                     }))
-    ResponseEntity<ApiResult<Void>> leaveChatRoom(
+    ResponseEntity<Void> leaveChatRoom(
             @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(description = "채팅방 ID", example = "1") Long roomId);
 }
