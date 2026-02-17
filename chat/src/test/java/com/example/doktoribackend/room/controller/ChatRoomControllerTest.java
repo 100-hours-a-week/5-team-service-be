@@ -2,15 +2,20 @@ package com.example.doktoribackend.room.controller;
 
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.room.domain.MemberRole;
 import com.example.doktoribackend.room.domain.Position;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest.QuizChoiceRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest.QuizRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
+import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
 import com.example.doktoribackend.room.dto.ChatRoomListItem;
 import com.example.doktoribackend.room.dto.ChatRoomListResponse;
 import com.example.doktoribackend.room.dto.PageInfo;
+import com.example.doktoribackend.room.dto.WaitingRoomMemberItem;
+import com.example.doktoribackend.room.dto.WaitingRoomResponse;
 import com.example.doktoribackend.room.service.ChatRoomService;
+import com.example.doktoribackend.room.service.WaitingRoomSseService;
 import com.example.doktoribackend.security.CustomUserDetails;
 import com.example.doktoribackend.security.jwt.JwtTokenProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,6 +33,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.stream.Stream;
@@ -56,6 +62,9 @@ class ChatRoomControllerTest {
 
     @MockitoBean
     ChatRoomService chatRoomService;
+
+    @MockitoBean
+    WaitingRoomSseService waitingRoomSseService;
 
     @MockitoBean
     JwtTokenProvider jwtTokenProvider;
@@ -327,7 +336,7 @@ class ChatRoomControllerTest {
     class LeaveChatRoom {
 
         @Test
-        @DisplayName("정상적으로 채팅방을 나가면 200 OK를 반환한다")
+        @DisplayName("정상적으로 채팅방을 나가면 204 No Content를 반환한다")
         void leaveChatRoom_success() throws Exception {
             willDoNothing().given(chatRoomService).leaveChatRoom(10L, USER_ID);
 
@@ -374,5 +383,192 @@ class ChatRoomControllerTest {
                             .with(csrf()))
                     .andExpect(status().isConflict());
         }
+    }
+
+    @Nested
+    @DisplayName("채팅방 참여")
+    class JoinChatRoom {
+
+        @Test
+        @DisplayName("유효한 요청이면 201 Created와 WaitingRoomResponse를 반환한다")
+        void joinChatRoom_success() throws Exception {
+            ChatRoomJoinRequest request = new ChatRoomJoinRequest(Position.AGREE, 1);
+            WaitingRoomResponse response = new WaitingRoomResponse(
+                    10L, 1, 1, 2,
+                    List.of(
+                            new WaitingRoomMemberItem("방장", "http://host.url", Position.AGREE, MemberRole.HOST),
+                            new WaitingRoomMemberItem("테스터", "http://profile.url", Position.DISAGREE, MemberRole.PARTICIPANT)
+                    )
+            );
+            given(chatRoomService.joinChatRoom(eq(10L), eq(USER_ID), any())).willReturn(response);
+
+            mockMvc.perform(post("/chat-rooms/10/members")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.data.roomId").value(10))
+                    .andExpect(jsonPath("$.data.agreeCount").value(1))
+                    .andExpect(jsonPath("$.data.disagreeCount").value(1))
+                    .andExpect(jsonPath("$.data.maxPerPosition").value(2))
+                    .andExpect(jsonPath("$.data.members").isArray())
+                    .andExpect(jsonPath("$.data.members.length()").value(2));
+        }
+
+        @Test
+        @DisplayName("position이 null이면 422를 반환한다")
+        void joinChatRoom_positionNull() throws Exception {
+            ChatRoomJoinRequest request = new ChatRoomJoinRequest(null, 1);
+
+            mockMvc.perform(post("/chat-rooms/10/members")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isUnprocessableEntity());
+        }
+
+        @Test
+        @DisplayName("quizAnswer가 null이면 422를 반환한다")
+        void joinChatRoom_quizAnswerNull() throws Exception {
+            ChatRoomJoinRequest request = new ChatRoomJoinRequest(Position.AGREE, null);
+
+            mockMvc.perform(post("/chat-rooms/10/members")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isUnprocessableEntity());
+        }
+
+        @Test
+        @DisplayName("퀴즈 오답이면 403을 반환한다")
+        void joinChatRoom_quizWrong() throws Exception {
+            ChatRoomJoinRequest request = new ChatRoomJoinRequest(Position.AGREE, 1);
+            willThrow(new BusinessException(ErrorCode.CHAT_ROOM_QUIZ_WRONG_ANSWER))
+                    .given(chatRoomService).joinChatRoom(eq(10L), eq(USER_ID), any());
+
+            mockMvc.perform(post("/chat-rooms/10/members")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("정원 초과이면 409를 반환한다")
+        void joinChatRoom_roomFull() throws Exception {
+            ChatRoomJoinRequest request = new ChatRoomJoinRequest(Position.AGREE, 1);
+            willThrow(new BusinessException(ErrorCode.CHAT_ROOM_FULL))
+                    .given(chatRoomService).joinChatRoom(eq(10L), eq(USER_ID), any());
+
+            mockMvc.perform(post("/chat-rooms/10/members")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isConflict());
+        }
+
+        @Test
+        @DisplayName("포지션 정원 초과이면 409를 반환한다")
+        void joinChatRoom_positionFull() throws Exception {
+            ChatRoomJoinRequest request = new ChatRoomJoinRequest(Position.AGREE, 1);
+            willThrow(new BusinessException(ErrorCode.CHAT_ROOM_POSITION_FULL))
+                    .given(chatRoomService).joinChatRoom(eq(10L), eq(USER_ID), any());
+
+            mockMvc.perform(post("/chat-rooms/10/members")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isConflict());
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 채팅방이면 404를 반환한다")
+        void joinChatRoom_roomNotFound() throws Exception {
+            ChatRoomJoinRequest request = new ChatRoomJoinRequest(Position.AGREE, 1);
+            willThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND))
+                    .given(chatRoomService).joinChatRoom(eq(10L), eq(USER_ID), any());
+
+            mockMvc.perform(post("/chat-rooms/10/members")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isNotFound());
+        }
+    }
+
+    @Nested
+    @DisplayName("대기실 조회")
+    class GetWaitingRoom {
+
+        @Test
+        @DisplayName("성공하면 200 OK와 WaitingRoomResponse를 반환한다")
+        void getWaitingRoom_success() throws Exception {
+            WaitingRoomResponse response = new WaitingRoomResponse(
+                    10L, 1, 0, 2,
+                    List.of(new WaitingRoomMemberItem("방장", "http://host.url", Position.AGREE, MemberRole.HOST))
+            );
+            given(chatRoomService.getWaitingRoom(10L, USER_ID)).willReturn(response);
+
+            mockMvc.perform(get("/chat-rooms/10/waiting-room")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.roomId").value(10))
+                    .andExpect(jsonPath("$.data.agreeCount").value(1))
+                    .andExpect(jsonPath("$.data.disagreeCount").value(0))
+                    .andExpect(jsonPath("$.data.maxPerPosition").value(2))
+                    .andExpect(jsonPath("$.data.members.length()").value(1));
+        }
+
+        @Test
+        @DisplayName("채팅방이 없으면 404를 반환한다")
+        void getWaitingRoom_roomNotFound() throws Exception {
+            willThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND))
+                    .given(chatRoomService).getWaitingRoom(10L, USER_ID);
+
+            mockMvc.perform(get("/chat-rooms/10/waiting-room")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("멤버가 아니면 404를 반환한다")
+        void getWaitingRoom_memberNotFound() throws Exception {
+            willThrow(new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND))
+                    .given(chatRoomService).getWaitingRoom(10L, USER_ID);
+
+            mockMvc.perform(get("/chat-rooms/10/waiting-room")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isNotFound());
+        }
+    }
+
+    @Nested
+    @DisplayName("대기실 SSE 구독")
+    class SubscribeWaitingRoom {
+
+        @Test
+        @DisplayName("성공하면 200 OK를 반환한다")
+        void subscribeWaitingRoom_success() throws Exception {
+            WaitingRoomResponse response = new WaitingRoomResponse(10L, 1, 0, 2, List.of());
+            given(chatRoomService.getWaitingRoom(10L, USER_ID)).willReturn(response);
+            given(waitingRoomSseService.subscribe(10L)).willReturn(new SseEmitter());
+
+            mockMvc.perform(get("/chat-rooms/10/waiting-room/subscribe")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf())
+                            .accept(MediaType.TEXT_EVENT_STREAM_VALUE))
+                    .andExpect(status().isOk());
+        }
+
     }
 }
