@@ -321,6 +321,65 @@ public interface ChatRoomApi {
             @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(description = "채팅방 ID", example = "1") Long roomId);
 
+    @CommonErrorResponses
+    @AuthErrorResponses
+    @Operation(summary = "채팅 시작", description = "방장이 채팅을 시작합니다. 상대 포지션에 최소 1명 이상의 멤버가 필요합니다.")
+    @ApiResponse(responseCode = "200", description = "OK",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {
+                              "message": "OK"
+                            }
+                            """)))
+    @ApiResponse(responseCode = "403", description = "Forbidden",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(name = "방장이 아님",
+                            value = """
+                                    {
+                                      "code": "CHAT_ROOM_NOT_HOST",
+                                      "message": "방장만 채팅을 시작할 수 있습니다."
+                                    }
+                                    """)))
+    @ApiResponse(responseCode = "404", description = "Not Found",
+            content = @Content(mediaType = "application/json",
+                    examples = {
+                            @ExampleObject(name = "채팅방 없음",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_NOT_FOUND",
+                                              "message": "존재하지 않는 채팅방입니다."
+                                            }
+                                            """),
+                            @ExampleObject(name = "멤버 아님",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_MEMBER_NOT_FOUND",
+                                              "message": "채팅방 멤버가 아닙니다."
+                                            }
+                                            """)
+                    }))
+    @ApiResponse(responseCode = "409", description = "Conflict",
+            content = @Content(mediaType = "application/json",
+                    examples = {
+                            @ExampleObject(name = "대기 중이 아닌 채팅방",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_NOT_WAITING",
+                                              "message": "대기 중인 채팅방만 참여할 수 있습니다."
+                                            }
+                                            """),
+                            @ExampleObject(name = "상대 포지션 부족",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_INSUFFICIENT_MEMBERS",
+                                              "message": "상대 포지션에 최소 1명 이상의 멤버가 필요합니다."
+                                            }
+                                            """)
+                    }))
+    ResponseEntity<ApiResult<Void>> startChatRoom(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
+            @Parameter(description = "채팅방 ID", example = "1") Long roomId);
+
     @AuthErrorResponses
     @Operation(summary = "대기실 SSE 구독",
             description = "대기실 실시간 업데이트를 SSE로 구독합니다. "

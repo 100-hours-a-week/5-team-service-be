@@ -18,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -94,6 +95,16 @@ public class ChatRoomController implements ChatRoomApi {
     ) {
         chatRoomService.getWaitingRoom(roomId, userDetails.getId());
         return waitingRoomSseService.subscribe(roomId);
+    }
+
+    @PatchMapping("/{roomId}")
+    @Override
+    public ResponseEntity<ApiResult<Void>> startChatRoom(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId
+    ) {
+        chatRoomService.startChatRoom(roomId, userDetails.getId());
+        return ResponseEntity.ok(ApiResult.ok());
     }
 
     @DeleteMapping("/{roomId}/members/me")
