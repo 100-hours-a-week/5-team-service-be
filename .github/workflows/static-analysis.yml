@@ -3,8 +3,16 @@ name: Static Analysis (JDK 21)
 on:
   pull_request:
     branches: [ develop, main ]
+    paths-ignore:
+      - '.github/**'
+      - '*.md'
+      - 'docs/**'
   push:
     branches: [ main ]
+    paths-ignore:
+      - '.github/**'
+      - '*.md'
+      - 'docs/**'
   workflow_dispatch:
   schedule:
     - cron: '0 9 * * 1'  # 매주 월요일 09:00 UTC (CodeQL 정기 스캔)
