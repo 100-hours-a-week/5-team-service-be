@@ -19,6 +19,8 @@ import com.example.doktoribackend.room.dto.ChatRoomListResponse;
 import com.example.doktoribackend.room.dto.PageInfo;
 import com.example.doktoribackend.room.repository.ChattingRoomMemberRepository;
 import com.example.doktoribackend.room.repository.ChattingRoomRepository;
+import com.example.doktoribackend.user.domain.UserInfo;
+import com.example.doktoribackend.user.repository.UserInfoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -37,6 +39,7 @@ public class ChatRoomService {
     private final ChattingRoomMemberRepository chattingRoomMemberRepository;
     private final BookRepository bookRepository;
     private final KakaoBookClient kakaoBookClient;
+    private final UserInfoRepository userInfoRepository;
 
     @Transactional(readOnly = true)
     public ChatRoomListResponse getChatRooms(Long cursorId, int size) {
@@ -69,7 +72,11 @@ public class ChatRoomService {
 
         room.increaseMemberCount();
 
-        ChattingRoomMember member = ChattingRoomMember.createHost(room, userId, request);
+        UserInfo userInfo = userInfoRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        ChattingRoomMember member = ChattingRoomMember.createHost(
+                room, userId, userInfo.getNickname(), userInfo.getProfileImagePath(), request);
         chattingRoomMemberRepository.save(member);
 
         return new ChatRoomCreateResponse(room.getId());
