@@ -74,6 +74,24 @@ public class WaitingRoomSseService {
         }
     }
 
+    public void broadcastStartedAndClose(Long roomId) {
+        List<SseEmitter> roomEmitters = emitters.remove(roomId);
+        if (roomEmitters == null) {
+            return;
+        }
+
+        for (SseEmitter emitter : roomEmitters) {
+            try {
+                emitter.send(SseEmitter.event()
+                        .name("room-started")
+                        .data("채팅이 시작되었습니다."));
+                emitter.complete();
+            } catch (IOException e) {
+                emitter.complete();
+            }
+        }
+    }
+
     private void remove(Long roomId, SseEmitter emitter) {
         List<SseEmitter> roomEmitters = emitters.get(roomId);
         if (roomEmitters != null) {
