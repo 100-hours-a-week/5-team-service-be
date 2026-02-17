@@ -1,5 +1,7 @@
 package com.example.doktoribackend.room.controller;
 
+import com.example.doktoribackend.common.error.ErrorCode;
+import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.room.domain.Position;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest.QuizChoiceRequest;
@@ -33,7 +35,11 @@ import java.util.stream.Stream;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willDoNothing;
+import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -313,6 +319,60 @@ class ChatRoomControllerTest {
                             .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
                             .with(csrf()))
                     .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Nested
+    @DisplayName("채팅방 나가기")
+    class LeaveChatRoom {
+
+        @Test
+        @DisplayName("정상적으로 채팅방을 나가면 200 OK를 반환한다")
+        void leaveChatRoom_success() throws Exception {
+            willDoNothing().given(chatRoomService).leaveChatRoom(10L, USER_ID);
+
+            mockMvc.perform(delete("/chat-rooms/10/members/me")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isNoContent());
+
+            then(chatRoomService).should().leaveChatRoom(10L, USER_ID);
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 채팅방이면 404를 반환한다")
+        void leaveChatRoom_roomNotFound() throws Exception {
+            willThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND))
+                    .given(chatRoomService).leaveChatRoom(999L, USER_ID);
+
+            mockMvc.perform(delete("/chat-rooms/999/members/me")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("이미 종료된 채팅방이면 409를 반환한다")
+        void leaveChatRoom_alreadyEnded() throws Exception {
+            willThrow(new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_ENDED))
+                    .given(chatRoomService).leaveChatRoom(10L, USER_ID);
+
+            mockMvc.perform(delete("/chat-rooms/10/members/me")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isConflict());
+        }
+
+        @Test
+        @DisplayName("이미 나간 채팅방이면 409를 반환한다")
+        void leaveChatRoom_alreadyLeft() throws Exception {
+            willThrow(new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_LEFT))
+                    .given(chatRoomService).leaveChatRoom(10L, USER_ID);
+
+            mockMvc.perform(delete("/chat-rooms/10/members/me")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isConflict());
         }
     }
 }

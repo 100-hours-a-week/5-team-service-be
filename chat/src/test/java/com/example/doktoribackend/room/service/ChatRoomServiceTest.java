@@ -273,8 +273,8 @@ class ChatRoomServiceTest {
 
             // then
             assertThat(response.items()).hasSize(2);
-            assertThat(response.items().get(0).roomId()).isEqualTo(3L);
-            assertThat(response.items().get(0).topic()).isEqualTo("주제3");
+            assertThat(response.items().getFirst().roomId()).isEqualTo(3L);
+            assertThat(response.items().getFirst().topic()).isEqualTo("주제3");
             assertThat(response.items().get(0).capacity()).isEqualTo(4);
             assertThat(response.items().get(0).currentMemberCount()).isEqualTo(2);
             assertThat(response.items().get(1).roomId()).isEqualTo(2L);
@@ -362,9 +362,198 @@ class ChatRoomServiceTest {
 
             // then
             assertThat(response.items()).hasSize(2);
-            assertThat(response.items().get(0).roomId()).isEqualTo(4L);
+            assertThat(response.items().getFirst().roomId()).isEqualTo(4L);
             then(chattingRoomRepository).should().findByStatusWithCursor(
                     eq(RoomStatus.WAITING), eq(cursorId), any(PageRequest.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("채팅방 나가기")
+    class LeaveChatRoom {
+
+        private static final Long ROOM_ID = 10L;
+
+        private ChattingRoom createRoomWithStatus(RoomStatus status, int currentMemberCount) {
+            ChattingRoom room = ChattingRoom.builder()
+                    .topic("주제")
+                    .description("설명")
+                    .capacity(4)
+                    .build();
+            ReflectionTestUtils.setField(room, "id", ROOM_ID);
+            ReflectionTestUtils.setField(room, "status", status);
+            ReflectionTestUtils.setField(room, "currentMemberCount", currentMemberCount);
+            return room;
+        }
+
+        private ChattingRoomMember createMember(ChattingRoom room, Long userId, MemberRole role, MemberStatus status) {
+            ChattingRoomMember member = ChattingRoomMember.builder()
+                    .chattingRoom(room)
+                    .userId(userId)
+                    .role(role)
+                    .position(Position.AGREE)
+                    .build();
+            ReflectionTestUtils.setField(member, "status", status);
+            return member;
+        }
+
+        @Test
+        @DisplayName("WAITING 상태의 방에서 일반 멤버가 나가면 멤버만 LEFT 처리된다")
+        void leaveChatRoom_waitingMember_success() {
+            // given
+            ChattingRoom room = createRoomWithStatus(RoomStatus.WAITING, 3);
+            ChattingRoomMember member = createMember(room, USER_ID, MemberRole.PARTICIPANT, MemberStatus.WAITING);
+
+            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
+                    .willReturn(Optional.of(member));
+
+            // when
+            chatRoomService.leaveChatRoom(ROOM_ID, USER_ID);
+
+            // then
+            assertThat(member.getStatus()).isEqualTo(MemberStatus.LEFT);
+            assertThat(room.getCurrentMemberCount()).isEqualTo(2);
+            assertThat(room.getStatus()).isEqualTo(RoomStatus.WAITING);
+        }
+
+        @Test
+        @DisplayName("WAITING 상태의 방에서 방장이 나가면 방이 CANCELLED되고 전체 멤버가 LEFT 처리된다")
+        void leaveChatRoom_waitingHost_cancelsRoom() {
+            // given
+            ChattingRoom room = createRoomWithStatus(RoomStatus.WAITING, 3);
+            ChattingRoomMember host = createMember(room, USER_ID, MemberRole.HOST, MemberStatus.WAITING);
+            ChattingRoomMember member1 = createMember(room, 2L, MemberRole.PARTICIPANT, MemberStatus.WAITING);
+            ChattingRoomMember member2 = createMember(room, 3L, MemberRole.PARTICIPANT, MemberStatus.WAITING);
+
+            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
+                    .willReturn(Optional.of(host));
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
+                    .willReturn(List.of(member1, member2));
+
+            // when
+            chatRoomService.leaveChatRoom(ROOM_ID, USER_ID);
+
+            // then
+            assertThat(room.getStatus()).isEqualTo(RoomStatus.CANCELLED);
+            assertThat(host.getStatus()).isEqualTo(MemberStatus.LEFT);
+            assertThat(member1.getStatus()).isEqualTo(MemberStatus.LEFT);
+            assertThat(member2.getStatus()).isEqualTo(MemberStatus.LEFT);
+        }
+
+        @Test
+        @DisplayName("CHATTING 상태의 방에서 나가면 해당 멤버만 LEFT 처리되고 방은 유지된다")
+        void leaveChatRoom_chatting_memberOnly() {
+            // given
+            ChattingRoom room = createRoomWithStatus(RoomStatus.CHATTING, 4);
+            ChattingRoomMember member = createMember(room, USER_ID, MemberRole.PARTICIPANT, MemberStatus.JOINED);
+
+            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
+                    .willReturn(Optional.of(member));
+
+            // when
+            chatRoomService.leaveChatRoom(ROOM_ID, USER_ID);
+
+            // then
+            assertThat(member.getStatus()).isEqualTo(MemberStatus.LEFT);
+            assertThat(room.getCurrentMemberCount()).isEqualTo(3);
+            assertThat(room.getStatus()).isEqualTo(RoomStatus.CHATTING);
+        }
+
+        @Test
+        @DisplayName("DISCONNECTED 상태의 멤버도 나갈 수 있다")
+        void leaveChatRoom_disconnectedMember_success() {
+            // given
+            ChattingRoom room = createRoomWithStatus(RoomStatus.CHATTING, 3);
+            ChattingRoomMember member = createMember(room, USER_ID, MemberRole.PARTICIPANT, MemberStatus.DISCONNECTED);
+
+            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
+                    .willReturn(Optional.of(member));
+
+            // when
+            chatRoomService.leaveChatRoom(ROOM_ID, USER_ID);
+
+            // then
+            assertThat(member.getStatus()).isEqualTo(MemberStatus.LEFT);
+            assertThat(room.getCurrentMemberCount()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("ENDED 상태의 방에서는 나갈 수 없다")
+        void leaveChatRoom_endedRoom_throws() {
+            // given
+            ChattingRoom room = createRoomWithStatus(RoomStatus.ENDED, 2);
+            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
+
+            // when & then
+            assertThatThrownBy(() -> chatRoomService.leaveChatRoom(ROOM_ID, USER_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.CHAT_ROOM_ALREADY_ENDED);
+        }
+
+        @Test
+        @DisplayName("CANCELLED 상태의 방에서는 나갈 수 없다")
+        void leaveChatRoom_cancelledRoom_throws() {
+            // given
+            ChattingRoom room = createRoomWithStatus(RoomStatus.CANCELLED, 0);
+            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
+
+            // when & then
+            assertThatThrownBy(() -> chatRoomService.leaveChatRoom(ROOM_ID, USER_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.CHAT_ROOM_ALREADY_ENDED);
+        }
+
+        @Test
+        @DisplayName("이미 LEFT 상태인 멤버는 나갈 수 없다")
+        void leaveChatRoom_alreadyLeft_throws() {
+            // given
+            ChattingRoom room = createRoomWithStatus(RoomStatus.CHATTING, 2);
+            ChattingRoomMember member = createMember(room, USER_ID, MemberRole.PARTICIPANT, MemberStatus.LEFT);
+
+            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
+                    .willReturn(Optional.of(member));
+
+            // when & then
+            assertThatThrownBy(() -> chatRoomService.leaveChatRoom(ROOM_ID, USER_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.CHAT_ROOM_ALREADY_LEFT);
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 채팅방이면 CHAT_ROOM_NOT_FOUND 예외가 발생한다")
+        void leaveChatRoom_roomNotFound_throws() {
+            // given
+            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> chatRoomService.leaveChatRoom(ROOM_ID, USER_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.CHAT_ROOM_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("채팅방 멤버가 아니면 CHAT_ROOM_MEMBER_NOT_FOUND 예외가 발생한다")
+        void leaveChatRoom_memberNotFound_throws() {
+            // given
+            ChattingRoom room = createRoomWithStatus(RoomStatus.WAITING, 2);
+            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
+                    .willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> chatRoomService.leaveChatRoom(ROOM_ID, USER_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND);
         }
     }
 }

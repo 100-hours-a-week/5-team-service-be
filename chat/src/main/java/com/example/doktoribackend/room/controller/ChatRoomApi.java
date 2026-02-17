@@ -116,4 +116,48 @@ public interface ChatRoomApi {
     ResponseEntity<ApiResult<ChatRoomCreateResponse>> createChatRoom(
             @Parameter(hidden = true) CustomUserDetails userDetails,
             ChatRoomCreateRequest request);
+
+    @CommonErrorResponses
+    @AuthErrorResponses
+    @Operation(summary = "채팅방 나가기", description = "현재 참여 중인 채팅방에서 나갑니다. 대기 중인 방의 방장이 나가면 방이 취소됩니다.")
+    @ApiResponse(responseCode = "204", description = "No Content")
+    @ApiResponse(responseCode = "404", description = "Not Found",
+            content = @Content(mediaType = "application/json",
+                    examples = {
+                            @ExampleObject(name = "채팅방 없음",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_NOT_FOUND",
+                                              "message": "존재하지 않는 채팅방입니다."
+                                            }
+                                            """),
+                            @ExampleObject(name = "멤버 아님",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_MEMBER_NOT_FOUND",
+                                              "message": "채팅방 멤버가 아닙니다."
+                                            }
+                                            """)
+                    }))
+    @ApiResponse(responseCode = "409", description = "Conflict",
+            content = @Content(mediaType = "application/json",
+                    examples = {
+                            @ExampleObject(name = "이미 종료된 채팅방",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_ALREADY_ENDED",
+                                              "message": "이미 종료되거나 취소된 채팅방입니다."
+                                            }
+                                            """),
+                            @ExampleObject(name = "이미 나간 채팅방",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_ALREADY_LEFT",
+                                              "message": "이미 나간 채팅방입니다."
+                                            }
+                                            """)
+                    }))
+    ResponseEntity<Void> leaveChatRoom(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
+            @Parameter(description = "채팅방 ID", example = "1") Long roomId);
 }

@@ -93,7 +93,11 @@ public enum ErrorCode {
 
     // ChatRoom
     CHAT_ROOM_INVALID_CAPACITY(HttpStatus.BAD_REQUEST, "CHAT_ROOM_INVALID_CAPACITY", "채팅방 정원은 2, 4, 6명만 가능합니다."),
-    CHAT_ROOM_ALREADY_JOINED(HttpStatus.CONFLICT, "CHAT_ROOM_ALREADY_JOINED", "이미 참여 중인 채팅방이 있어 새 채팅방을 생성할 수 없습니다.");
+    CHAT_ROOM_ALREADY_JOINED(HttpStatus.CONFLICT, "CHAT_ROOM_ALREADY_JOINED", "이미 참여 중인 채팅방이 있어 새 채팅방을 생성할 수 없습니다."),
+    CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_ROOM_NOT_FOUND", "존재하지 않는 채팅방입니다."),
+    CHAT_ROOM_ALREADY_ENDED(HttpStatus.CONFLICT, "CHAT_ROOM_ALREADY_ENDED", "이미 종료되거나 취소된 채팅방입니다."),
+    CHAT_ROOM_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_ROOM_MEMBER_NOT_FOUND", "채팅방 멤버가 아닙니다."),
+    CHAT_ROOM_ALREADY_LEFT(HttpStatus.CONFLICT, "CHAT_ROOM_ALREADY_LEFT", "이미 나간 채팅방입니다.");
 
 
     private final HttpStatus status;

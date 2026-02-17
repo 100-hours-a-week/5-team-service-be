@@ -74,4 +74,10 @@ public class ChattingRoomMember extends BaseTimeEntity {
     public boolean isHost() {
         return this.role == MemberRole.HOST;
     }
+
+    public boolean canLeave() {
+        return this.status == MemberStatus.WAITING
+                || this.status == MemberStatus.JOINED
+                || this.status == MemberStatus.DISCONNECTED;
+    }
 }

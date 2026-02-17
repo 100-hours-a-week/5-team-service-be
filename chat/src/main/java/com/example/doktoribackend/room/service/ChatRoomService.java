@@ -75,6 +75,45 @@ public class ChatRoomService {
         return new ChatRoomCreateResponse(room.getId());
     }
 
+    @Transactional
+    public void leaveChatRoom(Long roomId, Long userId) {
+        ChattingRoom room = chattingRoomRepository.findById(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+
+        validateRoomNotEnded(room);
+
+        ChattingRoomMember member = chattingRoomMemberRepository.findByChattingRoomIdAndUserId(roomId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND));
+
+        if (!member.canLeave()) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_LEFT);
+        }
+
+        member.leave();
+        room.decreaseMemberCount();
+
+        if (room.getStatus() == RoomStatus.WAITING && member.isHost()) {
+            room.cancel();
+            leaveAllActiveMembers(roomId);
+        }
+    }
+
+    private void validateRoomNotEnded(ChattingRoom room) {
+        if (room.getStatus() == RoomStatus.ENDED || room.getStatus() == RoomStatus.CANCELLED) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_ENDED);
+        }
+    }
+
+    private void leaveAllActiveMembers(Long roomId) {
+        List<ChattingRoomMember> activeMembers = chattingRoomMemberRepository
+                .findByChattingRoomIdAndStatusIn(roomId,
+                        List.of(MemberStatus.WAITING, MemberStatus.JOINED, MemberStatus.DISCONNECTED));
+
+        for (ChattingRoomMember m : activeMembers) {
+            m.leave();
+        }
+    }
+
     private void validateCapacity(Integer capacity) {
         if (!ALLOWED_CAPACITIES.contains(capacity)) {
             throw new BusinessException(ErrorCode.CHAT_ROOM_INVALID_CAPACITY);
