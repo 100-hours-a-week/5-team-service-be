@@ -35,6 +35,12 @@ public class ChattingRoomMember extends BaseTimeEntity {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    @Column(length = 20)
+    private String nickname;
+
+    @Column(name = "profile_image_url", length = 512)
+    private String profileImageUrl;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private MemberStatus status = MemberStatus.WAITING;
@@ -47,14 +53,28 @@ public class ChattingRoomMember extends BaseTimeEntity {
     @Column(nullable = false, length = 20)
     private Position position;
 
-    public static ChattingRoomMember createHost(ChattingRoom room, Long userId, ChatRoomCreateRequest request) {
-        return new ChattingRoomMember(room, userId, MemberRole.HOST, request.position());
+    public static ChattingRoomMember createHost(ChattingRoom room, Long userId,
+                                                    String nickname, String profileImageUrl,
+                                                    ChatRoomCreateRequest request) {
+        return new ChattingRoomMember(room, userId, nickname, profileImageUrl,
+                MemberRole.HOST, request.position());
+    }
+
+    public static ChattingRoomMember createParticipant(ChattingRoom room, Long userId,
+                                                        String nickname, String profileImageUrl,
+                                                        Position position) {
+        return new ChattingRoomMember(room, userId, nickname, profileImageUrl,
+                MemberRole.PARTICIPANT, position);
     }
 
     @Builder
-    private ChattingRoomMember(ChattingRoom chattingRoom, Long userId, MemberRole role, Position position) {
+    private ChattingRoomMember(ChattingRoom chattingRoom, Long userId,
+                               String nickname, String profileImageUrl,
+                               MemberRole role, Position position) {
         this.chattingRoom = chattingRoom;
         this.userId = userId;
+        this.nickname = nickname;
+        this.profileImageUrl = profileImageUrl;
         this.role = role;
         this.position = position;
     }
