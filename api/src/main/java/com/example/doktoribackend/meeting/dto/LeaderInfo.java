@@ -1,6 +1,6 @@
 package com.example.doktoribackend.meeting.dto;
 
-import com.example.doktoribackend.s3.ImageUrlResolver;
+import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.user.domain.User;
 import lombok.Builder;
 import lombok.Getter;

@@ -4,6 +4,7 @@ import com.example.doktoribackend.book.domain.Book;
 import com.example.doktoribackend.book.repository.BookRepository;
 import com.example.doktoribackend.common.client.KakaoBookClient;
 import com.example.doktoribackend.common.error.ErrorCode;
+import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.room.domain.ChattingRoom;
 import com.example.doktoribackend.room.domain.ChattingRoomMember;
@@ -72,6 +73,9 @@ class ChatRoomServiceTest {
 
     @Mock
     private WaitingRoomSseService waitingRoomSseService;
+
+    @Mock
+    private ImageUrlResolver imageUrlResolver;
 
     @InjectMocks
     private ChatRoomService chatRoomService;

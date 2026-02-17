@@ -5,6 +5,7 @@ import com.example.doktoribackend.book.repository.BookRepository;
 import com.example.doktoribackend.common.client.KakaoBookClient;
 import com.example.doktoribackend.common.client.KakaoBookResponse;
 import com.example.doktoribackend.common.error.ErrorCode;
+import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.quiz.domain.Quiz;
 import com.example.doktoribackend.quiz.domain.QuizChoice;
@@ -50,6 +51,7 @@ public class ChatRoomService {
     private final KakaoBookClient kakaoBookClient;
     private final UserInfoRepository userInfoRepository;
     private final WaitingRoomSseService waitingRoomSseService;
+    private final ImageUrlResolver imageUrlResolver;
 
     @Transactional(readOnly = true)
     public ChatRoomListResponse getChatRooms(Long cursorId, int size) {
@@ -234,7 +236,7 @@ public class ChatRoomService {
         int maxPerPosition = room.getCapacity() / 2;
 
         List<WaitingRoomMemberItem> members = activeMembers.stream()
-                .map(WaitingRoomMemberItem::from)
+                .map(m -> WaitingRoomMemberItem.from(m, imageUrlResolver))
                 .toList();
 
         return new WaitingRoomResponse(room.getId(), agreeCount, disagreeCount, maxPerPosition, members);

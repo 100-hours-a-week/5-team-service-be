@@ -5,7 +5,7 @@ import com.example.doktoribackend.reading.repository.ReadingGenreRepository;
 import com.example.doktoribackend.recommendation.domain.UserMeetingRecommendation;
 import com.example.doktoribackend.recommendation.dto.RecommendedMeetingDto;
 import com.example.doktoribackend.recommendation.repository.UserMeetingRecommendationRepository;
-import com.example.doktoribackend.s3.ImageUrlResolver;
+import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

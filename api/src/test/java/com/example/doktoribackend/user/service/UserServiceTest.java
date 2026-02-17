@@ -1,7 +1,7 @@
 package com.example.doktoribackend.user.service;
 
 import com.example.doktoribackend.exception.UserNotFoundException;
-import com.example.doktoribackend.s3.ImageUrlResolver;
+import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.s3.service.FileService;
 import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.dto.UpdateUserProfileRequest;

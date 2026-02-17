@@ -43,7 +43,7 @@ import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
 import com.example.doktoribackend.meeting.repository.NextRoundProjection;
 import com.example.doktoribackend.reading.domain.ReadingGenre;
 import com.example.doktoribackend.reading.repository.ReadingGenreRepository;
-import com.example.doktoribackend.s3.ImageUrlResolver;
+import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;

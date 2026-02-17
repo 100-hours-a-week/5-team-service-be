@@ -1,6 +1,7 @@
 package com.example.doktoribackend.room.controller;
 
 import com.example.doktoribackend.common.error.ErrorCode;
+import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.room.domain.MemberRole;
 import com.example.doktoribackend.room.domain.Position;
@@ -69,6 +70,9 @@ class ChatRoomControllerTest {
 
     @MockitoBean
     JwtTokenProvider jwtTokenProvider;
+
+    @MockitoBean
+    ImageUrlResolver imageUrlResolver;
 
     private static final Long USER_ID = 1L;
 
