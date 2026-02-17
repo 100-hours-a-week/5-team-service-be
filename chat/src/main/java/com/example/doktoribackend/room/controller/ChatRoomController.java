@@ -5,7 +5,9 @@ import com.example.doktoribackend.common.response.ApiResult;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
+import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
 import com.example.doktoribackend.room.dto.ChatRoomListResponse;
+import com.example.doktoribackend.room.dto.WaitingRoomResponse;
 import com.example.doktoribackend.room.service.ChatRoomService;
 import com.example.doktoribackend.security.CustomUserDetails;
 import jakarta.validation.Valid;
@@ -52,6 +54,19 @@ public class ChatRoomController implements ChatRoomApi {
     ) {
         ChatRoomCreateResponse response = chatRoomService.createChatRoom(
                 userDetails.getId(), request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResult.ok(response));
+    }
+
+    @PostMapping("/{roomId}/members")
+    @Override
+    public ResponseEntity<ApiResult<WaitingRoomResponse>> joinChatRoom(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId,
+            @Valid @RequestBody ChatRoomJoinRequest request
+    ) {
+        WaitingRoomResponse response = chatRoomService.joinChatRoom(
+                roomId, userDetails.getId(), request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResult.ok(response));
     }

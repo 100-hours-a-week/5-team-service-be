@@ -5,7 +5,9 @@ import com.example.doktoribackend.common.swagger.AuthErrorResponses;
 import com.example.doktoribackend.common.swagger.CommonErrorResponses;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
+import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
 import com.example.doktoribackend.room.dto.ChatRoomListResponse;
+import com.example.doktoribackend.room.dto.WaitingRoomResponse;
 import com.example.doktoribackend.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -160,4 +162,89 @@ public interface ChatRoomApi {
     ResponseEntity<Void> leaveChatRoom(
             @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(description = "채팅방 ID", example = "1") Long roomId);
+
+    @CommonErrorResponses
+    @AuthErrorResponses
+    @Operation(summary = "채팅방 참여", description = "퀴즈를 맞추고 채팅방에 참여합니다. 포지션(찬성/반대)을 선택해야 합니다.")
+    @ApiResponse(responseCode = "201", description = "Created",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {
+                              "message": "OK",
+                              "data": {
+                                "roomId": 1,
+                                "agreeCount": 2,
+                                "disagreeCount": 1,
+                                "maxPerPosition": 3,
+                                "members": [
+                                  {
+                                    "nickname": "독서왕",
+                                    "profileImageUrl": "https://example.com/profile.jpg",
+                                    "position": "AGREE",
+                                    "role": "HOST"
+                                  },
+                                  {
+                                    "nickname": "책벌레",
+                                    "profileImageUrl": null,
+                                    "position": "DISAGREE",
+                                    "role": "PARTICIPANT"
+                                  }
+                                ]
+                              }
+                            }
+                            """)))
+    @ApiResponse(responseCode = "403", description = "Forbidden",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(name = "퀴즈 오답",
+                            value = """
+                                    {
+                                      "code": "CHAT_ROOM_QUIZ_WRONG_ANSWER",
+                                      "message": "퀴즈 정답이 아닙니다."
+                                    }
+                                    """)))
+    @ApiResponse(responseCode = "404", description = "Not Found",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(name = "채팅방 없음",
+                            value = """
+                                    {
+                                      "code": "CHAT_ROOM_NOT_FOUND",
+                                      "message": "존재하지 않는 채팅방입니다."
+                                    }
+                                    """)))
+    @ApiResponse(responseCode = "409", description = "Conflict",
+            content = @Content(mediaType = "application/json",
+                    examples = {
+                            @ExampleObject(name = "이미 참여 중",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_ALREADY_JOINED",
+                                              "message": "이미 참여 중인 채팅방이 있어 새 채팅방을 생성할 수 없습니다."
+                                            }
+                                            """),
+                            @ExampleObject(name = "정원 초과",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_FULL",
+                                              "message": "채팅방 정원이 가득 찼습니다."
+                                            }
+                                            """),
+                            @ExampleObject(name = "포지션 정원 초과",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_POSITION_FULL",
+                                              "message": "해당 포지션의 정원이 가득 찼습니다."
+                                            }
+                                            """),
+                            @ExampleObject(name = "대기 중이 아닌 채팅방",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_NOT_WAITING",
+                                              "message": "대기 중인 채팅방만 참여할 수 있습니다."
+                                            }
+                                            """)
+                    }))
+    ResponseEntity<ApiResult<WaitingRoomResponse>> joinChatRoom(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
+            @Parameter(description = "채팅방 ID", example = "1") Long roomId,
+            ChatRoomJoinRequest request);
 }
