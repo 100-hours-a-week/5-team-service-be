@@ -244,6 +244,26 @@ public interface ChatRoomApi {
                                             }
                                             """)
                     }))
+    @ApiResponse(responseCode = "422", description = "Validation Failed",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {
+                              "code": "VALIDATION_FAILED",
+                              "message": "요청 값이 유효하지 않습니다.",
+                              "errors": [
+                                {
+                                  "field": "position",
+                                  "reason": "NotNull",
+                                  "message": "포지션은 필수입니다."
+                                },
+                                {
+                                  "field": "quizAnswer",
+                                  "reason": "NotNull",
+                                  "message": "퀴즈 답변은 필수입니다."
+                                }
+                              ]
+                            }
+                            """)))
     ResponseEntity<ApiResult<WaitingRoomResponse>> joinChatRoom(
             @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(description = "채팅방 ID", example = "1") Long roomId,
