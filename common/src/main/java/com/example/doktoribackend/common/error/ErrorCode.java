@@ -97,7 +97,12 @@ public enum ErrorCode {
     CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_ROOM_NOT_FOUND", "존재하지 않는 채팅방입니다."),
     CHAT_ROOM_ALREADY_ENDED(HttpStatus.CONFLICT, "CHAT_ROOM_ALREADY_ENDED", "이미 종료되거나 취소된 채팅방입니다."),
     CHAT_ROOM_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_ROOM_MEMBER_NOT_FOUND", "채팅방 멤버가 아닙니다."),
-    CHAT_ROOM_ALREADY_LEFT(HttpStatus.CONFLICT, "CHAT_ROOM_ALREADY_LEFT", "이미 나간 채팅방입니다.");
+    CHAT_ROOM_ALREADY_LEFT(HttpStatus.CONFLICT, "CHAT_ROOM_ALREADY_LEFT", "이미 나간 채팅방입니다."),
+    CHAT_ROOM_FULL(HttpStatus.CONFLICT, "CHAT_ROOM_FULL", "채팅방 정원이 가득 찼습니다."),
+    CHAT_ROOM_POSITION_FULL(HttpStatus.CONFLICT, "CHAT_ROOM_POSITION_FULL", "해당 포지션의 정원이 가득 찼습니다."),
+    CHAT_ROOM_QUIZ_WRONG_ANSWER(HttpStatus.FORBIDDEN, "CHAT_ROOM_QUIZ_WRONG_ANSWER", "퀴즈 정답이 아닙니다."),
+    CHAT_ROOM_QUIZ_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_ROOM_QUIZ_NOT_FOUND", "채팅방에 퀴즈가 존재하지 않습니다."),
+    CHAT_ROOM_NOT_WAITING(HttpStatus.CONFLICT, "CHAT_ROOM_NOT_WAITING", "대기 중인 채팅방만 참여할 수 있습니다.");
 
 
     private final HttpStatus status;
