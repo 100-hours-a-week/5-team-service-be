@@ -71,6 +71,17 @@ public class ChatRoomController implements ChatRoomApi {
                 .body(ApiResult.ok(response));
     }
 
+    @GetMapping("/{roomId}/waiting-room")
+    @Override
+    public ResponseEntity<ApiResult<WaitingRoomResponse>> getWaitingRoom(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId
+    ) {
+        WaitingRoomResponse response = chatRoomService.getWaitingRoom(
+                roomId, userDetails.getId());
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
     @DeleteMapping("/{roomId}/members/me")
     @Override
     public ResponseEntity<Void> leaveChatRoom(

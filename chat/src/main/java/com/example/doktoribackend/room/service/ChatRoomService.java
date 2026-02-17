@@ -137,6 +137,17 @@ public class ChatRoomService {
         return buildWaitingRoomResponse(room);
     }
 
+    @Transactional(readOnly = true)
+    public WaitingRoomResponse getWaitingRoom(Long roomId, Long userId) {
+        ChattingRoom room = chattingRoomRepository.findById(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+
+        chattingRoomMemberRepository.findByChattingRoomIdAndUserId(roomId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND));
+
+        return buildWaitingRoomResponse(room);
+    }
+
     private void validateQuizAnswer(ChattingRoom room, Integer quizAnswer) {
         Quiz quiz = room.getQuiz();
         if (quiz == null) {
