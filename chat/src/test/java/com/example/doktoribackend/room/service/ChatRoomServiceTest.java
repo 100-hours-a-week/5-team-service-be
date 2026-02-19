@@ -17,6 +17,7 @@ import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
 import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
 import com.example.doktoribackend.room.dto.ChatRoomListResponse;
+import com.example.doktoribackend.room.dto.ChatRoomStartResponse;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
 import com.example.doktoribackend.room.repository.ChattingRoomMemberRepository;
 import com.example.doktoribackend.room.repository.ChattingRoomRepository;
@@ -881,7 +882,7 @@ class ChatRoomServiceTest {
         }
 
         @Test
-        @DisplayName("HOST가 시작하면 방 CHATTING, 멤버 JOINED, RoomRound 생성")
+        @DisplayName("HOST가 시작하면 방 CHATTING, 멤버 JOINED, RoomRound 생성, 응답에 멤버/라운드 정보 포함")
         void startChatRoom_success() {
             // given
             ChattingRoom room = createWaitingRoom(2);
@@ -896,9 +897,13 @@ class ChatRoomServiceTest {
             given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(
                     ROOM_ID, List.of(MemberStatus.WAITING)))
                     .willReturn(List.of(host, participant));
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(
+                    eq(ROOM_ID), eq(List.of(MemberStatus.WAITING, MemberStatus.JOINED, MemberStatus.DISCONNECTED))))
+                    .willReturn(List.of(host, participant));
+            given(imageUrlResolver.toUrl("http://profile.url")).willReturn("http://profile.url");
 
             // when
-            chatRoomService.startChatRoom(ROOM_ID, USER_ID);
+            ChatRoomStartResponse response = chatRoomService.startChatRoom(ROOM_ID, USER_ID);
 
             // then
             assertThat(room.getStatus()).isEqualTo(RoomStatus.CHATTING);
@@ -906,6 +911,13 @@ class ChatRoomServiceTest {
             assertThat(participant.getStatus()).isEqualTo(MemberStatus.JOINED);
             assertThat(room.getRounds()).hasSize(1);
             assertThat(room.getRounds().getFirst().getRoundNumber()).isEqualTo(1);
+
+            assertThat(response.agreeMembers()).hasSize(1);
+            assertThat(response.agreeMembers().getFirst().nickname()).isEqualTo("닉네임");
+            assertThat(response.disagreeMembers()).hasSize(1);
+            assertThat(response.disagreeMembers().getFirst().nickname()).isEqualTo("닉네임");
+            assertThat(response.currentRound()).isEqualTo(1);
+            assertThat(response.startedAt()).isNotNull();
         }
 
         @Test
