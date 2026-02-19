@@ -85,8 +85,14 @@ class MessageServiceTest {
         return round;
     }
 
+    private static final String FILE_PATH = "chat/images/test-image.png";
+
     private MessageSendRequest createRequest() {
-        return new MessageSendRequest(CLIENT_MESSAGE_ID, MessageType.TEXT, TEXT_MESSAGE);
+        return new MessageSendRequest(CLIENT_MESSAGE_ID, MessageType.TEXT, TEXT_MESSAGE, null);
+    }
+
+    private MessageSendRequest createFileRequest() {
+        return new MessageSendRequest(CLIENT_MESSAGE_ID, MessageType.FILE, null, FILE_PATH);
     }
 
     private void stubSuccessScenario() {
@@ -121,6 +127,42 @@ class MessageServiceTest {
             assertThat(response.senderNickname()).isEqualTo(SENDER_NICKNAME);
             assertThat(response.messageType()).isEqualTo(MessageType.TEXT);
             assertThat(response.textMessage()).isEqualTo(TEXT_MESSAGE);
+        }
+
+        @Test
+        @DisplayName("FILE 타입 요청으로 메시지를 전송하면 filePath가 포함된 MessageResponse를 반환한다")
+        void sendMessage_fileType_success() {
+            // given
+            stubSuccessScenario();
+
+            // when
+            MessageResponse response = messageService.sendMessage(
+                    ROOM_ID, SENDER_ID, SENDER_NICKNAME, createFileRequest());
+
+            // then
+            assertThat(response).isNotNull();
+            assertThat(response.senderId()).isEqualTo(SENDER_ID);
+            assertThat(response.messageType()).isEqualTo(MessageType.FILE);
+            assertThat(response.filePath()).isEqualTo(FILE_PATH);
+            assertThat(response.textMessage()).isNull();
+        }
+
+        @Test
+        @DisplayName("FILE 타입 메시지 저장 시 올바른 filePath가 사용된다")
+        void sendMessage_fileType_correctFilePath() {
+            // given
+            stubSuccessScenario();
+            ArgumentCaptor<Message> messageCaptor = ArgumentCaptor.forClass(Message.class);
+
+            // when
+            messageService.sendMessage(ROOM_ID, SENDER_ID, SENDER_NICKNAME, createFileRequest());
+
+            // then
+            then(messageRepository).should().save(messageCaptor.capture());
+            Message saved = messageCaptor.getValue();
+            assertThat(saved.getMessageType()).isEqualTo(MessageType.FILE);
+            assertThat(saved.getFilePath()).isEqualTo(FILE_PATH);
+            assertThat(saved.getTextMessage()).isNull();
         }
 
         @Test
