@@ -203,7 +203,7 @@ public class ChatRoomService {
                 .toList();
 
         ChatRoomStartResponse response = new ChatRoomStartResponse(
-                agreeMembers, disagreeMembers, 1, firstRound.getStartedAt());
+                room.getTopic(), agreeMembers, disagreeMembers, 1, firstRound.getStartedAt());
 
         broadcastStartedAfterCommit(roomId, response);
 
@@ -249,7 +249,7 @@ public class ChatRoomService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_ROUND_NOT_FOUND));
 
         return new ChatRoomStartResponse(
-                agreeMembers, disagreeMembers, activeRound.getRoundNumber(), activeRound.getStartedAt());
+                room.getTopic(), agreeMembers, disagreeMembers, activeRound.getRoundNumber(), activeRound.getStartedAt());
     }
 
     private void validateQuizAnswer(ChattingRoom room, Integer quizAnswer) {
