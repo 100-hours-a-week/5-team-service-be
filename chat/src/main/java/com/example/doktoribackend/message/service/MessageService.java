@@ -1,6 +1,7 @@
 package com.example.doktoribackend.message.service;
 
 import com.example.doktoribackend.common.error.ErrorCode;
+import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.message.domain.Message;
 import com.example.doktoribackend.message.domain.MessageType;
@@ -34,6 +35,7 @@ public class MessageService {
     private final ChattingRoomRepository chattingRoomRepository;
     private final ChattingRoomMemberRepository chattingRoomMemberRepository;
     private final RoomRoundRepository roomRoundRepository;
+    private final ImageUrlResolver imageUrlResolver;
 
     @Transactional(readOnly = true)
     public MessageListResponse getMessages(Long roomId, Long userId, Long cursorId, int size) {
@@ -56,7 +58,7 @@ public class MessageService {
                 .collect(Collectors.toMap(ChattingRoomMember::getUserId, ChattingRoomMember::getNickname, (a, b) -> a));
 
         List<MessageResponse> messageResponses = content.stream()
-                .map(m -> MessageResponse.from(m, nicknameMap.getOrDefault(m.getSenderId(), "알 수 없음")))
+                .map(m -> MessageResponse.from(m, nicknameMap.getOrDefault(m.getSenderId(), "알 수 없음"), imageUrlResolver))
                 .toList();
 
         Long nextCursorId = hasNext ? content.getLast().getId() : null;
@@ -101,6 +103,6 @@ public class MessageService {
 
         messageRepository.save(message);
 
-        return MessageResponse.from(message, senderNickname);
+        return MessageResponse.from(message, senderNickname, imageUrlResolver);
     }
 }
