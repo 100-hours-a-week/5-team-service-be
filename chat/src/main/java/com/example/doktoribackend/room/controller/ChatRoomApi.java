@@ -332,6 +332,7 @@ public interface ChatRoomApi {
                             {
                               "message": "OK",
                               "data": {
+                                "topic": "AI가 인간의 일자리를 대체할 수 있는가",
                                 "agreeMembers": [
                                   { "nickname": "독서왕", "profileImageUrl": "https://example.com/profile.jpg" }
                                 ],
@@ -375,6 +376,7 @@ public interface ChatRoomApi {
             @Parameter(description = "채팅방 ID", example = "1") Long roomId);
 
     @CommonErrorResponses
+    @AuthErrorResponses
     @Operation(summary = "메세지 목록 조회", description = "커서 기반 페이지네이션으로 채팅방의 메세지 목록을 조회합니다. 최신 메세지부터 내림차순으로 반환합니다.")
     @ApiResponse(responseCode = "200", description = "OK",
             content = @Content(mediaType = "application/json",
@@ -421,14 +423,24 @@ public interface ChatRoomApi {
                     }))
     @ApiResponse(responseCode = "404", description = "Not Found",
             content = @Content(mediaType = "application/json",
-                    examples = @ExampleObject(name = "채팅방 없음",
-                            value = """
-                                    {
-                                      "code": "CHAT_ROOM_NOT_FOUND",
-                                      "message": "존재하지 않는 채팅방입니다."
-                                    }
-                                    """)))
+                    examples = {
+                            @ExampleObject(name = "채팅방 없음",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_NOT_FOUND",
+                                              "message": "존재하지 않는 채팅방입니다."
+                                            }
+                                            """),
+                            @ExampleObject(name = "멤버 아님",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_MEMBER_NOT_FOUND",
+                                              "message": "채팅방 멤버가 아닙니다."
+                                            }
+                                            """)
+                    }))
     ResponseEntity<ApiResult<MessageListResponse>> getMessages(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(description = "채팅방 ID", example = "1") Long roomId,
             @Parameter(description = "마지막으로 조회한 메세지 ID (첫 조회 시 생략)", example = "100") Long cursorId,
             @Parameter(description = "조회할 메세지 수 (기본값: 20, 최대: 20)", example = "20") Integer size);
@@ -442,6 +454,7 @@ public interface ChatRoomApi {
                             {
                               "message": "OK",
                               "data": {
+                                "topic": "AI가 인간의 일자리를 대체할 수 있는가",
                                 "agreeMembers": [
                                   { "nickname": "독서왕", "profileImageUrl": "https://example.com/profile.jpg" }
                                 ],
