@@ -50,7 +50,7 @@ public class Message {
     @Column(name = "file_path", length = 512)
     private String filePath;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
     private LocalDateTime createdAt;
 
     @Builder
