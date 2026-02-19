@@ -1,6 +1,7 @@
 package com.example.doktoribackend.message.service;
 
 import com.example.doktoribackend.common.error.ErrorCode;
+import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.message.domain.Message;
 import com.example.doktoribackend.message.domain.MessageType;
@@ -54,6 +55,9 @@ class MessageServiceTest {
 
     @Mock
     private RoomRoundRepository roomRoundRepository;
+
+    @Mock
+    private ImageUrlResolver imageUrlResolver;
 
     @InjectMocks
     private MessageService messageService;
@@ -111,6 +115,7 @@ class MessageServiceTest {
         given(messageRepository.existsByRoomIdAndSenderIdAndClientMessageId(
                 ROOM_ID, SENDER_ID, CLIENT_MESSAGE_ID))
                 .willReturn(false);
+        given(imageUrlResolver.toUrl(any())).willAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Nested
@@ -446,6 +451,10 @@ class MessageServiceTest {
                     .willReturn(Optional.of(createRoomMember(SENDER_ID, SENDER_NICKNAME)));
         }
 
+        private void stubImageUrlResolver() {
+            given(imageUrlResolver.toUrl(any())).willAnswer(invocation -> invocation.getArgument(0));
+        }
+
         @Test
         @DisplayName("메시지 목록을 성공적으로 조회한다")
         void getMessages_success() {
@@ -458,6 +467,7 @@ class MessageServiceTest {
             given(chattingRoomRepository.findById(ROOM_ID))
                     .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
             stubMemberExists();
+            stubImageUrlResolver();
             given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(null), any(PageRequest.class)))
                     .willReturn(messages);
             given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
@@ -487,6 +497,7 @@ class MessageServiceTest {
             given(chattingRoomRepository.findById(ROOM_ID))
                     .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
             stubMemberExists();
+            stubImageUrlResolver();
             given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(null), any(PageRequest.class)))
                     .willReturn(messages);
             given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
@@ -515,6 +526,7 @@ class MessageServiceTest {
             given(chattingRoomRepository.findById(ROOM_ID))
                     .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
             stubMemberExists();
+            stubImageUrlResolver();
             given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(cursorId), any(PageRequest.class)))
                     .willReturn(messages);
             given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
@@ -589,6 +601,7 @@ class MessageServiceTest {
             given(chattingRoomRepository.findById(ROOM_ID))
                     .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
             stubMemberExists();
+            stubImageUrlResolver();
             given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(null), any(PageRequest.class)))
                     .willReturn(messages);
             given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))

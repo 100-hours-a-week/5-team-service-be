@@ -284,7 +284,7 @@ class MessageIntegrationTest {
         assertThat(response.senderId()).isEqualTo(USER_A_ID);
         assertThat(response.senderNickname()).isEqualTo(USER_A_NICKNAME);
         assertThat(response.messageType()).isEqualTo(MessageType.FILE);
-        assertThat(response.filePath()).isEqualTo("images/chats/550e8400-e29b-41d4-a716-446655440000.png");
+        assertThat(response.filePath()).isEqualTo("https://test-bucket.s3.amazonaws.com/images/chats/550e8400-e29b-41d4-a716-446655440000.png");
         assertThat(response.textMessage()).isNull();
 
         stompClient.stop();
