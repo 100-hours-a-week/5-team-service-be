@@ -15,6 +15,10 @@ import com.example.doktoribackend.room.dto.ChatRoomListResponse;
 import com.example.doktoribackend.room.dto.ChatRoomStartResponse;
 import com.example.doktoribackend.room.dto.ChatStartMemberItem;
 import com.example.doktoribackend.room.dto.PageInfo;
+import com.example.doktoribackend.message.domain.MessageType;
+import com.example.doktoribackend.message.dto.MessageListResponse;
+import com.example.doktoribackend.message.dto.MessageResponse;
+import com.example.doktoribackend.message.service.MessageService;
 import com.example.doktoribackend.room.dto.WaitingRoomMemberItem;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
 import com.example.doktoribackend.room.service.ChatRoomService;
@@ -67,6 +71,9 @@ class ChatRoomControllerTest {
 
     @MockitoBean
     ChatRoomService chatRoomService;
+
+    @MockitoBean
+    MessageService messageService;
 
     @MockitoBean
     WaitingRoomSseService waitingRoomSseService;
@@ -568,6 +575,7 @@ class ChatRoomControllerTest {
         @DisplayName("방장이 시작하면 200 OK와 멤버/라운드 정보를 반환한다")
         void startChatRoom_success() throws Exception {
             ChatRoomStartResponse response = new ChatRoomStartResponse(
+                    "토론 주제",
                     List.of(new ChatStartMemberItem("독서왕", "https://example.com/profile.jpg")),
                     List.of(new ChatStartMemberItem("책벌레", null)),
                     1,
@@ -644,5 +652,162 @@ class ChatRoomControllerTest {
                     .andExpect(status().isOk());
         }
 
+    }
+
+    @Nested
+    @DisplayName("채팅방 상세 조회")
+    class GetChatRoomDetail {
+
+        @Test
+        @DisplayName("성공하면 200 OK와 멤버/라운드 정보를 반환한다")
+        void getChatRoomDetail_success() throws Exception {
+            ChatRoomStartResponse response = new ChatRoomStartResponse(
+                    "토론 주제",
+                    List.of(new ChatStartMemberItem("독서왕", "https://example.com/profile.jpg")),
+                    List.of(new ChatStartMemberItem("책벌레", null)),
+                    1,
+                    LocalDateTime.of(2026, 2, 17, 14, 30, 0)
+            );
+            given(chatRoomService.getChatRoomDetail(10L, USER_ID)).willReturn(response);
+
+            mockMvc.perform(get("/chat-rooms/10")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.message").value("OK"))
+                    .andExpect(jsonPath("$.data.agreeMembers[0].nickname").value("독서왕"))
+                    .andExpect(jsonPath("$.data.disagreeMembers[0].nickname").value("책벌레"))
+                    .andExpect(jsonPath("$.data.currentRound").value(1))
+                    .andExpect(jsonPath("$.data.startedAt").value("2026-02-17T14:30:00"));
+        }
+
+        @Test
+        @DisplayName("채팅방이 없으면 404를 반환한다")
+        void getChatRoomDetail_roomNotFound() throws Exception {
+            willThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND))
+                    .given(chatRoomService).getChatRoomDetail(999L, USER_ID);
+
+            mockMvc.perform(get("/chat-rooms/999")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("채팅 중이 아니면 409를 반환한다")
+        void getChatRoomDetail_notChatting() throws Exception {
+            willThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_CHATTING))
+                    .given(chatRoomService).getChatRoomDetail(10L, USER_ID);
+
+            mockMvc.perform(get("/chat-rooms/10")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isConflict());
+        }
+
+        @Test
+        @DisplayName("멤버가 아니면 404를 반환한다")
+        void getChatRoomDetail_memberNotFound() throws Exception {
+            willThrow(new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND))
+                    .given(chatRoomService).getChatRoomDetail(10L, USER_ID);
+
+            mockMvc.perform(get("/chat-rooms/10")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isNotFound());
+        }
+    }
+
+    @Nested
+    @DisplayName("메시지 목록 조회")
+    class GetMessages {
+
+        @Test
+        @DisplayName("파라미터 없이 요청하면 200 OK와 메시지 목록을 반환한다")
+        void getMessages_noParams_success() throws Exception {
+            MessageListResponse response = new MessageListResponse(
+                    List.of(new MessageResponse(100L, 1L, "독서왕", MessageType.TEXT, "안녕하세요!", null,
+                            LocalDateTime.of(2026, 2, 17, 14, 35, 0))),
+                    new PageInfo(null, false, 20)
+            );
+            given(messageService.getMessages(10L, USER_ID, null, 20)).willReturn(response);
+
+            mockMvc.perform(get("/chat-rooms/10/messages")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.messages").isArray())
+                    .andExpect(jsonPath("$.data.messages.length()").value(1))
+                    .andExpect(jsonPath("$.data.messages[0].messageId").value(100))
+                    .andExpect(jsonPath("$.data.messages[0].senderNickname").value("독서왕"))
+                    .andExpect(jsonPath("$.data.messages[0].messageType").value("TEXT"))
+                    .andExpect(jsonPath("$.data.messages[0].textMessage").value("안녕하세요!"))
+                    .andExpect(jsonPath("$.data.pageInfo.hasNext").value(false));
+        }
+
+        @Test
+        @DisplayName("cursorId와 size를 지정하면 해당 파라미터로 조회한다")
+        void getMessages_withParams_success() throws Exception {
+            MessageListResponse response = new MessageListResponse(
+                    List.of(new MessageResponse(99L, 1L, "독서왕", MessageType.TEXT, "이전 메시지", null,
+                            LocalDateTime.of(2026, 2, 17, 14, 30, 0))),
+                    new PageInfo(98L, true, 5)
+            );
+            given(messageService.getMessages(10L, USER_ID, 100L, 5)).willReturn(response);
+
+            mockMvc.perform(get("/chat-rooms/10/messages")
+                            .param("cursorId", "100")
+                            .param("size", "5")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.messages[0].messageId").value(99))
+                    .andExpect(jsonPath("$.data.pageInfo.hasNext").value(true))
+                    .andExpect(jsonPath("$.data.pageInfo.nextCursorId").value(98));
+        }
+
+        @Test
+        @DisplayName("채팅방이 없으면 404를 반환한다")
+        void getMessages_roomNotFound() throws Exception {
+            willThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND))
+                    .given(messageService).getMessages(999L, USER_ID, null, 20);
+
+            mockMvc.perform(get("/chat-rooms/999/messages")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("멤버가 아니면 404를 반환한다")
+        void getMessages_memberNotFound() throws Exception {
+            willThrow(new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND))
+                    .given(messageService).getMessages(10L, USER_ID, null, 20);
+
+            mockMvc.perform(get("/chat-rooms/10/messages")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isNotFound());
+        }
+
+        @ParameterizedTest(name = "size={0}이면 400 Bad Request")
+        @ValueSource(ints = {0, 21})
+        void invalidSize_returns400(int size) throws Exception {
+            mockMvc.perform(get("/chat-rooms/10/messages")
+                            .param("size", String.valueOf(size))
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @ParameterizedTest(name = "cursorId={0}이면 400 Bad Request")
+        @ValueSource(ints = {0, -1})
+        void invalidCursorId_returns400(int cursorId) throws Exception {
+            mockMvc.perform(get("/chat-rooms/10/messages")
+                            .param("cursorId", String.valueOf(cursorId))
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf()))
+                    .andExpect(status().isBadRequest());
+        }
     }
 }

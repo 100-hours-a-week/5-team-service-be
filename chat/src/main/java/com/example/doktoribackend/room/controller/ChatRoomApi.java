@@ -9,6 +9,7 @@ import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
 import com.example.doktoribackend.room.dto.ChatRoomListResponse;
 import com.example.doktoribackend.room.dto.ChatRoomStartResponse;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
+import com.example.doktoribackend.message.dto.MessageListResponse;
 import com.example.doktoribackend.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -324,6 +325,128 @@ public interface ChatRoomApi {
 
     @CommonErrorResponses
     @AuthErrorResponses
+    @Operation(summary = "채팅방 상세 조회", description = "채팅 중인 채팅방의 멤버 목록과 현재 라운드 정보를 조회합니다.")
+    @ApiResponse(responseCode = "200", description = "OK",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {
+                              "message": "OK",
+                              "data": {
+                                "topic": "AI가 인간의 일자리를 대체할 수 있는가",
+                                "agreeMembers": [
+                                  { "nickname": "독서왕", "profileImageUrl": "https://example.com/profile.jpg" }
+                                ],
+                                "disagreeMembers": [
+                                  { "nickname": "책벌레", "profileImageUrl": null }
+                                ],
+                                "currentRound": 1,
+                                "startedAt": "2026-02-17T14:30:00"
+                              }
+                            }
+                            """)))
+    @ApiResponse(responseCode = "404", description = "Not Found",
+            content = @Content(mediaType = "application/json",
+                    examples = {
+                            @ExampleObject(name = "채팅방 없음",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_NOT_FOUND",
+                                              "message": "존재하지 않는 채팅방입니다."
+                                            }
+                                            """),
+                            @ExampleObject(name = "멤버 아님",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_MEMBER_NOT_FOUND",
+                                              "message": "채팅방 멤버가 아닙니다."
+                                            }
+                                            """)
+                    }))
+    @ApiResponse(responseCode = "409", description = "Conflict",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(name = "채팅 중이 아닌 채팅방",
+                            value = """
+                                    {
+                                      "code": "CHAT_ROOM_NOT_CHATTING",
+                                      "message": "채팅 중인 채팅방이 아닙니다."
+                                    }
+                                    """)))
+    ResponseEntity<ApiResult<ChatRoomStartResponse>> getChatRoomDetail(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
+            @Parameter(description = "채팅방 ID", example = "1") Long roomId);
+
+    @CommonErrorResponses
+    @AuthErrorResponses
+    @Operation(summary = "메세지 목록 조회", description = "커서 기반 페이지네이션으로 채팅방의 메세지 목록을 조회합니다. 최신 메세지부터 내림차순으로 반환합니다.")
+    @ApiResponse(responseCode = "200", description = "OK",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {
+                              "message": "OK",
+                              "data": {
+                                "messages": [
+                                  {
+                                    "messageId": 100,
+                                    "senderId": 1,
+                                    "senderNickname": "독서왕",
+                                    "messageType": "TEXT",
+                                    "textMessage": "안녕하세요!",
+                                    "filePath": null,
+                                    "createdAt": "2026-02-17T14:35:00"
+                                  }
+                                ],
+                                "pageInfo": {
+                                  "nextCursorId": 99,
+                                  "hasNext": true,
+                                  "size": 20
+                                }
+                              }
+                            }
+                            """)))
+    @ApiResponse(responseCode = "400", description = "Bad Request",
+            content = @Content(mediaType = "application/json",
+                    examples = {
+                            @ExampleObject(name = "잘못된 cursorId",
+                                    value = """
+                                            {
+                                              "code": "PAGINATION_INVALID_CURSOR",
+                                              "message": "cursorId는 1 이상의 정수여야 합니다."
+                                            }
+                                            """),
+                            @ExampleObject(name = "잘못된 size",
+                                    value = """
+                                            {
+                                              "code": "PAGINATION_SIZE_OUT_OF_RANGE",
+                                              "message": "size는 1~10 사이여야 합니다."
+                                            }
+                                            """)
+                    }))
+    @ApiResponse(responseCode = "404", description = "Not Found",
+            content = @Content(mediaType = "application/json",
+                    examples = {
+                            @ExampleObject(name = "채팅방 없음",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_NOT_FOUND",
+                                              "message": "존재하지 않는 채팅방입니다."
+                                            }
+                                            """),
+                            @ExampleObject(name = "멤버 아님",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_MEMBER_NOT_FOUND",
+                                              "message": "채팅방 멤버가 아닙니다."
+                                            }
+                                            """)
+                    }))
+    ResponseEntity<ApiResult<MessageListResponse>> getMessages(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
+            @Parameter(description = "채팅방 ID", example = "1") Long roomId,
+            @Parameter(description = "마지막으로 조회한 메세지 ID (첫 조회 시 생략)", example = "100") Long cursorId,
+            @Parameter(description = "조회할 메세지 수 (기본값: 20, 최대: 20)", example = "20") Integer size);
+
+    @CommonErrorResponses
+    @AuthErrorResponses
     @Operation(summary = "채팅 시작", description = "방장이 채팅을 시작합니다. 상대 포지션에 최소 1명 이상의 멤버가 필요합니다.")
     @ApiResponse(responseCode = "200", description = "OK",
             content = @Content(mediaType = "application/json",
@@ -331,6 +454,7 @@ public interface ChatRoomApi {
                             {
                               "message": "OK",
                               "data": {
+                                "topic": "AI가 인간의 일자리를 대체할 수 있는가",
                                 "agreeMembers": [
                                   { "nickname": "독서왕", "profileImageUrl": "https://example.com/profile.jpg" }
                                 ],

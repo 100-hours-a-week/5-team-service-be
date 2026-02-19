@@ -4,12 +4,14 @@ import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.message.domain.Message;
 import com.example.doktoribackend.message.domain.MessageType;
+import com.example.doktoribackend.message.dto.MessageListResponse;
 import com.example.doktoribackend.message.dto.MessageResponse;
 import com.example.doktoribackend.message.dto.MessageSendRequest;
 import com.example.doktoribackend.message.repository.MessageRepository;
 import com.example.doktoribackend.room.domain.ChattingRoom;
 import com.example.doktoribackend.room.domain.ChattingRoomMember;
 import com.example.doktoribackend.room.domain.MemberStatus;
+import com.example.doktoribackend.room.domain.Position;
 import com.example.doktoribackend.room.domain.RoomRound;
 import com.example.doktoribackend.room.domain.RoomStatus;
 import com.example.doktoribackend.room.repository.ChattingRoomMemberRepository;
@@ -23,13 +25,17 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
@@ -409,6 +415,190 @@ class MessageServiceTest {
 
             // then
             then(messageRepository).should(never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("메시지 목록 조회")
+    class GetMessages {
+
+        private Message createMessage(Long id, Long senderId, String text) {
+            Message message = Message.createTextMessage(
+                    ROOM_ID, ROUND_ID, senderId, "client-" + id, text);
+            ReflectionTestUtils.setField(message, "id", id);
+            return message;
+        }
+
+        private ChattingRoomMember createRoomMember(Long userId, String nickname) {
+            ChattingRoom room = createRoomWithStatus(RoomStatus.CHATTING);
+            ChattingRoomMember member = ChattingRoomMember.builder()
+                    .chattingRoom(room)
+                    .userId(userId)
+                    .nickname(nickname)
+                    .position(Position.AGREE)
+                    .build();
+            ReflectionTestUtils.setField(member, "status", MemberStatus.JOINED);
+            return member;
+        }
+
+        private void stubMemberExists() {
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, SENDER_ID))
+                    .willReturn(Optional.of(createRoomMember(SENDER_ID, SENDER_NICKNAME)));
+        }
+
+        @Test
+        @DisplayName("메시지 목록을 성공적으로 조회한다")
+        void getMessages_success() {
+            // given
+            int size = 2;
+            List<Message> messages = List.of(
+                    createMessage(3L, SENDER_ID, "세번째"),
+                    createMessage(2L, SENDER_ID, "두번째")
+            );
+            given(chattingRoomRepository.findById(ROOM_ID))
+                    .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
+            stubMemberExists();
+            given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(null), any(PageRequest.class)))
+                    .willReturn(messages);
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
+                    .willReturn(List.of(createRoomMember(SENDER_ID, SENDER_NICKNAME)));
+
+            // when
+            MessageListResponse response = messageService.getMessages(ROOM_ID, SENDER_ID, null, size);
+
+            // then
+            assertThat(response.messages()).hasSize(2);
+            assertThat(response.messages().getFirst().messageId()).isEqualTo(3L);
+            assertThat(response.messages().getFirst().senderNickname()).isEqualTo(SENDER_NICKNAME);
+            assertThat(response.pageInfo().hasNext()).isFalse();
+            assertThat(response.pageInfo().nextCursorId()).isNull();
+        }
+
+        @Test
+        @DisplayName("다음 페이지가 있으면 hasNext=true, nextCursorId는 마지막 항목의 id이다")
+        void getMessages_hasNext_true() {
+            // given
+            int size = 2;
+            List<Message> messages = List.of(
+                    createMessage(5L, SENDER_ID, "다섯번째"),
+                    createMessage(4L, SENDER_ID, "네번째"),
+                    createMessage(3L, SENDER_ID, "세번째")
+            );
+            given(chattingRoomRepository.findById(ROOM_ID))
+                    .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
+            stubMemberExists();
+            given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(null), any(PageRequest.class)))
+                    .willReturn(messages);
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
+                    .willReturn(List.of(createRoomMember(SENDER_ID, SENDER_NICKNAME)));
+
+            // when
+            MessageListResponse response = messageService.getMessages(ROOM_ID, SENDER_ID, null, size);
+
+            // then
+            assertThat(response.messages()).hasSize(2);
+            assertThat(response.pageInfo().hasNext()).isTrue();
+            assertThat(response.pageInfo().nextCursorId()).isEqualTo(4L);
+            assertThat(response.pageInfo().size()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("cursorId를 지정하면 해당 id 이전 메시지를 조회한다")
+        void getMessages_withCursorId() {
+            // given
+            Long cursorId = 5L;
+            int size = 10;
+            List<Message> messages = List.of(
+                    createMessage(4L, SENDER_ID, "네번째"),
+                    createMessage(3L, SENDER_ID, "세번째")
+            );
+            given(chattingRoomRepository.findById(ROOM_ID))
+                    .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
+            stubMemberExists();
+            given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(cursorId), any(PageRequest.class)))
+                    .willReturn(messages);
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
+                    .willReturn(List.of(createRoomMember(SENDER_ID, SENDER_NICKNAME)));
+
+            // when
+            MessageListResponse response = messageService.getMessages(ROOM_ID, SENDER_ID, cursorId, size);
+
+            // then
+            assertThat(response.messages()).hasSize(2);
+            assertThat(response.messages().getFirst().messageId()).isEqualTo(4L);
+        }
+
+        @Test
+        @DisplayName("메시지가 없으면 빈 리스트를 반환한다")
+        void getMessages_emptyResult() {
+            // given
+            given(chattingRoomRepository.findById(ROOM_ID))
+                    .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
+            stubMemberExists();
+            given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(null), any(PageRequest.class)))
+                    .willReturn(Collections.emptyList());
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
+                    .willReturn(Collections.emptyList());
+
+            // when
+            MessageListResponse response = messageService.getMessages(ROOM_ID, SENDER_ID, null, 20);
+
+            // then
+            assertThat(response.messages()).isEmpty();
+            assertThat(response.pageInfo().hasNext()).isFalse();
+            assertThat(response.pageInfo().nextCursorId()).isNull();
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 채팅방이면 CHAT_ROOM_NOT_FOUND 예외가 발생한다")
+        void getMessages_roomNotFound() {
+            // given
+            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> messageService.getMessages(ROOM_ID, SENDER_ID, null, 20))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.CHAT_ROOM_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("채팅방 멤버가 아니면 CHAT_ROOM_MEMBER_NOT_FOUND 예외가 발생한다")
+        void getMessages_memberNotFound() {
+            // given
+            given(chattingRoomRepository.findById(ROOM_ID))
+                    .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, SENDER_ID))
+                    .willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> messageService.getMessages(ROOM_ID, SENDER_ID, null, 20))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("닉네임을 찾을 수 없는 발신자는 '알 수 없음'으로 표시된다")
+        void getMessages_unknownSender() {
+            // given
+            Long unknownSenderId = 999L;
+            List<Message> messages = List.of(
+                    createMessage(1L, unknownSenderId, "메시지")
+            );
+            given(chattingRoomRepository.findById(ROOM_ID))
+                    .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
+            stubMemberExists();
+            given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(null), any(PageRequest.class)))
+                    .willReturn(messages);
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
+                    .willReturn(List.of(createRoomMember(SENDER_ID, SENDER_NICKNAME)));
+
+            // when
+            MessageListResponse response = messageService.getMessages(ROOM_ID, SENDER_ID, null, 20);
+
+            // then
+            assertThat(response.messages().getFirst().senderNickname()).isEqualTo("알 수 없음");
         }
     }
 }
