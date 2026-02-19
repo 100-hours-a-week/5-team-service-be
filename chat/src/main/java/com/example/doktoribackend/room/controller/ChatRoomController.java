@@ -7,6 +7,7 @@ import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
 import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
 import com.example.doktoribackend.room.dto.ChatRoomListResponse;
+import com.example.doktoribackend.room.dto.ChatRoomStartResponse;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
 import com.example.doktoribackend.room.service.ChatRoomService;
 import com.example.doktoribackend.room.service.WaitingRoomSseService;
@@ -99,12 +100,12 @@ public class ChatRoomController implements ChatRoomApi {
 
     @PatchMapping("/{roomId}")
     @Override
-    public ResponseEntity<ApiResult<Void>> startChatRoom(
+    public ResponseEntity<ApiResult<ChatRoomStartResponse>> startChatRoom(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long roomId
     ) {
-        chatRoomService.startChatRoom(roomId, userDetails.getId());
-        return ResponseEntity.ok(ApiResult.ok());
+        ChatRoomStartResponse response = chatRoomService.startChatRoom(roomId, userDetails.getId());
+        return ResponseEntity.ok(ApiResult.ok(response));
     }
 
     @DeleteMapping("/{roomId}/members/me")

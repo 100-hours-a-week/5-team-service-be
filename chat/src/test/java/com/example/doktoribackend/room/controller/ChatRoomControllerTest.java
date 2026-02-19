@@ -12,6 +12,8 @@ import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
 import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
 import com.example.doktoribackend.room.dto.ChatRoomListItem;
 import com.example.doktoribackend.room.dto.ChatRoomListResponse;
+import com.example.doktoribackend.room.dto.ChatRoomStartResponse;
+import com.example.doktoribackend.room.dto.ChatStartMemberItem;
 import com.example.doktoribackend.room.dto.PageInfo;
 import com.example.doktoribackend.room.dto.WaitingRoomMemberItem;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
@@ -36,6 +38,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -562,15 +565,26 @@ class ChatRoomControllerTest {
     class StartChatRoom {
 
         @Test
-        @DisplayName("방장이 시작하면 200 OK를 반환한다")
+        @DisplayName("방장이 시작하면 200 OK와 멤버/라운드 정보를 반환한다")
         void startChatRoom_success() throws Exception {
-            willDoNothing().given(chatRoomService).startChatRoom(10L, USER_ID);
+            ChatRoomStartResponse response = new ChatRoomStartResponse(
+                    List.of(new ChatStartMemberItem("독서왕", "https://example.com/profile.jpg")),
+                    List.of(new ChatStartMemberItem("책벌레", null)),
+                    1,
+                    LocalDateTime.of(2026, 2, 17, 14, 30, 0)
+            );
+            given(chatRoomService.startChatRoom(10L, USER_ID)).willReturn(response);
 
             mockMvc.perform(patch("/chat-rooms/10")
                             .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
                             .with(csrf()))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.message").value("OK"));
+                    .andExpect(jsonPath("$.message").value("OK"))
+                    .andExpect(jsonPath("$.data.agreeMembers[0].nickname").value("독서왕"))
+                    .andExpect(jsonPath("$.data.agreeMembers[0].profileImageUrl").value("https://example.com/profile.jpg"))
+                    .andExpect(jsonPath("$.data.disagreeMembers[0].nickname").value("책벌레"))
+                    .andExpect(jsonPath("$.data.currentRound").value(1))
+                    .andExpect(jsonPath("$.data.startedAt").value("2026-02-17T14:30:00"));
 
             then(chatRoomService).should().startChatRoom(10L, USER_ID);
         }

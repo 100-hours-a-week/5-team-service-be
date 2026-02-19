@@ -20,6 +20,8 @@ import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
 import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
 import com.example.doktoribackend.room.dto.ChatRoomListItem;
 import com.example.doktoribackend.room.dto.ChatRoomListResponse;
+import com.example.doktoribackend.room.dto.ChatRoomStartResponse;
+import com.example.doktoribackend.room.dto.ChatStartMemberItem;
 import com.example.doktoribackend.room.dto.PageInfo;
 import com.example.doktoribackend.room.dto.WaitingRoomMemberItem;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
@@ -150,7 +152,7 @@ public class ChatRoomService {
     }
 
     @Transactional
-    public void startChatRoom(Long roomId, Long userId) {
+    public ChatRoomStartResponse startChatRoom(Long roomId, Long userId) {
         ChattingRoom room = chattingRoomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
 
@@ -186,7 +188,24 @@ public class ChatRoomService {
                 .build();
         room.getRounds().add(firstRound);
 
-        broadcastStartedAfterCommit(roomId);
+        List<ChattingRoomMember> activeMembers = chattingRoomMemberRepository
+                .findByChattingRoomIdAndStatusIn(roomId, ACTIVE_STATUSES);
+
+        List<ChatStartMemberItem> agreeMembers = activeMembers.stream()
+                .filter(m -> m.getPosition() == Position.AGREE)
+                .map(m -> ChatStartMemberItem.from(m, imageUrlResolver))
+                .toList();
+        List<ChatStartMemberItem> disagreeMembers = activeMembers.stream()
+                .filter(m -> m.getPosition() == Position.DISAGREE)
+                .map(m -> ChatStartMemberItem.from(m, imageUrlResolver))
+                .toList();
+
+        ChatRoomStartResponse response = new ChatRoomStartResponse(
+                agreeMembers, disagreeMembers, 1, firstRound.getStartedAt());
+
+        broadcastStartedAfterCommit(roomId, response);
+
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -260,11 +279,11 @@ public class ChatRoomService {
         });
     }
 
-    private void broadcastStartedAfterCommit(Long roomId) {
+    private void broadcastStartedAfterCommit(Long roomId, ChatRoomStartResponse response) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                waitingRoomSseService.broadcastStartedAndClose(roomId);
+                waitingRoomSseService.broadcastStartedAndClose(roomId, response);
             }
         });
     }

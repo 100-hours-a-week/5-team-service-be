@@ -1,5 +1,6 @@
 package com.example.doktoribackend.room.service;
 
+import com.example.doktoribackend.room.dto.ChatRoomStartResponse;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -74,7 +75,7 @@ public class WaitingRoomSseService {
         }
     }
 
-    public void broadcastStartedAndClose(Long roomId) {
+    public void broadcastStartedAndClose(Long roomId, ChatRoomStartResponse response) {
         List<SseEmitter> roomEmitters = emitters.remove(roomId);
         if (roomEmitters == null) {
             return;
@@ -84,7 +85,7 @@ public class WaitingRoomSseService {
             try {
                 emitter.send(SseEmitter.event()
                         .name("room-started")
-                        .data("채팅이 시작되었습니다."));
+                        .data(response));
                 emitter.complete();
             } catch (IOException e) {
                 emitter.complete();

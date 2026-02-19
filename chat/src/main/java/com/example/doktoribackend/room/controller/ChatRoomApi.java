@@ -7,6 +7,7 @@ import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
 import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
 import com.example.doktoribackend.room.dto.ChatRoomListResponse;
+import com.example.doktoribackend.room.dto.ChatRoomStartResponse;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
 import com.example.doktoribackend.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -328,7 +329,17 @@ public interface ChatRoomApi {
             content = @Content(mediaType = "application/json",
                     examples = @ExampleObject(value = """
                             {
-                              "message": "OK"
+                              "message": "OK",
+                              "data": {
+                                "agreeMembers": [
+                                  { "nickname": "독서왕", "profileImageUrl": "https://example.com/profile.jpg" }
+                                ],
+                                "disagreeMembers": [
+                                  { "nickname": "책벌레", "profileImageUrl": null }
+                                ],
+                                "currentRound": 1,
+                                "startedAt": "2026-02-17T14:30:00"
+                              }
                             }
                             """)))
     @ApiResponse(responseCode = "403", description = "Forbidden",
@@ -376,7 +387,7 @@ public interface ChatRoomApi {
                                             }
                                             """)
                     }))
-    ResponseEntity<ApiResult<Void>> startChatRoom(
+    ResponseEntity<ApiResult<ChatRoomStartResponse>> startChatRoom(
             @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(description = "채팅방 ID", example = "1") Long roomId);
 
