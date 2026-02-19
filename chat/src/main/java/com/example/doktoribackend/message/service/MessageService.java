@@ -3,6 +3,7 @@ package com.example.doktoribackend.message.service;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.message.domain.Message;
+import com.example.doktoribackend.message.domain.MessageType;
 import com.example.doktoribackend.message.dto.MessageResponse;
 import com.example.doktoribackend.message.dto.MessageSendRequest;
 import com.example.doktoribackend.message.repository.MessageRepository;
@@ -53,9 +54,13 @@ public class MessageService {
             return null;
         }
 
-        Message message = Message.createTextMessage(
-                roomId, activeRound.getId(), senderId,
-                request.clientMessageId(), request.textMessage());
+        Message message = request.messageType() == MessageType.FILE
+                ? Message.createFileMessage(
+                        roomId, activeRound.getId(), senderId,
+                        request.clientMessageId(), request.filePath())
+                : Message.createTextMessage(
+                        roomId, activeRound.getId(), senderId,
+                        request.clientMessageId(), request.textMessage());
 
         messageRepository.save(message);
 
