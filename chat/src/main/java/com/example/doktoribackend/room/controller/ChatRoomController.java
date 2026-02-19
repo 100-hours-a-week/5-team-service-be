@@ -136,6 +136,16 @@ public class ChatRoomController implements ChatRoomApi {
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
+    @PostMapping("/{roomId}/next-round")
+    @Override
+    public ResponseEntity<Void> nextRound(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId
+    ) {
+        chatRoomService.nextRound(roomId, userDetails.getId());
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/{roomId}/members/me")
     @Override
     public ResponseEntity<Void> leaveChatRoom(

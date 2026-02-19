@@ -39,6 +39,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
@@ -79,6 +80,9 @@ class ChatRoomServiceTest {
 
     @Mock
     private WaitingRoomSseService waitingRoomSseService;
+
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
 
     @Mock
     private ImageUrlResolver imageUrlResolver;
@@ -1144,6 +1148,140 @@ class ChatRoomServiceTest {
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.CHAT_ROOM_ROUND_NOT_FOUND);
+        }
+    }
+
+    @Nested
+    @DisplayName("다음 라운드 전환")
+    class NextRound {
+
+        private ChattingRoom createChattingRoom() {
+            ChattingRoom room = ChattingRoom.builder()
+                    .topic("주제").description("설명").capacity(4).build();
+            ReflectionTestUtils.setField(room, "id", ROOM_ID);
+            ReflectionTestUtils.setField(room, "status", RoomStatus.CHATTING);
+            return room;
+        }
+
+        private ChattingRoomMember createMember(ChattingRoom room, Long userId,
+                                                 MemberRole role, Position position) {
+            ChattingRoomMember member = ChattingRoomMember.builder()
+                    .chattingRoom(room).userId(userId).nickname("닉네임")
+                    .profileImageUrl("http://profile.url")
+                    .role(role).position(position).build();
+            ReflectionTestUtils.setField(member, "status", MemberStatus.JOINED);
+            return member;
+        }
+
+        private RoomRound createActiveRound(ChattingRoom room, int roundNumber) {
+            return RoomRound.builder()
+                    .chattingRoom(room).roundNumber(roundNumber).build();
+        }
+
+        @Test
+        @DisplayName("HOST가 1라운드에서 다음 라운드로 전환하면 2라운드가 생성된다")
+        void nextRound_success() {
+            // given
+            ChattingRoom room = createChattingRoom();
+            ChattingRoomMember host = createMember(room, USER_ID, MemberRole.HOST, Position.AGREE);
+            RoomRound activeRound = createActiveRound(room, 1);
+
+            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
+                    .willReturn(Optional.of(host));
+            given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(ROOM_ID))
+                    .willReturn(Optional.of(activeRound));
+
+            // when
+            chatRoomService.nextRound(ROOM_ID, USER_ID);
+
+            // then
+            assertThat(activeRound.getEndedAt()).isNotNull();
+            assertThat(room.getRounds()).hasSize(1);
+            assertThat(room.getRounds().getFirst().getRoundNumber()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 채팅방이면 CHAT_ROOM_NOT_FOUND 예외가 발생한다")
+        void nextRound_roomNotFound() {
+            // given
+            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> chatRoomService.nextRound(ROOM_ID, USER_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.CHAT_ROOM_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("CHATTING 상태가 아니면 CHAT_ROOM_NOT_CHATTING 예외가 발생한다")
+        void nextRound_notChatting() {
+            // given
+            ChattingRoom room = createChattingRoom();
+            ReflectionTestUtils.setField(room, "status", RoomStatus.WAITING);
+            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
+
+            // when & then
+            assertThatThrownBy(() -> chatRoomService.nextRound(ROOM_ID, USER_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.CHAT_ROOM_NOT_CHATTING);
+        }
+
+        @Test
+        @DisplayName("멤버가 아니면 CHAT_ROOM_MEMBER_NOT_FOUND 예외가 발생한다")
+        void nextRound_memberNotFound() {
+            // given
+            ChattingRoom room = createChattingRoom();
+            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
+                    .willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> chatRoomService.nextRound(ROOM_ID, USER_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("HOST가 아니면 CHAT_ROOM_NOT_HOST 예외가 발생한다")
+        void nextRound_notHost() {
+            // given
+            ChattingRoom room = createChattingRoom();
+            ChattingRoomMember participant = createMember(room, USER_ID, MemberRole.PARTICIPANT, Position.AGREE);
+
+            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
+                    .willReturn(Optional.of(participant));
+
+            // when & then
+            assertThatThrownBy(() -> chatRoomService.nextRound(ROOM_ID, USER_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.CHAT_ROOM_NOT_HOST);
+        }
+
+        @Test
+        @DisplayName("3라운드에서 다음 라운드 시도 시 CHAT_ROOM_MAX_ROUND_REACHED 예외가 발생한다")
+        void nextRound_maxRoundReached() {
+            // given
+            ChattingRoom room = createChattingRoom();
+            ChattingRoomMember host = createMember(room, USER_ID, MemberRole.HOST, Position.AGREE);
+            RoomRound activeRound = createActiveRound(room, 3);
+
+            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
+                    .willReturn(Optional.of(host));
+            given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(ROOM_ID))
+                    .willReturn(Optional.of(activeRound));
+
+            // when & then
+            assertThatThrownBy(() -> chatRoomService.nextRound(ROOM_ID, USER_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.CHAT_ROOM_MAX_ROUND_REACHED);
         }
     }
 }

@@ -21,6 +21,7 @@ import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
 import com.example.doktoribackend.room.dto.ChatRoomListItem;
 import com.example.doktoribackend.room.dto.ChatRoomListResponse;
 import com.example.doktoribackend.room.dto.ChatRoomStartResponse;
+import com.example.doktoribackend.room.dto.NextRoundResponse;
 import com.example.doktoribackend.room.dto.ChatStartMemberItem;
 import com.example.doktoribackend.room.dto.PageInfo;
 import com.example.doktoribackend.room.dto.WaitingRoomMemberItem;
@@ -32,6 +33,7 @@ import com.example.doktoribackend.user.domain.UserInfo;
 import com.example.doktoribackend.user.repository.UserInfoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -45,6 +47,7 @@ import java.util.List;
 public class ChatRoomService {
 
     private static final List<Integer> ALLOWED_CAPACITIES = List.of(2, 4, 6);
+    private static final int MAX_ROUND = 3;
     private static final List<MemberStatus> ACTIVE_STATUSES =
             List.of(MemberStatus.WAITING, MemberStatus.JOINED, MemberStatus.DISCONNECTED);
 
@@ -55,6 +58,7 @@ public class ChatRoomService {
     private final KakaoBookClient kakaoBookClient;
     private final UserInfoRepository userInfoRepository;
     private final WaitingRoomSseService waitingRoomSseService;
+    private final SimpMessagingTemplate messagingTemplate;
     private final ImageUrlResolver imageUrlResolver;
 
     @Transactional(readOnly = true)
@@ -100,8 +104,7 @@ public class ChatRoomService {
 
     @Transactional
     public void leaveChatRoom(Long roomId, Long userId) {
-        ChattingRoom room = chattingRoomRepository.findById(roomId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+        ChattingRoom room = findRoom(roomId);
 
         validateRoomNotEnded(room);
 
@@ -127,8 +130,7 @@ public class ChatRoomService {
 
     @Transactional
     public WaitingRoomResponse joinChatRoom(Long roomId, Long userId, ChatRoomJoinRequest request) {
-        ChattingRoom room = chattingRoomRepository.findById(roomId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+        ChattingRoom room = findRoom(roomId);
 
         if (room.getStatus() != RoomStatus.WAITING) {
             throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_WAITING);
@@ -155,8 +157,7 @@ public class ChatRoomService {
 
     @Transactional
     public ChatRoomStartResponse startChatRoom(Long roomId, Long userId) {
-        ChattingRoom room = chattingRoomRepository.findById(roomId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+        ChattingRoom room = findRoom(roomId);
 
         if (room.getStatus() != RoomStatus.WAITING) {
             throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_WAITING);
@@ -184,14 +185,9 @@ public class ChatRoomService {
             member.join();
         }
 
-        RoomRound firstRound = RoomRound.builder()
-                .chattingRoom(room)
-                .roundNumber(1)
-                .build();
-        room.getRounds().add(firstRound);
+        RoomRound firstRound = createRound(room, 1);
 
-        List<ChattingRoomMember> activeMembers = chattingRoomMemberRepository
-                .findByChattingRoomIdAndStatusIn(roomId, ACTIVE_STATUSES);
+        List<ChattingRoomMember> activeMembers = findActiveMembers(roomId);
 
         List<ChatStartMemberItem> agreeMembers = activeMembers.stream()
                 .filter(m -> m.getPosition() == Position.AGREE)
@@ -212,8 +208,7 @@ public class ChatRoomService {
 
     @Transactional(readOnly = true)
     public WaitingRoomResponse getWaitingRoom(Long roomId, Long userId) {
-        ChattingRoom room = chattingRoomRepository.findById(roomId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+        ChattingRoom room = findRoom(roomId);
 
         chattingRoomMemberRepository.findByChattingRoomIdAndUserId(roomId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND));
@@ -223,18 +218,10 @@ public class ChatRoomService {
 
     @Transactional(readOnly = true)
     public ChatRoomStartResponse getChatRoomDetail(Long roomId, Long userId) {
-        ChattingRoom room = chattingRoomRepository.findById(roomId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+        ChattingRoomAndMember context = findChattingRoomAndMember(roomId, userId);
+        ChattingRoom room = context.room();
 
-        if (room.getStatus() != RoomStatus.CHATTING) {
-            throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_CHATTING);
-        }
-
-        chattingRoomMemberRepository.findByChattingRoomIdAndUserId(roomId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND));
-
-        List<ChattingRoomMember> activeMembers = chattingRoomMemberRepository
-                .findByChattingRoomIdAndStatusIn(roomId, ACTIVE_STATUSES);
+        List<ChattingRoomMember> activeMembers = findActiveMembers(roomId);
 
         List<ChatStartMemberItem> agreeMembers = activeMembers.stream()
                 .filter(m -> m.getPosition() == Position.AGREE)
@@ -250,6 +237,64 @@ public class ChatRoomService {
 
         return new ChatRoomStartResponse(
                 room.getTopic(), agreeMembers, disagreeMembers, activeRound.getRoundNumber(), activeRound.getStartedAt());
+    }
+
+    @Transactional
+    public void nextRound(Long roomId, Long userId) {
+        ChattingRoomAndMember context = findChattingRoomAndMember(roomId, userId);
+        ChattingRoom room = context.room();
+        ChattingRoomMember requester = context.member();
+
+        if (!requester.isHost()) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_HOST);
+        }
+
+        RoomRound currentRound = roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_ROUND_NOT_FOUND));
+
+        if (currentRound.getRoundNumber() >= MAX_ROUND) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_MAX_ROUND_REACHED);
+        }
+
+        currentRound.endRound();
+
+        RoomRound newRound = createRound(room, currentRound.getRoundNumber() + 1);
+
+        NextRoundResponse response = new NextRoundResponse(newRound.getRoundNumber(), newRound.getStartedAt());
+        broadcastNextRoundAfterCommit(roomId, response);
+    }
+
+    private ChattingRoom findRoom(Long roomId) {
+        return chattingRoomRepository.findById(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+    }
+
+    private List<ChattingRoomMember> findActiveMembers(Long roomId) {
+        return chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(roomId, ACTIVE_STATUSES);
+    }
+
+    private RoomRound createRound(ChattingRoom room, int roundNumber) {
+        RoomRound round = RoomRound.builder()
+                .chattingRoom(room)
+                .roundNumber(roundNumber)
+                .build();
+        room.getRounds().add(round);
+        return round;
+    }
+
+    private record ChattingRoomAndMember(ChattingRoom room, ChattingRoomMember member) {}
+
+    private ChattingRoomAndMember findChattingRoomAndMember(Long roomId, Long userId) {
+        ChattingRoom room = findRoom(roomId);
+
+        if (room.getStatus() != RoomStatus.CHATTING) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_CHATTING);
+        }
+
+        ChattingRoomMember member = chattingRoomMemberRepository.findByChattingRoomIdAndUserId(roomId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND));
+
+        return new ChattingRoomAndMember(room, member);
     }
 
     private void validateQuizAnswer(ChattingRoom room, Integer quizAnswer) {
@@ -317,6 +362,15 @@ public class ChatRoomService {
             @Override
             public void afterCommit() {
                 waitingRoomSseService.broadcastStartedAndClose(roomId, response);
+            }
+        });
+    }
+
+    private void broadcastNextRoundAfterCommit(Long roomId, NextRoundResponse response) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                messagingTemplate.convertAndSend("/topic/chat-rooms/" + roomId + "/next-round", response);
             }
         });
     }

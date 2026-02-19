@@ -515,6 +515,59 @@ public interface ChatRoomApi {
             @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(description = "채팅방 ID", example = "1") Long roomId);
 
+    @CommonErrorResponses
+    @AuthErrorResponses
+    @Operation(summary = "다음 라운드 전환", description = "방장이 현재 라운드를 종료하고 다음 라운드로 전환합니다. 최대 3라운드까지 가능합니다. 전환 결과는 STOMP `/topic/chat-rooms/{roomId}/next-round`로 브로드캐스트됩니다.")
+    @ApiResponse(responseCode = "204", description = "No Content")
+    @ApiResponse(responseCode = "403", description = "Forbidden",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(name = "방장이 아님",
+                            value = """
+                                    {
+                                      "code": "CHAT_ROOM_NOT_HOST",
+                                      "message": "방장만 채팅을 시작할 수 있습니다."
+                                    }
+                                    """)))
+    @ApiResponse(responseCode = "404", description = "Not Found",
+            content = @Content(mediaType = "application/json",
+                    examples = {
+                            @ExampleObject(name = "채팅방 없음",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_NOT_FOUND",
+                                              "message": "존재하지 않는 채팅방입니다."
+                                            }
+                                            """),
+                            @ExampleObject(name = "멤버 아님",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_MEMBER_NOT_FOUND",
+                                              "message": "채팅방 멤버가 아닙니다."
+                                            }
+                                            """)
+                    }))
+    @ApiResponse(responseCode = "409", description = "Conflict",
+            content = @Content(mediaType = "application/json",
+                    examples = {
+                            @ExampleObject(name = "채팅 중이 아닌 채팅방",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_NOT_CHATTING",
+                                              "message": "채팅 중인 채팅방이 아닙니다."
+                                            }
+                                            """),
+                            @ExampleObject(name = "최대 라운드 도달",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_MAX_ROUND_REACHED",
+                                              "message": "최대 라운드에 도달했습니다."
+                                            }
+                                            """)
+                    }))
+    ResponseEntity<Void> nextRound(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
+            @Parameter(description = "채팅방 ID", example = "1") Long roomId);
+
     @AuthErrorResponses
     @Operation(summary = "대기실 SSE 구독",
             description = "대기실 실시간 업데이트를 SSE로 구독합니다. "
