@@ -85,7 +85,7 @@ class MessageServiceTest {
         return round;
     }
 
-    private static final String FILE_PATH = "chat/images/test-image.png";
+    private static final String FILE_PATH = "images/chats/550e8400-e29b-41d4-a716-446655440000.png";
 
     private MessageSendRequest createRequest() {
         return new MessageSendRequest(CLIENT_MESSAGE_ID, MessageType.TEXT, TEXT_MESSAGE, null);
