@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface BookReportRepository extends JpaRepository<BookReport, Long> {
@@ -26,4 +27,36 @@ public interface BookReportRepository extends JpaRepository<BookReport, Long> {
             "WHERE br.user.id = :userId " +
             "AND br.createdAt >= :startOfDay")
     int countTodaySubmissions(@Param("userId") Long userId, @Param("startOfDay") LocalDateTime startOfDay);
+
+    // 특정 회차의 독후감 목록 조회 (관리 화면용)
+    @Query("SELECT br FROM BookReport br " +
+            "WHERE br.meetingRound.id = :roundId " +
+            "AND br.deletedAt IS NULL")
+    List<BookReport> findByMeetingRoundId(@Param("roundId") Long roundId);
+
+    // 특정 모임에서 특정 사용자의 APPROVED 독후감 수 조회
+    @Query("SELECT COUNT(br) FROM BookReport br " +
+            "JOIN br.meetingRound mr " +
+            "WHERE mr.meeting.id = :meetingId " +
+            "AND br.user.id = :userId " +
+            "AND br.status = 'APPROVED' " +
+            "AND br.deletedAt IS NULL")
+    int countApprovedByMeetingIdAndUserId(
+            @Param("meetingId") Long meetingId,
+            @Param("userId") Long userId);
+
+    // 특정 모임의 모든 멤버별 APPROVED 독후감 수 일괄 조회 (N+1 방지)
+    @Query("SELECT br.user.id AS userId, COUNT(br) AS approvedCount " +
+            "FROM BookReport br " +
+            "JOIN br.meetingRound mr " +
+            "WHERE mr.meeting.id = :meetingId " +
+            "AND br.status = 'APPROVED' " +
+            "AND br.deletedAt IS NULL " +
+            "GROUP BY br.user.id")
+    List<MemberApprovedCountProjection> countApprovedByMeetingIdGroupByUser(@Param("meetingId") Long meetingId);
+
+    interface MemberApprovedCountProjection {
+        Long getUserId();
+        Long getApprovedCount();
+    }
 }
