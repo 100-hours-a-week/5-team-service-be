@@ -4,6 +4,7 @@ import com.example.doktoribackend.bookReport.dto.BookReportCreateRequest;
 import com.example.doktoribackend.bookReport.dto.BookReportCreateResponse;
 import com.example.doktoribackend.bookReport.dto.BookReportDetailResponse;
 import com.example.doktoribackend.bookReport.dto.BookReportManagementResponse;
+import com.example.doktoribackend.bookReport.dto.MemberBookReportDetailResponse;
 import com.example.doktoribackend.bookReport.service.BookReportService;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.response.ApiResult;
@@ -66,6 +67,30 @@ public class BookReportController implements BookReportManagementApi {
 
         BookReportManagementResponse response = bookReportService.getBookReportManagement(
                 userDetails.getId(), roundId);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Override
+    @GetMapping("/{bookReportId}")
+    public ResponseEntity<ApiResult<MemberBookReportDetailResponse>> getMemberBookReport(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roundId,
+            @PathVariable Long bookReportId
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (roundId == null || roundId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        if (bookReportId == null || bookReportId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        MemberBookReportDetailResponse response = bookReportService.getMemberBookReport(
+                userDetails.getId(), roundId, bookReportId);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 }
