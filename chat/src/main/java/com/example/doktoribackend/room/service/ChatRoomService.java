@@ -40,7 +40,9 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -264,6 +266,46 @@ public class ChatRoomService {
         broadcastNextRoundAfterCommit(roomId, response);
     }
 
+    @Transactional
+    public void endChatRoom(Long roomId, Long userId) {
+        ChattingRoomAndMember context = findChattingRoomAndMember(roomId, userId);
+        ChattingRoomMember requester = context.member();
+
+        if (!requester.isHost()) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_HOST);
+        }
+
+        RoomRound currentRound = roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_ROUND_NOT_FOUND));
+
+        if (currentRound.getRoundNumber() < MAX_ROUND) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_LAST_ROUND);
+        }
+
+        endRoom(context.room());
+    }
+
+    @Transactional
+    public void endExpiredChatRooms() {
+        List<ChattingRoom> chattingRooms = chattingRoomRepository.findByStatus(RoomStatus.CHATTING);
+        LocalDateTime now = LocalDateTime.now();
+
+        for (ChattingRoom room : chattingRooms) {
+            roomRoundRepository.findByChattingRoomIdAndRoundNumber(room.getId(), 1)
+                    .filter(firstRound -> firstRound.getStartedAt().plusMinutes(room.getDuration()).isBefore(now))
+                    .ifPresent(firstRound -> endRoom(room));
+        }
+    }
+
+    private void endRoom(ChattingRoom room) {
+        roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(room.getId())
+                .ifPresent(RoomRound::endRound);
+
+        room.endChatting();
+        leaveAllActiveMembers(room.getId());
+        broadcastEndedAfterCommit(room.getId());
+    }
+
     private ChattingRoom findRoom(Long roomId) {
         return chattingRoomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
@@ -371,6 +413,15 @@ public class ChatRoomService {
             @Override
             public void afterCommit() {
                 messagingTemplate.convertAndSend("/topic/chat-rooms/" + roomId, response);
+            }
+        });
+    }
+
+    private void broadcastEndedAfterCommit(Long roomId) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                messagingTemplate.convertAndSend("/topic/chat-rooms/" + roomId, Map.of("type", "ROOM_ENDED"));
             }
         });
     }
