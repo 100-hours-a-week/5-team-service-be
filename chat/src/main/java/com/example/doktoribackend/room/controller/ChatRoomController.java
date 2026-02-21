@@ -136,7 +136,17 @@ public class ChatRoomController implements ChatRoomApi {
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
-    @PostMapping("/{roomId}/next-round")
+    @DeleteMapping("/{roomId}")
+    @Override
+    public ResponseEntity<Void> endChatRoom(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId
+    ) {
+        chatRoomService.endChatRoom(roomId, userDetails.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{roomId}/next-round")
     @Override
     public ResponseEntity<Void> nextRound(
             @AuthenticationPrincipal CustomUserDetails userDetails,
