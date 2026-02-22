@@ -172,12 +172,13 @@ public class ChatRoomService {
             throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_HOST);
         }
 
-        Position oppositePosition = requester.getPosition() == Position.AGREE ? Position.DISAGREE : Position.AGREE;
-        int oppositeCount = chattingRoomMemberRepository
-                .countByChattingRoomIdAndPositionAndStatusIn(roomId, oppositePosition, ACTIVE_STATUSES);
-        if (oppositeCount < 1) {
-            throw new BusinessException(ErrorCode.CHAT_ROOM_INSUFFICIENT_MEMBERS);
-        }
+        // TODO: 테스트 후 주석 해제
+        // Position oppositePosition = requester.getPosition() == Position.AGREE ? Position.DISAGREE : Position.AGREE;
+        // int oppositeCount = chattingRoomMemberRepository
+        //         .countByChattingRoomIdAndPositionAndStatusIn(roomId, oppositePosition, ACTIVE_STATUSES);
+        // if (oppositeCount < 1) {
+        //     throw new BusinessException(ErrorCode.CHAT_ROOM_INSUFFICIENT_MEMBERS);
+        // }
 
         room.startChatting();
 
