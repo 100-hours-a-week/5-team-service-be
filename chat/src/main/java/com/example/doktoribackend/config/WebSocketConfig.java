@@ -28,8 +28,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         "http://localhost:3000",
                         "https://doktori.kr",
                         "https://dev.doktori.kr"
-                )
-                .withSockJS();
+                );
     }
 
     @Override
