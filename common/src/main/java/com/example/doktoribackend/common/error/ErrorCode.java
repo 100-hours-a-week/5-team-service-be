@@ -86,6 +86,13 @@ public enum ErrorCode {
     // MeetingRound
     ROUND_NOT_FOUND(HttpStatus.NOT_FOUND, "ROUND_NOT_FOUND", "모임 회차를 찾을 수 없습니다."),
 
+    // TopicRecommendation
+    TOPIC_RECOMMENDATION_FORBIDDEN(HttpStatus.FORBIDDEN, "TOPIC_RECOMMENDATION_FORBIDDEN", "토론 주제 추천 권한이 없습니다."),
+    NO_BOOK_REPORTS_FOR_TOPIC(HttpStatus.CONFLICT, "NO_BOOK_REPORTS_FOR_TOPIC", "제출된 독후감이 없어 AI 추천을 할 수 없습니다."),
+    TOPIC_RECOMMENDATION_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "TOPIC_RECOMMENDATION_LIMIT_EXCEEDED", "일일 AI 추천 횟수(15회)를 초과했습니다."),
+    TOPIC_REQUIRED_FOR_LEADER_MODE(HttpStatus.BAD_REQUEST, "TOPIC_REQUIRED_FOR_LEADER_MODE", "LEADER 모드에서는 주제 입력이 필수입니다."),
+    AI_TOPIC_RECOMMENDATION_FAILED(HttpStatus.BAD_GATEWAY, "AI_TOPIC_RECOMMENDATION_FAILED", "AI 주제 추천에 실패했습니다."),
+
     // BookReport
     BOOK_REPORT_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "BOOK_REPORT_ALREADY_SUBMITTED", "이미 독후감을 제출했습니다."),
     BOOK_REPORT_NOT_WRITABLE(HttpStatus.CONFLICT, "BOOK_REPORT_NOT_WRITABLE", "독후감 작성 가능 시간이 아닙니다."),

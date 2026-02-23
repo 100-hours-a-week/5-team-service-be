@@ -13,7 +13,10 @@ import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
 import com.example.doktoribackend.meeting.dto.MeetingUpdateRequest;
 import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateRequest;
 import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateResponse;
+import com.example.doktoribackend.meeting.dto.TopicRecommendationRequest;
+import com.example.doktoribackend.meeting.dto.TopicRecommendationResponse;
 import com.example.doktoribackend.meeting.service.MeetingService;
+import com.example.doktoribackend.meeting.service.TopicRecommendationService;
 import com.example.doktoribackend.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -36,9 +39,10 @@ import java.net.URI;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/meetings")
-public class MeetingController implements MeetingParticipationApi {
+public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi {
 
     private final MeetingService meetingService;
+    private final TopicRecommendationService topicRecommendationService;
 
     @Operation(summary = "모임 생성", description = "로그인 사용자가 모임을 생성합니다.")
     @ApiResponses({
@@ -455,6 +459,36 @@ public class MeetingController implements MeetingParticipationApi {
 
         ParticipationStatusUpdateResponse response = meetingService.updateParticipationStatus(
                 userDetails.getId(), meetingId, joinRequestId, request);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Override
+    @PostMapping("/{meetingId}/rounds/{roundNo}/topic-recommendations")
+    public ResponseEntity<ApiResult<TopicRecommendationResponse>> recommendTopic(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId,
+            @PathVariable Integer roundNo,
+            @Valid @RequestBody TopicRecommendationRequest request
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        if (roundNo == null || roundNo <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        // mode=LEADER인데 topic이 없는 경우
+        if (request.isLeaderMode() && (request.topic() == null || request.topic().isBlank())) {
+            throw new BusinessException(ErrorCode.TOPIC_REQUIRED_FOR_LEADER_MODE);
+        }
+
+        TopicRecommendationResponse response = topicRecommendationService.recommendTopic(
+                userDetails.getId(), meetingId, roundNo, request);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 }

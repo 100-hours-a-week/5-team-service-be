@@ -2,7 +2,9 @@ package com.example.doktoribackend.meeting.repository;
 
 import com.example.doktoribackend.meeting.domain.Meeting;
 import com.example.doktoribackend.meeting.domain.MeetingStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -17,6 +19,10 @@ public interface MeetingRepository extends JpaRepository<Meeting, Long>, Meeting
             "JOIN FETCH m.leaderUser " +
             "WHERE m.id = :meetingId")
     Optional<Meeting> findByIdWithLeader(@Param("meetingId") Long meetingId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT m FROM Meeting m WHERE m.id = :meetingId")
+    Optional<Meeting> findByIdWithLock(@Param("meetingId") Long meetingId);
 
     @Query("SELECT m FROM Meeting m " +
             "WHERE m.status = 'RECRUITING' " +
