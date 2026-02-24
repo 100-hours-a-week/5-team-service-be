@@ -6,6 +6,7 @@ import com.example.doktoribackend.common.client.KakaoBookClient;
 import com.example.doktoribackend.common.client.KakaoBookResponse;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.s3.ImageUrlResolver;
+import com.example.doktoribackend.config.WebSocketSessionRegistry;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.quiz.domain.Quiz;
 import com.example.doktoribackend.quiz.domain.QuizChoice;
@@ -62,6 +63,7 @@ public class ChatRoomService {
     private final WaitingRoomSseService waitingRoomSseService;
     private final SimpMessagingTemplate messagingTemplate;
     private final ImageUrlResolver imageUrlResolver;
+    private final WebSocketSessionRegistry sessionRegistry;
 
     @Transactional(readOnly = true)
     public ChatRoomListResponse getChatRooms(Long cursorId, int size) {
@@ -304,6 +306,7 @@ public class ChatRoomService {
 
         room.endChatting();
         leaveAllActiveMembers(room.getId());
+        sessionRegistry.removeAllForRoom(room.getId());
         broadcastEndedAfterCommit(room.getId());
     }
 
