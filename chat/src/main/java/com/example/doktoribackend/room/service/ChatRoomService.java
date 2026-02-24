@@ -453,7 +453,7 @@ public class ChatRoomService {
 
     private void validateNotAlreadyJoined(Long userId) {
         boolean alreadyJoined = chattingRoomMemberRepository.existsByUserIdAndStatusIn(
-                userId, List.of(MemberStatus.WAITING, MemberStatus.JOINED));
+                userId, ACTIVE_STATUSES);
 
         if (alreadyJoined) {
             throw new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_JOINED);

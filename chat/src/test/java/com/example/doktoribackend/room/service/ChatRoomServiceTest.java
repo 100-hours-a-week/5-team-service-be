@@ -258,12 +258,12 @@ class ChatRoomServiceTest {
     class DuplicateJoinValidation {
 
         @Test
-        @DisplayName("이미 WAITING 또는 JOINED 상태로 참여 중이면 CHAT_ROOM_ALREADY_JOINED 예외가 발생한다")
+        @DisplayName("이미 WAITING, JOINED 또는 DISCONNECTED 상태로 참여 중이면 CHAT_ROOM_ALREADY_JOINED 예외가 발생한다")
         void alreadyJoined_throwsException() {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
-                    USER_ID, List.of(MemberStatus.WAITING, MemberStatus.JOINED)))
+                    USER_ID, List.of(MemberStatus.WAITING, MemberStatus.JOINED, MemberStatus.DISCONNECTED)))
                     .willReturn(true);
 
             // when & then
@@ -276,8 +276,8 @@ class ChatRoomServiceTest {
         }
 
         @Test
-        @DisplayName("LEFT 또는 DISCONNECTED 상태만 있으면 새 채팅방을 생성할 수 있다")
-        void leftOrDisconnected_canCreateNewRoom() {
+        @DisplayName("LEFT 상태만 있으면 새 채팅방을 생성할 수 있다")
+        void leftOnly_canCreateNewRoom() {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
             given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
