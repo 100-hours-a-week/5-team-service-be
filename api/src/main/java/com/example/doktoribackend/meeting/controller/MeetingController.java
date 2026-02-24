@@ -3,6 +3,8 @@ package com.example.doktoribackend.meeting.controller;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.response.ApiResult;
 import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.meeting.dto.LeaderDelegationRequest;
+import com.example.doktoribackend.meeting.dto.LeaderDelegationResponse;
 import com.example.doktoribackend.meeting.dto.MeetingCreateRequest;
 import com.example.doktoribackend.meeting.dto.MeetingCreateResponse;
 import com.example.doktoribackend.meeting.dto.MeetingDetailResponse;
@@ -15,6 +17,7 @@ import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateRequest;
 import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateResponse;
 import com.example.doktoribackend.meeting.dto.TopicRecommendationRequest;
 import com.example.doktoribackend.meeting.dto.TopicRecommendationResponse;
+import com.example.doktoribackend.meeting.service.LeaderDelegationService;
 import com.example.doktoribackend.meeting.service.MeetingService;
 import com.example.doktoribackend.meeting.service.TopicRecommendationService;
 import com.example.doktoribackend.security.CustomUserDetails;
@@ -39,10 +42,11 @@ import java.net.URI;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/meetings")
-public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi {
+public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi, LeaderDelegationApi {
 
     private final MeetingService meetingService;
     private final TopicRecommendationService topicRecommendationService;
+    private final LeaderDelegationService leaderDelegationService;
 
     @Operation(summary = "모임 생성", description = "로그인 사용자가 모임을 생성합니다.")
     @ApiResponses({
@@ -490,5 +494,25 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
         TopicRecommendationResponse response = topicRecommendationService.recommendTopic(
                 userDetails.getId(), meetingId, roundNo, request);
         return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Override
+    @PatchMapping("/{meetingId}/leader")
+    public ResponseEntity<ApiResult<LeaderDelegationResponse>> delegateLeader(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId,
+            @Valid @RequestBody LeaderDelegationRequest request
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        LeaderDelegationResponse response = leaderDelegationService.delegateLeader(
+                userDetails.getId(), meetingId, request);
+        return ResponseEntity.ok(ApiResult.ok("모임장 권한이 성공적으로 위임되었습니다.", response));
     }
 }
