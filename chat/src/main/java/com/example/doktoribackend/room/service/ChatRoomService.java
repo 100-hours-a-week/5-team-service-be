@@ -36,9 +36,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -64,6 +66,7 @@ public class ChatRoomService {
     private final SimpMessagingTemplate messagingTemplate;
     private final ImageUrlResolver imageUrlResolver;
     private final WebSocketSessionRegistry sessionRegistry;
+    private final PlatformTransactionManager transactionManager;
 
     @Transactional(readOnly = true)
     public ChatRoomListResponse getChatRooms(Long cursorId, int size) {
@@ -82,28 +85,29 @@ public class ChatRoomService {
         return new ChatRoomListResponse(items, pageInfo);
     }
 
-    @Transactional
     public ChatRoomCreateResponse createChatRoom(Long userId, ChatRoomCreateRequest request) {
         validateCapacity(request.capacity());
-        validateNotAlreadyJoined(userId);
-
         Book book = resolveBook(request.isbn());
 
-        ChattingRoom room = ChattingRoom.create(request, book);
-        chattingRoomRepository.save(room);
+        TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
+        return txTemplate.execute(status -> {
+            validateNotAlreadyJoined(userId);
 
-        createQuiz(room, request.quiz());
+            Book managedBook = bookRepository.getReferenceById(book.getId());
+            ChattingRoom room = ChattingRoom.create(request, managedBook);
+            chattingRoomRepository.save(room);
 
-        room.increaseMemberCount();
+            createQuiz(room, request.quiz());
+            room.increaseMemberCount();
 
-        UserInfo userInfo = userInfoRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+            UserInfo userInfo = userInfoRepository.findById(userId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+            ChattingRoomMember member = ChattingRoomMember.createHost(
+                    room, userId, userInfo.getNickname(), userInfo.getProfileImagePath(), request);
+            chattingRoomMemberRepository.save(member);
 
-        ChattingRoomMember member = ChattingRoomMember.createHost(
-                room, userId, userInfo.getNickname(), userInfo.getProfileImagePath(), request);
-        chattingRoomMemberRepository.save(member);
-
-        return new ChatRoomCreateResponse(room.getId());
+            return new ChatRoomCreateResponse(room.getId());
+        });
     }
 
     @Transactional
@@ -290,13 +294,9 @@ public class ChatRoomService {
 
     @Transactional
     public void endExpiredChatRooms() {
-        List<ChattingRoom> chattingRooms = chattingRoomRepository.findByStatus(RoomStatus.CHATTING);
-        LocalDateTime now = LocalDateTime.now();
-
-        for (ChattingRoom room : chattingRooms) {
-            roomRoundRepository.findByChattingRoomIdAndRoundNumber(room.getId(), 1)
-                    .filter(firstRound -> firstRound.getStartedAt().plusMinutes(room.getDuration()).isBefore(now))
-                    .ifPresent(firstRound -> endRoom(room));
+        List<ChattingRoom> expiredRooms = chattingRoomRepository.findExpiredChattingRooms(LocalDateTime.now());
+        for (ChattingRoom room : expiredRooms) {
+            endRoom(room);
         }
     }
 
@@ -453,7 +453,7 @@ public class ChatRoomService {
 
     private void validateNotAlreadyJoined(Long userId) {
         boolean alreadyJoined = chattingRoomMemberRepository.existsByUserIdAndStatusIn(
-                userId, List.of(MemberStatus.WAITING, MemberStatus.JOINED));
+                userId, ACTIVE_STATUSES);
 
         if (alreadyJoined) {
             throw new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_JOINED);

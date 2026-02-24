@@ -288,8 +288,8 @@ class MessageIntegrationTest {
     }
 
     @Test
-    @DisplayName("중복 clientMessageId 메시지는 브로드캐스트되지 않는다")
-    void duplicateClientMessageId_notBroadcast() throws Exception {
+    @DisplayName("중복 clientMessageId 메시지도 브로드캐스트되며 동일한 messageId를 가진다")
+    void duplicateClientMessageId_broadcastsExistingMessage() throws Exception {
         // given
         String token = jwtTokenProvider.createAccessToken(USER_A_ID, USER_A_NICKNAME);
         WebSocketStompClient stompClient = createStompClient();
@@ -327,9 +327,12 @@ class MessageIntegrationTest {
 
         session.send("/app/chat-rooms/" + roomId + "/messages", message);
 
-        // then: second message should not be broadcast
-        MessageResponse secondResponse = queue.poll(2, TimeUnit.SECONDS);
-        assertThat(secondResponse).isNull();
+        // then: second message should also be broadcast with the same messageId
+        MessageResponse secondResponse = queue.poll(5, TimeUnit.SECONDS);
+        assertThat(secondResponse).isNotNull();
+        assertThat(secondResponse.messageId()).isEqualTo(firstResponse.messageId());
+        assertThat(secondResponse.textMessage()).isEqualTo("첫 번째 메시지");
+        assertThat(secondResponse.senderId()).isEqualTo(USER_A_ID);
 
         stompClient.stop();
     }

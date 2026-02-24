@@ -26,12 +26,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,6 +41,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
@@ -112,9 +115,9 @@ class MessageServiceTest {
                 .willReturn(Optional.of(createMemberWithStatus(MemberStatus.JOINED)));
         given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(ROOM_ID))
                 .willReturn(Optional.of(createActiveRound()));
-        given(messageRepository.existsByRoomIdAndSenderIdAndClientMessageId(
+        given(messageRepository.findByRoomIdAndSenderIdAndClientMessageId(
                 ROOM_ID, SENDER_ID, CLIENT_MESSAGE_ID))
-                .willReturn(false);
+                .willReturn(Optional.empty());
         given(imageUrlResolver.toUrl(any())).willAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -169,7 +172,7 @@ class MessageServiceTest {
             messageService.sendMessage(ROOM_ID, SENDER_ID, SENDER_NICKNAME, createFileRequest());
 
             // then
-            then(messageRepository).should().save(messageCaptor.capture());
+            then(messageRepository).should().saveAndFlush(messageCaptor.capture());
             Message saved = messageCaptor.getValue();
             assertThat(saved.getMessageType()).isEqualTo(MessageType.FILE);
             assertThat(saved.getFilePath()).isEqualTo(FILE_PATH);
@@ -187,7 +190,7 @@ class MessageServiceTest {
             messageService.sendMessage(ROOM_ID, SENDER_ID, SENDER_NICKNAME, createRequest());
 
             // then
-            then(messageRepository).should().save(messageCaptor.capture());
+            then(messageRepository).should().saveAndFlush(messageCaptor.capture());
             assertThat(messageCaptor.getValue().getRoundId()).isEqualTo(ROUND_ID);
         }
 
@@ -201,7 +204,7 @@ class MessageServiceTest {
             messageService.sendMessage(ROOM_ID, SENDER_ID, SENDER_NICKNAME, createRequest());
 
             // then
-            then(messageRepository).should().save(any(Message.class));
+            then(messageRepository).should().saveAndFlush(any(Message.class));
         }
     }
 
@@ -379,47 +382,91 @@ class MessageServiceTest {
     @DisplayName("중복 메시지 검증")
     class DuplicateMessageValidation {
 
+        private Message createExistingMessage() {
+            Message message = Message.createTextMessage(
+                    ROOM_ID, ROUND_ID, SENDER_ID, CLIENT_MESSAGE_ID, TEXT_MESSAGE);
+            ReflectionTestUtils.setField(message, "id", 999L);
+            return message;
+        }
+
         @Test
-        @DisplayName("동일한 clientMessageId면 null을 반환한다")
-        void sendMessage_duplicate_returnsNull() {
+        @DisplayName("동일한 clientMessageId면 기존 메시지의 MessageResponse를 반환한다")
+        void sendMessage_duplicate_returnsExistingMessage() {
             // given
+            Message existingMessage = createExistingMessage();
             given(chattingRoomRepository.findById(ROOM_ID))
                     .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, SENDER_ID))
                     .willReturn(Optional.of(createMemberWithStatus(MemberStatus.JOINED)));
             given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(ROOM_ID))
                     .willReturn(Optional.of(createActiveRound()));
-            given(messageRepository.existsByRoomIdAndSenderIdAndClientMessageId(
+            given(messageRepository.findByRoomIdAndSenderIdAndClientMessageId(
                     ROOM_ID, SENDER_ID, CLIENT_MESSAGE_ID))
-                    .willReturn(true);
+                    .willReturn(Optional.of(existingMessage));
+            given(imageUrlResolver.toUrl(any())).willAnswer(invocation -> invocation.getArgument(0));
 
             // when
             MessageResponse response = messageService.sendMessage(
                     ROOM_ID, SENDER_ID, SENDER_NICKNAME, createRequest());
 
             // then
-            assertThat(response).isNull();
+            assertThat(response).isNotNull();
+            assertThat(response.messageId()).isEqualTo(999L);
+            assertThat(response.senderId()).isEqualTo(SENDER_ID);
+            assertThat(response.textMessage()).isEqualTo(TEXT_MESSAGE);
         }
 
         @Test
-        @DisplayName("중복 메시지일 때 MessageRepository.save()가 호출되지 않는다")
+        @DisplayName("중복 메시지일 때 saveAndFlush가 호출되지 않는다")
         void sendMessage_duplicate_saveNotCalled() {
             // given
+            Message existingMessage = createExistingMessage();
             given(chattingRoomRepository.findById(ROOM_ID))
                     .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, SENDER_ID))
                     .willReturn(Optional.of(createMemberWithStatus(MemberStatus.JOINED)));
             given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(ROOM_ID))
                     .willReturn(Optional.of(createActiveRound()));
-            given(messageRepository.existsByRoomIdAndSenderIdAndClientMessageId(
+            given(messageRepository.findByRoomIdAndSenderIdAndClientMessageId(
                     ROOM_ID, SENDER_ID, CLIENT_MESSAGE_ID))
-                    .willReturn(true);
+                    .willReturn(Optional.of(existingMessage));
+            given(imageUrlResolver.toUrl(any())).willAnswer(invocation -> invocation.getArgument(0));
 
             // when
             messageService.sendMessage(ROOM_ID, SENDER_ID, SENDER_NICKNAME, createRequest());
 
             // then
-            then(messageRepository).should(never()).save(any());
+            then(messageRepository).should(never()).saveAndFlush(any());
+        }
+
+        @Test
+        @DisplayName("race condition으로 DataIntegrityViolationException 발생 시 기존 메시지를 반환한다")
+        void sendMessage_raceCondition_returnsExistingMessage() {
+            // given
+            Message existingMessage = createExistingMessage();
+            given(chattingRoomRepository.findById(ROOM_ID))
+                    .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, SENDER_ID))
+                    .willReturn(Optional.of(createMemberWithStatus(MemberStatus.JOINED)));
+            given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(ROOM_ID))
+                    .willReturn(Optional.of(createActiveRound()));
+            given(messageRepository.findByRoomIdAndSenderIdAndClientMessageId(
+                    ROOM_ID, SENDER_ID, CLIENT_MESSAGE_ID))
+                    .willReturn(Optional.empty())
+                    .willReturn(Optional.of(existingMessage));
+            willThrow(new DataIntegrityViolationException("unique constraint"))
+                    .given(messageRepository).saveAndFlush(any(Message.class));
+            given(imageUrlResolver.toUrl(any())).willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            MessageResponse response = messageService.sendMessage(
+                    ROOM_ID, SENDER_ID, SENDER_NICKNAME, createRequest());
+
+            // then
+            assertThat(response).isNotNull();
+            assertThat(response.messageId()).isEqualTo(999L);
+            assertThat(response.senderId()).isEqualTo(SENDER_ID);
+            assertThat(response.textMessage()).isEqualTo(TEXT_MESSAGE);
         }
     }
 
@@ -470,7 +517,7 @@ class MessageServiceTest {
             stubImageUrlResolver();
             given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(null), any(PageRequest.class)))
                     .willReturn(messages);
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserIdIn(eq(ROOM_ID), eq(Set.of(SENDER_ID))))
                     .willReturn(List.of(createRoomMember(SENDER_ID, SENDER_NICKNAME)));
 
             // when
@@ -500,7 +547,7 @@ class MessageServiceTest {
             stubImageUrlResolver();
             given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(null), any(PageRequest.class)))
                     .willReturn(messages);
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserIdIn(eq(ROOM_ID), eq(Set.of(SENDER_ID))))
                     .willReturn(List.of(createRoomMember(SENDER_ID, SENDER_NICKNAME)));
 
             // when
@@ -529,7 +576,7 @@ class MessageServiceTest {
             stubImageUrlResolver();
             given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(cursorId), any(PageRequest.class)))
                     .willReturn(messages);
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserIdIn(eq(ROOM_ID), eq(Set.of(SENDER_ID))))
                     .willReturn(List.of(createRoomMember(SENDER_ID, SENDER_NICKNAME)));
 
             // when
@@ -549,8 +596,6 @@ class MessageServiceTest {
             stubMemberExists();
             given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(null), any(PageRequest.class)))
                     .willReturn(Collections.emptyList());
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
-                    .willReturn(Collections.emptyList());
 
             // when
             MessageListResponse response = messageService.getMessages(ROOM_ID, SENDER_ID, null, 20);
@@ -559,6 +604,7 @@ class MessageServiceTest {
             assertThat(response.messages()).isEmpty();
             assertThat(response.pageInfo().hasNext()).isFalse();
             assertThat(response.pageInfo().nextCursorId()).isNull();
+            then(chattingRoomMemberRepository).should(never()).findByChattingRoomIdAndUserIdIn(any(), any());
         }
 
         @Test
@@ -591,6 +637,60 @@ class MessageServiceTest {
         }
 
         @Test
+        @DisplayName("WAITING 상태 멤버면 메시지 조회 시 CHAT_ROOM_MEMBER_NOT_FOUND 예외가 발생한다")
+        void getMessages_waitingMember() {
+            // given
+            given(chattingRoomRepository.findById(ROOM_ID))
+                    .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
+            ChattingRoomMember waitingMember = createRoomMember(SENDER_ID, SENDER_NICKNAME);
+            ReflectionTestUtils.setField(waitingMember, "status", MemberStatus.WAITING);
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, SENDER_ID))
+                    .willReturn(Optional.of(waitingMember));
+
+            // when & then
+            assertThatThrownBy(() -> messageService.getMessages(ROOM_ID, SENDER_ID, null, 20))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("DISCONNECTED 상태 멤버면 메시지 조회 시 CHAT_ROOM_MEMBER_NOT_FOUND 예외가 발생한다")
+        void getMessages_disconnectedMember() {
+            // given
+            given(chattingRoomRepository.findById(ROOM_ID))
+                    .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
+            ChattingRoomMember disconnectedMember = createRoomMember(SENDER_ID, SENDER_NICKNAME);
+            ReflectionTestUtils.setField(disconnectedMember, "status", MemberStatus.DISCONNECTED);
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, SENDER_ID))
+                    .willReturn(Optional.of(disconnectedMember));
+
+            // when & then
+            assertThatThrownBy(() -> messageService.getMessages(ROOM_ID, SENDER_ID, null, 20))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("LEFT 상태 멤버면 메시지 조회 시 CHAT_ROOM_MEMBER_NOT_FOUND 예외가 발생한다")
+        void getMessages_leftMember() {
+            // given
+            given(chattingRoomRepository.findById(ROOM_ID))
+                    .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
+            ChattingRoomMember leftMember = createRoomMember(SENDER_ID, SENDER_NICKNAME);
+            ReflectionTestUtils.setField(leftMember, "status", MemberStatus.LEFT);
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, SENDER_ID))
+                    .willReturn(Optional.of(leftMember));
+
+            // when & then
+            assertThatThrownBy(() -> messageService.getMessages(ROOM_ID, SENDER_ID, null, 20))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND);
+        }
+
+        @Test
         @DisplayName("닉네임을 찾을 수 없는 발신자는 '알 수 없음'으로 표시된다")
         void getMessages_unknownSender() {
             // given
@@ -604,7 +704,7 @@ class MessageServiceTest {
             stubImageUrlResolver();
             given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(null), any(PageRequest.class)))
                     .willReturn(messages);
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserIdIn(eq(ROOM_ID), eq(Set.of(unknownSenderId))))
                     .willReturn(List.of(createRoomMember(SENDER_ID, SENDER_NICKNAME)));
 
             // when

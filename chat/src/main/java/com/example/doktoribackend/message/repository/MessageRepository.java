@@ -7,10 +7,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
-    boolean existsByRoomIdAndSenderIdAndClientMessageId(Long roomId, Long senderId, String clientMessageId);
+    Optional<Message> findByRoomIdAndSenderIdAndClientMessageId(Long roomId, Long senderId, String clientMessageId);
 
     @Query("SELECT m FROM Message m WHERE m.roomId = :roomId AND (:cursorId IS NULL OR m.id < :cursorId) ORDER BY m.id DESC")
     List<Message> findByRoomIdWithCursor(@Param("roomId") Long roomId, @Param("cursorId") Long cursorId, Pageable pageable);

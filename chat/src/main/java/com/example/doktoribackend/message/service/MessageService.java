@@ -19,12 +19,15 @@ import com.example.doktoribackend.room.repository.ChattingRoomMemberRepository;
 import com.example.doktoribackend.room.repository.ChattingRoomRepository;
 import com.example.doktoribackend.room.repository.RoomRoundRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -42,8 +45,12 @@ public class MessageService {
         chattingRoomRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
 
-        chattingRoomMemberRepository.findByChattingRoomIdAndUserId(roomId, userId)
+        ChattingRoomMember member = chattingRoomMemberRepository.findByChattingRoomIdAndUserId(roomId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND));
+
+        if (member.getStatus() != MemberStatus.JOINED) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND);
+        }
 
         List<Message> messages = messageRepository.findByRoomIdWithCursor(
                 roomId, cursorId, PageRequest.of(0, size + 1));
@@ -51,9 +58,18 @@ public class MessageService {
         boolean hasNext = messages.size() > size;
         List<Message> content = hasNext ? messages.subList(0, size) : messages;
 
+        if (content.isEmpty()) {
+            Long nextCursorId = null;
+            PageInfo pageInfo = new PageInfo(nextCursorId, false, size);
+            return new MessageListResponse(List.of(), pageInfo);
+        }
+
+        Set<Long> senderIds = content.stream()
+                .map(Message::getSenderId)
+                .collect(Collectors.toSet());
+
         List<ChattingRoomMember> members = chattingRoomMemberRepository
-                .findByChattingRoomIdAndStatusIn(roomId,
-                        List.of(MemberStatus.WAITING, MemberStatus.JOINED, MemberStatus.DISCONNECTED, MemberStatus.LEFT));
+                .findByChattingRoomIdAndUserIdIn(roomId, senderIds);
         Map<Long, String> nicknameMap = members.stream()
                 .collect(Collectors.toMap(ChattingRoomMember::getUserId, ChattingRoomMember::getNickname, (a, b) -> a));
 
@@ -88,9 +104,10 @@ public class MessageService {
         RoomRound activeRound = roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_ROUND_NOT_FOUND));
 
-        if (messageRepository.existsByRoomIdAndSenderIdAndClientMessageId(
-                roomId, senderId, request.clientMessageId())) {
-            return null;
+        Optional<Message> existing = messageRepository.findByRoomIdAndSenderIdAndClientMessageId(
+                roomId, senderId, request.clientMessageId());
+        if (existing.isPresent()) {
+            return MessageResponse.from(existing.get(), senderNickname, imageUrlResolver);
         }
 
         Message message = request.messageType() == MessageType.FILE
@@ -101,7 +118,14 @@ public class MessageService {
                         roomId, activeRound.getId(), senderId,
                         request.clientMessageId(), request.textMessage());
 
-        messageRepository.save(message);
+        try {
+            messageRepository.saveAndFlush(message);
+        } catch (DataIntegrityViolationException e) {
+            Message duplicateMessage = messageRepository.findByRoomIdAndSenderIdAndClientMessageId(
+                    roomId, senderId, request.clientMessageId())
+                    .orElseThrow(() -> e);
+            return MessageResponse.from(duplicateMessage, senderNickname, imageUrlResolver);
+        }
 
         return MessageResponse.from(message, senderNickname, imageUrlResolver);
     }

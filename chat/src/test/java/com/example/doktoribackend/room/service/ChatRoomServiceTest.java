@@ -40,6 +40,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
@@ -90,6 +92,9 @@ class ChatRoomServiceTest {
     @Mock
     private com.example.doktoribackend.config.WebSocketSessionRegistry sessionRegistry;
 
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     @InjectMocks
     private ChatRoomService chatRoomService;
 
@@ -100,6 +105,8 @@ class ChatRoomServiceTest {
     @BeforeEach
     void setUp() {
         TransactionSynchronizationManager.initSynchronization();
+        lenient().when(transactionManager.getTransaction(any()))
+                .thenReturn(mock(TransactionStatus.class));
     }
 
     @AfterEach
@@ -145,6 +152,7 @@ class ChatRoomServiceTest {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
             given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     eq(USER_ID), any())).willReturn(false);
             given(chattingRoomRepository.save(any(ChattingRoom.class)))
@@ -166,6 +174,7 @@ class ChatRoomServiceTest {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
             given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     eq(USER_ID), any())).willReturn(false);
             stubUserInfo();
@@ -191,6 +200,7 @@ class ChatRoomServiceTest {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
             given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     eq(USER_ID), any())).willReturn(false);
             given(chattingRoomRepository.save(any(ChattingRoom.class)))
@@ -223,6 +233,7 @@ class ChatRoomServiceTest {
             // given
             ChatRoomCreateRequest request = createValidRequest(capacity);
             given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     eq(USER_ID), any())).willReturn(false);
             given(chattingRoomRepository.save(any(ChattingRoom.class)))
@@ -258,12 +269,13 @@ class ChatRoomServiceTest {
     class DuplicateJoinValidation {
 
         @Test
-        @DisplayName("이미 WAITING 또는 JOINED 상태로 참여 중이면 CHAT_ROOM_ALREADY_JOINED 예외가 발생한다")
+        @DisplayName("이미 WAITING, JOINED 또는 DISCONNECTED 상태로 참여 중이면 CHAT_ROOM_ALREADY_JOINED 예외가 발생한다")
         void alreadyJoined_throwsException() {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
+            given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
-                    USER_ID, List.of(MemberStatus.WAITING, MemberStatus.JOINED)))
+                    USER_ID, List.of(MemberStatus.WAITING, MemberStatus.JOINED, MemberStatus.DISCONNECTED)))
                     .willReturn(true);
 
             // when & then
@@ -276,11 +288,12 @@ class ChatRoomServiceTest {
         }
 
         @Test
-        @DisplayName("LEFT 또는 DISCONNECTED 상태만 있으면 새 채팅방을 생성할 수 있다")
-        void leftOrDisconnected_canCreateNewRoom() {
+        @DisplayName("LEFT 상태만 있으면 새 채팅방을 생성할 수 있다")
+        void leftOnly_canCreateNewRoom() {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
             given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     eq(USER_ID), any())).willReturn(false);
             given(chattingRoomRepository.save(any(ChattingRoom.class)))
@@ -495,6 +508,7 @@ class ChatRoomServiceTest {
 
             // then
             assertThat(room.getStatus()).isEqualTo(RoomStatus.CANCELLED);
+            assertThat(room.getCurrentMemberCount()).isZero();
             assertThat(host.getStatus()).isEqualTo(MemberStatus.LEFT);
             assertThat(member1.getStatus()).isEqualTo(MemberStatus.LEFT);
             assertThat(member2.getStatus()).isEqualTo(MemberStatus.LEFT);
@@ -1437,13 +1451,9 @@ class ChatRoomServiceTest {
         void endExpiredChatRooms_endsExpired() {
             // given
             ChattingRoom expiredRoom = createChattingRoom(1L, 30);
-            RoomRound firstRound = RoomRound.builder().chattingRoom(expiredRoom).roundNumber(1).build();
-            ReflectionTestUtils.setField(firstRound, "startedAt", java.time.LocalDateTime.now().minusMinutes(31));
 
-            given(chattingRoomRepository.findByStatus(RoomStatus.CHATTING))
+            given(chattingRoomRepository.findExpiredChattingRooms(any(java.time.LocalDateTime.class)))
                     .willReturn(List.of(expiredRoom));
-            given(roomRoundRepository.findByChattingRoomIdAndRoundNumber(1L, 1))
-                    .willReturn(Optional.of(firstRound));
             given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(1L))
                     .willReturn(Optional.empty());
             given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(1L), any()))
@@ -1460,20 +1470,14 @@ class ChatRoomServiceTest {
         @DisplayName("duration이 지나지 않은 채팅방은 종료되지 않는다")
         void endExpiredChatRooms_skipsActive() {
             // given
-            ChattingRoom activeRoom = createChattingRoom(2L, 30);
-            RoomRound firstRound = RoomRound.builder().chattingRoom(activeRoom).roundNumber(1).build();
-            ReflectionTestUtils.setField(firstRound, "startedAt", java.time.LocalDateTime.now().minusMinutes(10));
-
-            given(chattingRoomRepository.findByStatus(RoomStatus.CHATTING))
-                    .willReturn(List.of(activeRoom));
-            given(roomRoundRepository.findByChattingRoomIdAndRoundNumber(2L, 1))
-                    .willReturn(Optional.of(firstRound));
+            given(chattingRoomRepository.findExpiredChattingRooms(any(java.time.LocalDateTime.class)))
+                    .willReturn(Collections.emptyList());
 
             // when
             chatRoomService.endExpiredChatRooms();
 
             // then
-            assertThat(activeRoom.getStatus()).isEqualTo(RoomStatus.CHATTING);
+            then(chattingRoomRepository).should(never()).findById(any());
         }
     }
 }

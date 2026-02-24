@@ -84,6 +84,7 @@ public class ChattingRoom {
 
     public void cancel() {
         this.status = RoomStatus.CANCELLED;
+        this.currentMemberCount = 0;
     }
 
     public void increaseMemberCount() {

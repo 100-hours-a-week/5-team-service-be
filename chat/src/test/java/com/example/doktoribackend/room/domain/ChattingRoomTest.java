@@ -68,17 +68,20 @@ class ChattingRoomTest {
     }
 
     @Test
-    @DisplayName("채팅방을 취소하면 상태가 CANCELLED로 변경된다")
+    @DisplayName("채팅방을 취소하면 상태가 CANCELLED로 변경되고 인원이 0이 된다")
     void cancel() {
         ChattingRoom room = ChattingRoom.builder()
                 .topic("주제")
                 .description("설명")
                 .capacity(4)
                 .build();
+        room.increaseMemberCount();
+        room.increaseMemberCount();
 
         room.cancel();
 
         assertThat(room.getStatus()).isEqualTo(RoomStatus.CANCELLED);
+        assertThat(room.getCurrentMemberCount()).isZero();
     }
 
     @Test
