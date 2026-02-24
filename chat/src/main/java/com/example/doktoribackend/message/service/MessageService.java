@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -57,9 +58,18 @@ public class MessageService {
         boolean hasNext = messages.size() > size;
         List<Message> content = hasNext ? messages.subList(0, size) : messages;
 
+        if (content.isEmpty()) {
+            Long nextCursorId = null;
+            PageInfo pageInfo = new PageInfo(nextCursorId, false, size);
+            return new MessageListResponse(List.of(), pageInfo);
+        }
+
+        Set<Long> senderIds = content.stream()
+                .map(Message::getSenderId)
+                .collect(Collectors.toSet());
+
         List<ChattingRoomMember> members = chattingRoomMemberRepository
-                .findByChattingRoomIdAndStatusIn(roomId,
-                        List.of(MemberStatus.WAITING, MemberStatus.JOINED, MemberStatus.DISCONNECTED, MemberStatus.LEFT));
+                .findByChattingRoomIdAndUserIdIn(roomId, senderIds);
         Map<Long, String> nicknameMap = members.stream()
                 .collect(Collectors.toMap(ChattingRoomMember::getUserId, ChattingRoomMember::getNickname, (a, b) -> a));
 

@@ -33,6 +33,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -516,7 +517,7 @@ class MessageServiceTest {
             stubImageUrlResolver();
             given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(null), any(PageRequest.class)))
                     .willReturn(messages);
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserIdIn(eq(ROOM_ID), eq(Set.of(SENDER_ID))))
                     .willReturn(List.of(createRoomMember(SENDER_ID, SENDER_NICKNAME)));
 
             // when
@@ -546,7 +547,7 @@ class MessageServiceTest {
             stubImageUrlResolver();
             given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(null), any(PageRequest.class)))
                     .willReturn(messages);
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserIdIn(eq(ROOM_ID), eq(Set.of(SENDER_ID))))
                     .willReturn(List.of(createRoomMember(SENDER_ID, SENDER_NICKNAME)));
 
             // when
@@ -575,7 +576,7 @@ class MessageServiceTest {
             stubImageUrlResolver();
             given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(cursorId), any(PageRequest.class)))
                     .willReturn(messages);
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserIdIn(eq(ROOM_ID), eq(Set.of(SENDER_ID))))
                     .willReturn(List.of(createRoomMember(SENDER_ID, SENDER_NICKNAME)));
 
             // when
@@ -595,8 +596,6 @@ class MessageServiceTest {
             stubMemberExists();
             given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(null), any(PageRequest.class)))
                     .willReturn(Collections.emptyList());
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
-                    .willReturn(Collections.emptyList());
 
             // when
             MessageListResponse response = messageService.getMessages(ROOM_ID, SENDER_ID, null, 20);
@@ -605,6 +604,7 @@ class MessageServiceTest {
             assertThat(response.messages()).isEmpty();
             assertThat(response.pageInfo().hasNext()).isFalse();
             assertThat(response.pageInfo().nextCursorId()).isNull();
+            then(chattingRoomMemberRepository).should(never()).findByChattingRoomIdAndUserIdIn(any(), any());
         }
 
         @Test
@@ -704,7 +704,7 @@ class MessageServiceTest {
             stubImageUrlResolver();
             given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(null), any(PageRequest.class)))
                     .willReturn(messages);
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
+            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserIdIn(eq(ROOM_ID), eq(Set.of(unknownSenderId))))
                     .willReturn(List.of(createRoomMember(SENDER_ID, SENDER_NICKNAME)));
 
             // when
