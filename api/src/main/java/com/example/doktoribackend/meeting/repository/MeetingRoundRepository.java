@@ -1,9 +1,9 @@
 package com.example.doktoribackend.meeting.repository;
 
 import com.example.doktoribackend.meeting.domain.MeetingRound;
-import com.example.doktoribackend.meeting.domain.MeetingRoundStatus;
 import com.example.doktoribackend.meeting.domain.MeetingStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -87,10 +87,9 @@ public interface MeetingRoundRepository extends JpaRepository<MeetingRound, Long
             @Param("meetingIds") List<Long> meetingIds,
             @Param("now") LocalDateTime now);
 
-    @Query("SELECT mr FROM MeetingRound mr " +
-           "WHERE mr.status = :status " +
-           "AND mr.endAt < :now")
-    List<MeetingRound> findByStatusAndEndAtBefore(
-            @Param("status") MeetingRoundStatus status,
-            @Param("now") LocalDateTime now);
+    @Modifying
+    @Query("UPDATE MeetingRound mr SET mr.status = 'DONE' " +
+            "WHERE mr.status = 'SCHEDULED' " +
+            "AND mr.endAt < :now")
+    int bulkUpdateExpiredToDone(@Param("now") LocalDateTime now);
 }

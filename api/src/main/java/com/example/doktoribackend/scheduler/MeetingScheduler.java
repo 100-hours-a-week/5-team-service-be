@@ -1,7 +1,5 @@
 package com.example.doktoribackend.scheduler;
 
-import com.example.doktoribackend.meeting.domain.MeetingRound;
-import com.example.doktoribackend.meeting.domain.MeetingRoundStatus;
 import com.example.doktoribackend.meeting.repository.MeetingRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Slf4j
 @Component
@@ -46,17 +43,8 @@ public class MeetingScheduler {
     public void completeExpiredRounds() {
         LocalDateTime now = LocalDateTime.now();
 
-        List<MeetingRound> expiredRounds = meetingRoundRepository.findByStatusAndEndAtBefore(
-                MeetingRoundStatus.SCHEDULED, now);
+        int updatedCount = meetingRoundRepository.bulkUpdateExpiredToDone(now);
 
-        if (expiredRounds.isEmpty()) {
-            return;
-        }
-
-        for (MeetingRound round : expiredRounds) {
-            round.complete();
-        }
-
-        log.info("종료 시간이 지난 {} 개의 회차 상태를 DONE으로 업데이트했습니다.", expiredRounds.size());
+        log.info("종료 시간이 지난 {} 개의 회차 상태를 DONE으로 업데이트했습니다.", updatedCount);
     }
 }
