@@ -31,8 +31,6 @@ public class MessageController {
         MessageResponse response = messageService.sendMessage(
                 roomId, userDetails.getId(), userDetails.getNickname(), request);
 
-        if (response != null) {
-            messagingTemplate.convertAndSend("/topic/chat-rooms/" + roomId, response);
-        }
+        messagingTemplate.convertAndSend("/topic/chat-rooms/" + roomId, response);
     }
 }

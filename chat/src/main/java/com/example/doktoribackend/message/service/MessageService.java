@@ -19,12 +19,14 @@ import com.example.doktoribackend.room.repository.ChattingRoomMemberRepository;
 import com.example.doktoribackend.room.repository.ChattingRoomRepository;
 import com.example.doktoribackend.room.repository.RoomRoundRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -88,9 +90,10 @@ public class MessageService {
         RoomRound activeRound = roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_ROUND_NOT_FOUND));
 
-        if (messageRepository.existsByRoomIdAndSenderIdAndClientMessageId(
-                roomId, senderId, request.clientMessageId())) {
-            return null;
+        Optional<Message> existing = messageRepository.findByRoomIdAndSenderIdAndClientMessageId(
+                roomId, senderId, request.clientMessageId());
+        if (existing.isPresent()) {
+            return MessageResponse.from(existing.get(), senderNickname, imageUrlResolver);
         }
 
         Message message = request.messageType() == MessageType.FILE
@@ -101,7 +104,14 @@ public class MessageService {
                         roomId, activeRound.getId(), senderId,
                         request.clientMessageId(), request.textMessage());
 
-        messageRepository.save(message);
+        try {
+            messageRepository.saveAndFlush(message);
+        } catch (DataIntegrityViolationException e) {
+            Message duplicateMessage = messageRepository.findByRoomIdAndSenderIdAndClientMessageId(
+                    roomId, senderId, request.clientMessageId())
+                    .orElseThrow(() -> e);
+            return MessageResponse.from(duplicateMessage, senderNickname, imageUrlResolver);
+        }
 
         return MessageResponse.from(message, senderNickname, imageUrlResolver);
     }
