@@ -3,6 +3,7 @@ package com.example.doktoribackend.room.controller;
 import com.example.doktoribackend.common.response.ApiResult;
 import com.example.doktoribackend.common.swagger.AuthErrorResponses;
 import com.example.doktoribackend.common.swagger.CommonErrorResponses;
+import com.example.doktoribackend.quiz.dto.QuizResponse;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
 import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
@@ -270,6 +271,56 @@ public interface ChatRoomApi {
             @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(description = "채팅방 ID", example = "1") Long roomId,
             ChatRoomJoinRequest request);
+
+    @CommonErrorResponses
+    @AuthErrorResponses
+    @Operation(summary = "퀴즈 조회", description = "채팅방 입장 퀴즈의 질문과 선택지를 조회합니다. 정답은 포함되지 않습니다.")
+    @ApiResponse(responseCode = "200", description = "OK",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {
+                              "message": "OK",
+                              "data": {
+                                "question": "이 책의 주인공 이름은?",
+                                "choices": [
+                                  { "choiceNumber": 1, "choiceText": "윤재" },
+                                  { "choiceNumber": 2, "choiceText": "곤이" },
+                                  { "choiceNumber": 3, "choiceText": "선아" },
+                                  { "choiceNumber": 4, "choiceText": "데니스" }
+                                ]
+                              }
+                            }
+                            """)))
+    @ApiResponse(responseCode = "404", description = "Not Found",
+            content = @Content(mediaType = "application/json",
+                    examples = {
+                            @ExampleObject(name = "채팅방 없음",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_NOT_FOUND",
+                                              "message": "존재하지 않는 채팅방입니다."
+                                            }
+                                            """),
+                            @ExampleObject(name = "퀴즈 없음",
+                                    value = """
+                                            {
+                                              "code": "CHAT_ROOM_QUIZ_NOT_FOUND",
+                                              "message": "채팅방에 퀴즈가 존재하지 않습니다."
+                                            }
+                                            """)
+                    }))
+    @ApiResponse(responseCode = "409", description = "Conflict",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(name = "대기 중이 아닌 채팅방",
+                            value = """
+                                    {
+                                      "code": "CHAT_ROOM_NOT_WAITING",
+                                      "message": "대기 중인 채팅방만 참여할 수 있습니다."
+                                    }
+                                    """)))
+    ResponseEntity<ApiResult<QuizResponse>> getQuiz(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
+            @Parameter(description = "채팅방 ID", example = "1") Long roomId);
 
     @CommonErrorResponses
     @AuthErrorResponses

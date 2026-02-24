@@ -3,6 +3,7 @@ package com.example.doktoribackend.room.controller;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.response.ApiResult;
 import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.quiz.dto.QuizResponse;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
 import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
@@ -78,6 +79,16 @@ public class ChatRoomController implements ChatRoomApi {
                 roomId, userDetails.getId(), request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResult.ok(response));
+    }
+
+    @GetMapping("/{roomId}/quiz")
+    @Override
+    public ResponseEntity<ApiResult<QuizResponse>> getQuiz(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId
+    ) {
+        QuizResponse response = chatRoomService.getQuiz(roomId);
+        return ResponseEntity.ok(ApiResult.ok(response));
     }
 
     @GetMapping("/{roomId}/waiting-room")

@@ -16,6 +16,7 @@ import com.example.doktoribackend.room.domain.MemberStatus;
 import com.example.doktoribackend.room.domain.Position;
 import com.example.doktoribackend.room.domain.RoomRound;
 import com.example.doktoribackend.room.domain.RoomStatus;
+import com.example.doktoribackend.quiz.dto.QuizResponse;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
 import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
@@ -223,6 +224,22 @@ public class ChatRoomService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND));
 
         return buildWaitingRoomResponse(room);
+    }
+
+    @Transactional(readOnly = true)
+    public QuizResponse getQuiz(Long roomId) {
+        ChattingRoom room = findRoom(roomId);
+
+        if (room.getStatus() != RoomStatus.WAITING) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_WAITING);
+        }
+
+        Quiz quiz = room.getQuiz();
+        if (quiz == null) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_QUIZ_NOT_FOUND);
+        }
+
+        return QuizResponse.from(quiz);
     }
 
     @Transactional(readOnly = true)
