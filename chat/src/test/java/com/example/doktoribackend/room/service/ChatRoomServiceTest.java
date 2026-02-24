@@ -87,6 +87,9 @@ class ChatRoomServiceTest {
     @Mock
     private ImageUrlResolver imageUrlResolver;
 
+    @Mock
+    private com.example.doktoribackend.config.WebSocketSessionRegistry sessionRegistry;
+
     @InjectMocks
     private ChatRoomService chatRoomService;
 
@@ -901,8 +904,6 @@ class ChatRoomServiceTest {
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
                     .willReturn(Optional.of(host));
-            given(chattingRoomMemberRepository.countByChattingRoomIdAndPositionAndStatusIn(
-                    eq(ROOM_ID), eq(Position.DISAGREE), any())).willReturn(1);
             given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(
                     ROOM_ID, List.of(MemberStatus.WAITING)))
                     .willReturn(List.of(host, participant));
