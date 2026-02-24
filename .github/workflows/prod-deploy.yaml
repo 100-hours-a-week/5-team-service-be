@@ -1,0 +1,265 @@
+name: Prod Deploy (Containerized)
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '.github/**'
+      - '*.md'
+      - 'docs/**'
+
+env:
+  AWS_REGION: ap-northeast-2
+
+concurrency:
+  group: prod-deploy
+  cancel-in-progress: false
+
+jobs:
+  # ─── CI: Gradle 빌드 검증 ──────────────────────────────────────────
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build (compile check)
+        run: ./gradlew build -x test --no-daemon
+
+      - name: Notify Discord on CI failure
+        if: failure()
+        run: |
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+          ACTIONS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          curl -sS -H "Content-Type: application/json" -X POST -d "{
+            \"content\": \"❌ **[Prod] Backend CI 빌드 실패**\",
+            \"embeds\": [{
+              \"title\": \"🔴 빌드 실패 알림\",
+              \"color\": 15158528,
+              \"fields\": [
+                {\"name\": \"📦 저장소\", \"value\": \"\`${{ github.repository }}\`\", \"inline\": true},
+                {\"name\": \"🌿 브랜치\", \"value\": \"\`main\`\", \"inline\": true},
+                {\"name\": \"🔖 커밋\", \"value\": \"[\`${SHORT_SHA}\`](${COMMIT_URL})\", \"inline\": true},
+                {\"name\": \"📋 상세 로그\", \"value\": \"[Actions에서 확인](${ACTIONS_URL})\", \"inline\": true}
+              ],
+              \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+            }]
+          }" ${{ secrets.DISCORD_WEBHOOK_URL }} || true
+
+  # ─── Docker 빌드 → ECR Push ────────────────────────────────────────
+  build-and-push:
+    needs: ci
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      image-tag: ${{ steps.meta.outputs.image-tag }}
+      api-image: ${{ steps.meta.outputs.api-image }}
+      chat-image: ${{ steps.meta.outputs.chat-image }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image metadata
+        id: meta
+        run: |
+          REGISTRY="${{ secrets.ECR_REGISTRY }}"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          TAG="sha-${SHORT_SHA}"
+
+          echo "image-tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "api-image=${REGISTRY}/doktori/backend-api" >> $GITHUB_OUTPUT
+          echo "chat-image=${REGISTRY}/doktori/backend-chat" >> $GITHUB_OUTPUT
+
+          {
+            echo "api-tags<<EOF"
+            echo "${REGISTRY}/doktori/backend-api:${TAG}"
+            echo "${REGISTRY}/doktori/backend-api:latest"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+          {
+            echo "chat-tags<<EOF"
+            echo "${REGISTRY}/doktori/backend-chat:${TAG}"
+            echo "${REGISTRY}/doktori/backend-chat:latest"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: api
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.api-tags }}
+          cache-from: type=gha,scope=prod-api
+          cache-to: type=gha,mode=max,scope=prod-api
+
+      - name: Build and push Chat image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: chat
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.chat-tags }}
+          cache-from: |
+            type=gha,scope=prod-chat
+            type=gha,scope=prod-api
+          cache-to: type=gha,mode=max,scope=prod-chat
+
+  # ─── Prod 배포: SSM으로 각 인스턴스에 컨테이너 배포 ────────────────
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy API server via SSM
+        id: deploy-api
+        run: |
+          REGISTRY="${{ secrets.ECR_REGISTRY }}"
+          TAG="${{ needs.build-and-push.outputs.image-tag }}"
+
+          API_CMDS=$(jq -n --arg r "$REGISTRY" --arg t "$TAG" '[
+            "set -e",
+            ("aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin " + $r),
+            ("docker pull " + $r + "/doktori/backend-api:" + $t),
+            "docker stop doktori-api 2>/dev/null || true",
+            "docker rm doktori-api 2>/dev/null || true",
+            ("docker run -d --name doktori-api --restart unless-stopped --env-file /home/ubuntu/app/.env -e SPRING_PROFILES_ACTIVE=prod -p 8080:8080 " + $r + "/doktori/backend-api:" + $t),
+            "docker image prune -f"
+          ]')
+
+          CMD_ID=$(aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Name,Values=doktori-prod-api" \
+            --parameters "{\"commands\": $API_CMDS}" \
+            --timeout-seconds 300 \
+            --comment "deploy prod api ${{ github.sha }}" \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "cmd_id=${CMD_ID}" >> $GITHUB_OUTPUT
+          echo "API SSM Command: ${CMD_ID}"
+
+      - name: Deploy Chat server via SSM
+        id: deploy-chat
+        run: |
+          REGISTRY="${{ secrets.ECR_REGISTRY }}"
+          TAG="${{ needs.build-and-push.outputs.image-tag }}"
+
+          CHAT_CMDS=$(jq -n --arg r "$REGISTRY" --arg t "$TAG" '[
+            "set -e",
+            ("aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin " + $r),
+            ("docker pull " + $r + "/doktori/backend-chat:" + $t),
+            "docker stop doktori-chat 2>/dev/null || true",
+            "docker rm doktori-chat 2>/dev/null || true",
+            ("docker run -d --name doktori-chat --restart unless-stopped --env-file /home/ubuntu/app/.env -e SPRING_PROFILES_ACTIVE=prod -p 8081:8081 " + $r + "/doktori/backend-chat:" + $t),
+            "docker image prune -f"
+          ]')
+
+          CMD_ID=$(aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Name,Values=doktori-prod-chat" \
+            --parameters "{\"commands\": $CHAT_CMDS}" \
+            --timeout-seconds 300 \
+            --comment "deploy prod chat ${{ github.sha }}" \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "cmd_id=${CMD_ID}" >> $GITHUB_OUTPUT
+          echo "Chat SSM Command: ${CMD_ID}"
+
+      - name: Wait for deployments
+        run: |
+          wait_ssm() {
+            local cmd_id=$1 label=$2
+            for i in $(seq 1 60); do
+              sleep 5
+              STATUS=$(aws ssm list-command-invocations \
+                --command-id "$cmd_id" \
+                --query "CommandInvocations[0].Status" \
+                --output text 2>/dev/null || echo "Pending")
+              echo "[$label $i/60] $STATUS"
+              case "$STATUS" in
+                Success) return 0 ;;
+                Failed|Cancelled|TimedOut|DeliveryTimedOut)
+                  echo "::error::${label} deployment failed: ${STATUS}"
+                  aws ssm list-command-invocations --command-id "$cmd_id" --details \
+                    --query "CommandInvocations[0].CommandPlugins[0].Output" --output text || true
+                  return 1 ;;
+              esac
+            done
+            echo "::error::${label} deployment timed out (300s)"
+            return 1
+          }
+
+          wait_ssm "${{ steps.deploy-api.outputs.cmd_id }}" "API"
+          wait_ssm "${{ steps.deploy-chat.outputs.cmd_id }}" "Chat"
+
+      - name: Notify Discord
+        if: always()
+        run: |
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          COMMIT_MSG=$(echo '${{ github.event.head_commit.message }}' | head -1)
+          COMMIT_AUTHOR="${{ github.event.head_commit.author.name }}"
+          COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+          ACTIONS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          if [ "${{ job.status }}" == "success" ]; then
+            COLOR=3066993; STATUS_EMOJI="✅"; STATUS_TEXT="배포 성공"
+          else
+            COLOR=15158528; STATUS_EMOJI="❌"; STATUS_TEXT="배포 실패"
+          fi
+
+          curl -sS -H "Content-Type: application/json" -X POST -d "{
+            \"content\": \"${STATUS_EMOJI} **Backend Production 배포 알림**\",
+            \"embeds\": [{
+              \"title\": \"🚀 [Production] ${STATUS_TEXT}\",
+              \"color\": ${COLOR},
+              \"fields\": [
+                {\"name\": \"📦 저장소\", \"value\": \"\`${{ github.repository }}\`\", \"inline\": true},
+                {\"name\": \"🌿 브랜치\", \"value\": \"\`main\`\", \"inline\": true},
+                {\"name\": \"🔖 커밋\", \"value\": \"[\`${SHORT_SHA}\`](${COMMIT_URL})\", \"inline\": true},
+                {\"name\": \"💬 커밋 메시지\", \"value\": \"${COMMIT_MSG}\", \"inline\": false},
+                {\"name\": \"👤 작성자\", \"value\": \"${COMMIT_AUTHOR}\", \"inline\": true},
+                {\"name\": \"📋 상세 로그\", \"value\": \"[Actions에서 확인](${ACTIONS_URL})\", \"inline\": true}
+              ],
+              \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+            }]
+          }" ${{ secrets.DISCORD_WEBHOOK_URL }} || true

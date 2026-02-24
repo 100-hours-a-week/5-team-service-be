@@ -9,6 +9,8 @@ spring:
         format_sql: false
 
 logging:
+  file:
+    name: /app/logs/chat.log
   level:
     root: INFO
     org.hibernate.SQL: WARN

@@ -8,6 +8,8 @@ spring:
       hibernate:
         format_sql: false
 logging:
+  file:
+    name: /app/logs/api.log
   level:
     org.hibernate.SQL: debug
 app:
