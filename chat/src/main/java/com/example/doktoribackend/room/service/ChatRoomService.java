@@ -1,24 +1,20 @@
 package com.example.doktoribackend.room.service;
 
 import com.example.doktoribackend.book.domain.Book;
+import com.example.doktoribackend.book.service.BookService;
 import com.example.doktoribackend.book.repository.BookRepository;
-import com.example.doktoribackend.common.client.KakaoBookClient;
-import com.example.doktoribackend.common.client.KakaoBookResponse;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.config.WebSocketSessionRegistry;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.vote.service.VoteService;
-import com.example.doktoribackend.quiz.domain.Quiz;
-import com.example.doktoribackend.quiz.domain.QuizChoice;
-import com.example.doktoribackend.quiz.repository.QuizRepository;
+import com.example.doktoribackend.quiz.service.QuizService;
 import com.example.doktoribackend.room.domain.ChattingRoom;
 import com.example.doktoribackend.room.domain.ChattingRoomMember;
 import com.example.doktoribackend.room.domain.MemberStatus;
 import com.example.doktoribackend.room.domain.Position;
 import com.example.doktoribackend.room.domain.RoomRound;
 import com.example.doktoribackend.room.domain.RoomStatus;
-import com.example.doktoribackend.quiz.dto.QuizResponse;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
 import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
@@ -37,18 +33,13 @@ import com.example.doktoribackend.user.domain.UserInfo;
 import com.example.doktoribackend.user.repository.UserInfoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -62,16 +53,15 @@ public class ChatRoomService {
     private final ChattingRoomRepository chattingRoomRepository;
     private final ChattingRoomMemberRepository chattingRoomMemberRepository;
     private final RoomRoundRepository roomRoundRepository;
-    private final BookRepository bookRepository;
-    private final KakaoBookClient kakaoBookClient;
     private final UserInfoRepository userInfoRepository;
-    private final WaitingRoomSseService waitingRoomSseService;
-    private final SimpMessagingTemplate messagingTemplate;
     private final ImageUrlResolver imageUrlResolver;
     private final WebSocketSessionRegistry sessionRegistry;
     private final PlatformTransactionManager transactionManager;
     private final VoteService voteService;
-    private final QuizRepository quizRepository;
+    private final BookService bookService;
+    private final QuizService quizService;
+    private final ChatRoomEventPublisher chatRoomEventPublisher;
+    private final BookRepository bookRepository;
 
     @Transactional(readOnly = true)
     public ChatRoomListResponse getChatRooms(Long cursorId, int size) {
@@ -92,7 +82,7 @@ public class ChatRoomService {
 
     public ChatRoomCreateResponse createChatRoom(Long userId, ChatRoomCreateRequest request) {
         validateCapacity(request.capacity());
-        Book book = resolveBook(request.isbn());
+        Book book = bookService.resolveBook(request.isbn());
 
         TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
         return txTemplate.execute(status -> {
@@ -102,7 +92,7 @@ public class ChatRoomService {
             ChattingRoom room = ChattingRoom.create(request, managedBook);
             chattingRoomRepository.save(room);
 
-            createQuiz(room, request.quiz());
+            quizService.createQuiz(room, request.quiz());
             room.increaseMemberCount();
 
             UserInfo userInfo = userInfoRepository.findById(userId)
@@ -134,10 +124,10 @@ public class ChatRoomService {
         if (room.getStatus() == RoomStatus.WAITING && member.isHost()) {
             room.cancel();
             leaveAllActiveMembers(roomId);
-            broadcastCancelledAfterCommit(roomId);
+            chatRoomEventPublisher.broadcastCancelled(roomId);
         } else {
             WaitingRoomResponse response = buildWaitingRoomResponse(room);
-            broadcastAfterCommit(roomId, response);
+            chatRoomEventPublisher.broadcastWaitingRoomUpdate(roomId, response);
         }
     }
 
@@ -150,7 +140,7 @@ public class ChatRoomService {
         }
 
         validateNotAlreadyJoined(userId);
-        validateQuizAnswer(roomId, request.quizAnswer());
+        quizService.validateQuizAnswer(roomId, request.quizAnswer());
         validateRoomNotFull(room);
         validatePositionNotFull(roomId, room.getCapacity(), request.position());
 
@@ -164,7 +154,7 @@ public class ChatRoomService {
         room.increaseMemberCount();
 
         WaitingRoomResponse response = buildWaitingRoomResponse(room);
-        broadcastAfterCommit(roomId, response);
+        chatRoomEventPublisher.broadcastWaitingRoomUpdate(roomId, response);
         return response;
     }
 
@@ -215,7 +205,7 @@ public class ChatRoomService {
         ChatRoomStartResponse response = new ChatRoomStartResponse(
                 room.getTopic(), agreeMembers, disagreeMembers, 1, firstRound.getStartedAt());
 
-        broadcastStartedAfterCommit(roomId, response);
+        chatRoomEventPublisher.broadcastStarted(roomId, response);
 
         return response;
     }
@@ -228,20 +218,6 @@ public class ChatRoomService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND));
 
         return buildWaitingRoomResponse(room);
-    }
-
-    @Transactional(readOnly = true)
-    public QuizResponse getQuiz(Long roomId) {
-        ChattingRoom room = findRoom(roomId);
-
-        if (room.getStatus() != RoomStatus.WAITING) {
-            throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_WAITING);
-        }
-
-        Quiz quiz = quizRepository.findById(roomId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_QUIZ_NOT_FOUND));
-
-        return QuizResponse.from(quiz);
     }
 
     @Transactional(readOnly = true)
@@ -289,7 +265,7 @@ public class ChatRoomService {
         RoomRound newRound = createRound(room, currentRound.getRoundNumber() + 1);
 
         NextRoundResponse response = new NextRoundResponse(newRound.getRoundNumber(), newRound.getStartedAt());
-        broadcastNextRoundAfterCommit(roomId, response);
+        chatRoomEventPublisher.broadcastNextRound(roomId, response);
     }
 
     @Transactional
@@ -332,7 +308,7 @@ public class ChatRoomService {
         leaveAllActiveMembers(room.getId());
         voteService.createVote(room, memberCount);
         sessionRegistry.removeAllForRoom(room.getId());
-        broadcastEndedAfterCommit(room.getId());
+        chatRoomEventPublisher.broadcastEnded(room.getId());
     }
 
     private ChattingRoom findRoom(Long roomId) {
@@ -368,14 +344,6 @@ public class ChatRoomService {
         return new ChattingRoomAndMember(room, member);
     }
 
-    private void validateQuizAnswer(Long roomId, Integer quizAnswer) {
-        Quiz quiz = quizRepository.findById(roomId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_QUIZ_NOT_FOUND));
-        if (!quiz.isCorrect(quizAnswer)) {
-            throw new BusinessException(ErrorCode.CHAT_ROOM_QUIZ_WRONG_ANSWER);
-        }
-    }
-
     private void validateRoomNotFull(ChattingRoom room) {
         if (room.getCurrentMemberCount() >= room.getCapacity()) {
             throw new BusinessException(ErrorCode.CHAT_ROOM_FULL);
@@ -408,51 +376,6 @@ public class ChatRoomService {
         return new WaitingRoomResponse(room.getId(), agreeCount, disagreeCount, maxPerPosition, members);
     }
 
-    private void broadcastAfterCommit(Long roomId, WaitingRoomResponse response) {
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                waitingRoomSseService.broadcast(roomId, response);
-            }
-        });
-    }
-
-    private void broadcastCancelledAfterCommit(Long roomId) {
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                waitingRoomSseService.broadcastCancelledAndClose(roomId);
-            }
-        });
-    }
-
-    private void broadcastStartedAfterCommit(Long roomId, ChatRoomStartResponse response) {
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                waitingRoomSseService.broadcastStartedAndClose(roomId, response);
-            }
-        });
-    }
-
-    private void broadcastNextRoundAfterCommit(Long roomId, NextRoundResponse response) {
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                messagingTemplate.convertAndSend("/topic/chat-rooms/" + roomId, response);
-            }
-        });
-    }
-
-    private void broadcastEndedAfterCommit(Long roomId) {
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                messagingTemplate.convertAndSend("/topic/chat-rooms/" + roomId, Map.of("type", "ROOM_ENDED"));
-            }
-        });
-    }
-
     private void validateRoomNotEnded(ChattingRoom room) {
         if (room.getStatus() == RoomStatus.ENDED || room.getStatus() == RoomStatus.CANCELLED) {
             throw new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_ENDED);
@@ -480,40 +403,6 @@ public class ChatRoomService {
 
         if (alreadyJoined) {
             throw new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_JOINED);
-        }
-    }
-
-    private void createQuiz(ChattingRoom room, ChatRoomCreateRequest.QuizRequest quizRequest) {
-        Quiz quiz = Quiz.create(room, quizRequest);
-
-        for (ChatRoomCreateRequest.QuizChoiceRequest choiceRequest : quizRequest.choices()) {
-            quiz.addChoice(QuizChoice.create(quiz, choiceRequest));
-        }
-
-        quizRepository.save(quiz);
-    }
-
-    private Book resolveBook(String isbn) {
-        return bookRepository.findByIsbn(isbn)
-                .orElseGet(() -> kakaoBookClient.searchByIsbn(isbn)
-                        .map(doc -> bookRepository.save(toBookFromKakao(doc, isbn)))
-                        .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND)));
-    }
-
-    private Book toBookFromKakao(KakaoBookResponse.KakaoBookDocument doc, String isbn) {
-        String authors = doc.authors() != null ? String.join(", ", doc.authors()) : null;
-        LocalDate publishedAt = parsePublishedAt(doc.datetime());
-        return Book.create(isbn, doc.title(), authors, doc.publisher(), doc.thumbnail(), publishedAt);
-    }
-
-    private LocalDate parsePublishedAt(String datetime) {
-        if (datetime == null || datetime.isBlank()) {
-            return null;
-        }
-        try {
-            return LocalDate.parse(datetime.substring(0, 10));
-        } catch (Exception e) {
-            return null;
         }
     }
 }

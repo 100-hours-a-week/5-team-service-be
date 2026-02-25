@@ -12,6 +12,7 @@ import com.example.doktoribackend.room.dto.ChatRoomStartResponse;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
 import com.example.doktoribackend.message.dto.MessageListResponse;
 import com.example.doktoribackend.message.service.MessageService;
+import com.example.doktoribackend.quiz.service.QuizService;
 import com.example.doktoribackend.room.service.ChatRoomService;
 import com.example.doktoribackend.room.service.WaitingRoomSseService;
 import com.example.doktoribackend.security.CustomUserDetails;
@@ -42,6 +43,7 @@ public class ChatRoomController implements ChatRoomApi {
     private final ChatRoomService chatRoomService;
     private final MessageService messageService;
     private final WaitingRoomSseService waitingRoomSseService;
+    private final QuizService quizService;
 
     @GetMapping
     @Override
@@ -87,7 +89,7 @@ public class ChatRoomController implements ChatRoomApi {
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long roomId
     ) {
-        QuizResponse response = chatRoomService.getQuiz(roomId);
+        QuizResponse response = quizService.getQuiz(roomId);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
