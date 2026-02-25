@@ -105,4 +105,10 @@ public class UserService {
             preference.changeNotificationAgreement(notificationAgreement);
         }
     }
+
+    @Transactional
+    public void withdraw(Long userId) {
+        // TODO: 커밋 2에서 구현
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
 }
