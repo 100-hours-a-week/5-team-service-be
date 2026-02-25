@@ -31,7 +31,7 @@ public class VoteController implements VoteApi {
             @Valid @RequestBody VoteCastRequest request
     ) {
         voteService.castVote(roomId, userDetails.getId(), request.choice());
-        return ResponseEntity.ok(ApiResult.ok());
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping

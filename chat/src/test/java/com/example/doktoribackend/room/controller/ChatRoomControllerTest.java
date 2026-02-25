@@ -21,6 +21,8 @@ import com.example.doktoribackend.message.dto.MessageResponse;
 import com.example.doktoribackend.message.service.MessageService;
 import com.example.doktoribackend.room.dto.WaitingRoomMemberItem;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
+import com.example.doktoribackend.quiz.service.QuizService;
+import com.example.doktoribackend.room.service.ChatRoomQueryService;
 import com.example.doktoribackend.room.service.ChatRoomService;
 import com.example.doktoribackend.room.service.WaitingRoomSseService;
 import com.example.doktoribackend.security.CustomUserDetails;
@@ -73,10 +75,16 @@ class ChatRoomControllerTest {
     ChatRoomService chatRoomService;
 
     @MockitoBean
+    ChatRoomQueryService chatRoomQueryService;
+
+    @MockitoBean
     MessageService messageService;
 
     @MockitoBean
     WaitingRoomSseService waitingRoomSseService;
+
+    @MockitoBean
+    QuizService quizService;
 
     @MockitoBean
     JwtTokenProvider jwtTokenProvider;
@@ -279,7 +287,7 @@ class ChatRoomControllerTest {
                             new ChatRoomListItem(2L, "주제2", "설명2", 6, 1, "책제목2", "저자2", "http://thumb2.url")),
                     new PageInfo(null, false, 10)
             );
-            given(chatRoomService.getChatRooms(null, 10)).willReturn(response);
+            given(chatRoomQueryService.getChatRooms(null, 10)).willReturn(response);
 
             mockMvc.perform(get("/chat-rooms")
                             .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
@@ -302,7 +310,7 @@ class ChatRoomControllerTest {
                     List.of(new ChatRoomListItem(4L, "주제4", "설명4", 4, 1, "책제목4", "저자4", "http://thumb4.url")),
                     new PageInfo(4L, true, 1)
             );
-            given(chatRoomService.getChatRooms(10L, 1)).willReturn(response);
+            given(chatRoomQueryService.getChatRooms(10L, 1)).willReturn(response);
 
             mockMvc.perform(get("/chat-rooms")
                             .param("cursorId", "10")
@@ -529,7 +537,7 @@ class ChatRoomControllerTest {
                     10L, 1, 0, 2,
                     List.of(new WaitingRoomMemberItem("방장", "http://host.url", Position.AGREE, MemberRole.HOST))
             );
-            given(chatRoomService.getWaitingRoom(10L, USER_ID)).willReturn(response);
+            given(chatRoomQueryService.getWaitingRoom(10L, USER_ID)).willReturn(response);
 
             mockMvc.perform(get("/chat-rooms/10/waiting-room")
                             .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
@@ -546,7 +554,7 @@ class ChatRoomControllerTest {
         @DisplayName("채팅방이 없으면 404를 반환한다")
         void getWaitingRoom_roomNotFound() throws Exception {
             willThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND))
-                    .given(chatRoomService).getWaitingRoom(10L, USER_ID);
+                    .given(chatRoomQueryService).getWaitingRoom(10L, USER_ID);
 
             mockMvc.perform(get("/chat-rooms/10/waiting-room")
                             .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
@@ -558,7 +566,7 @@ class ChatRoomControllerTest {
         @DisplayName("멤버가 아니면 404를 반환한다")
         void getWaitingRoom_memberNotFound() throws Exception {
             willThrow(new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND))
-                    .given(chatRoomService).getWaitingRoom(10L, USER_ID);
+                    .given(chatRoomQueryService).getWaitingRoom(10L, USER_ID);
 
             mockMvc.perform(get("/chat-rooms/10/waiting-room")
                             .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
@@ -643,7 +651,7 @@ class ChatRoomControllerTest {
         @DisplayName("성공하면 200 OK를 반환한다")
         void subscribeWaitingRoom_success() throws Exception {
             WaitingRoomResponse response = new WaitingRoomResponse(10L, 1, 0, 2, List.of());
-            given(chatRoomService.getWaitingRoom(10L, USER_ID)).willReturn(response);
+            given(chatRoomQueryService.getWaitingRoom(10L, USER_ID)).willReturn(response);
             given(waitingRoomSseService.subscribe(10L)).willReturn(new SseEmitter());
 
             mockMvc.perform(get("/chat-rooms/10/waiting-room/subscribe")
@@ -669,7 +677,7 @@ class ChatRoomControllerTest {
                     1,
                     LocalDateTime.of(2026, 2, 17, 14, 30, 0)
             );
-            given(chatRoomService.getChatRoomDetail(10L, USER_ID)).willReturn(response);
+            given(chatRoomQueryService.getChatRoomDetail(10L, USER_ID)).willReturn(response);
 
             mockMvc.perform(get("/chat-rooms/10")
                             .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
@@ -686,7 +694,7 @@ class ChatRoomControllerTest {
         @DisplayName("채팅방이 없으면 404를 반환한다")
         void getChatRoomDetail_roomNotFound() throws Exception {
             willThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND))
-                    .given(chatRoomService).getChatRoomDetail(999L, USER_ID);
+                    .given(chatRoomQueryService).getChatRoomDetail(999L, USER_ID);
 
             mockMvc.perform(get("/chat-rooms/999")
                             .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
@@ -698,7 +706,7 @@ class ChatRoomControllerTest {
         @DisplayName("채팅 중이 아니면 409를 반환한다")
         void getChatRoomDetail_notChatting() throws Exception {
             willThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_CHATTING))
-                    .given(chatRoomService).getChatRoomDetail(10L, USER_ID);
+                    .given(chatRoomQueryService).getChatRoomDetail(10L, USER_ID);
 
             mockMvc.perform(get("/chat-rooms/10")
                             .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
@@ -710,7 +718,7 @@ class ChatRoomControllerTest {
         @DisplayName("멤버가 아니면 404를 반환한다")
         void getChatRoomDetail_memberNotFound() throws Exception {
             willThrow(new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND))
-                    .given(chatRoomService).getChatRoomDetail(10L, USER_ID);
+                    .given(chatRoomQueryService).getChatRoomDetail(10L, USER_ID);
 
             mockMvc.perform(get("/chat-rooms/10")
                             .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))

@@ -2,10 +2,10 @@ package com.example.doktoribackend.room.service;
 
 import com.example.doktoribackend.book.domain.Book;
 import com.example.doktoribackend.book.repository.BookRepository;
-import com.example.doktoribackend.common.client.KakaoBookClient;
+import com.example.doktoribackend.book.service.BookService;
 import com.example.doktoribackend.common.error.ErrorCode;
-import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.quiz.service.QuizService;
 import com.example.doktoribackend.room.domain.ChattingRoom;
 import com.example.doktoribackend.room.domain.ChattingRoomMember;
 import com.example.doktoribackend.room.domain.MemberRole;
@@ -13,13 +13,11 @@ import com.example.doktoribackend.room.domain.MemberStatus;
 import com.example.doktoribackend.room.domain.Position;
 import com.example.doktoribackend.room.domain.RoomRound;
 import com.example.doktoribackend.room.domain.RoomStatus;
-import com.example.doktoribackend.quiz.domain.Quiz;
-import com.example.doktoribackend.quiz.repository.QuizRepository;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
 import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
-import com.example.doktoribackend.room.dto.ChatRoomListResponse;
 import com.example.doktoribackend.room.dto.ChatRoomStartResponse;
+import com.example.doktoribackend.room.dto.ChatStartMemberItem;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
 import com.example.doktoribackend.room.repository.ChattingRoomMemberRepository;
 import com.example.doktoribackend.room.repository.ChattingRoomRepository;
@@ -35,13 +33,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -74,22 +69,7 @@ class ChatRoomServiceTest {
     private RoomRoundRepository roomRoundRepository;
 
     @Mock
-    private BookRepository bookRepository;
-
-    @Mock
-    private KakaoBookClient kakaoBookClient;
-
-    @Mock
     private UserInfoRepository userInfoRepository;
-
-    @Mock
-    private WaitingRoomSseService waitingRoomSseService;
-
-    @Mock
-    private SimpMessagingTemplate messagingTemplate;
-
-    @Mock
-    private ImageUrlResolver imageUrlResolver;
 
     @Mock
     private com.example.doktoribackend.config.WebSocketSessionRegistry sessionRegistry;
@@ -101,7 +81,19 @@ class ChatRoomServiceTest {
     private VoteService voteService;
 
     @Mock
-    private QuizRepository quizRepository;
+    private BookService bookService;
+
+    @Mock
+    private QuizService quizService;
+
+    @Mock
+    private ChatRoomEventPublisher chatRoomEventPublisher;
+
+    @Mock
+    private BookRepository bookRepository;
+
+    @Mock
+    private ChatRoomQueryService chatRoomQueryService;
 
     @InjectMocks
     private ChatRoomService chatRoomService;
@@ -159,7 +151,7 @@ class ChatRoomServiceTest {
         void createChatRoom_success() {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
-            given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     eq(USER_ID), any())).willReturn(false);
@@ -177,11 +169,11 @@ class ChatRoomServiceTest {
         }
 
         @Test
-        @DisplayName("생성된 방에 Quiz가 저장되고 QuizChoice 4개가 저장된다")
+        @DisplayName("생성된 방에 Quiz가 저장된다")
         void createChatRoom_quizCreated() {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
-            given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     eq(USER_ID), any())).willReturn(false);
@@ -189,19 +181,11 @@ class ChatRoomServiceTest {
                     .willAnswer(invocation -> invocation.getArgument(0));
             stubUserInfo();
 
-            ArgumentCaptor<Quiz> quizCaptor = ArgumentCaptor.forClass(Quiz.class);
-            given(quizRepository.save(quizCaptor.capture()))
-                    .willAnswer(invocation -> invocation.getArgument(0));
-
             // when
             chatRoomService.createChatRoom(USER_ID, request);
 
             // then
-            Quiz savedQuiz = quizCaptor.getValue();
-            assertThat(savedQuiz).isNotNull();
-            assertThat(savedQuiz.getQuestion()).isEqualTo("퀴즈 질문입니다");
-            assertThat(savedQuiz.getCorrectChoiceNumber()).isEqualTo(1);
-            assertThat(savedQuiz.getChoices()).hasSize(4);
+            then(quizService).should().createQuiz(any(ChattingRoom.class), eq(request.quiz()));
         }
 
         @Test
@@ -209,7 +193,7 @@ class ChatRoomServiceTest {
         void createChatRoom_hostMemberSaved() {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
-            given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     eq(USER_ID), any())).willReturn(false);
@@ -217,8 +201,8 @@ class ChatRoomServiceTest {
                     .willAnswer(invocation -> invocation.getArgument(0));
             stubUserInfo();
 
-            ArgumentCaptor<ChattingRoomMember> memberCaptor =
-                    ArgumentCaptor.forClass(ChattingRoomMember.class);
+            org.mockito.ArgumentCaptor<ChattingRoomMember> memberCaptor =
+                    org.mockito.ArgumentCaptor.forClass(ChattingRoomMember.class);
 
             // when
             chatRoomService.createChatRoom(USER_ID, request);
@@ -242,7 +226,7 @@ class ChatRoomServiceTest {
         void allowedCapacity_success(int capacity) {
             // given
             ChatRoomCreateRequest request = createValidRequest(capacity);
-            given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     eq(USER_ID), any())).willReturn(false);
@@ -283,7 +267,7 @@ class ChatRoomServiceTest {
         void alreadyJoined_throwsException() {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
-            given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     USER_ID, List.of(MemberStatus.WAITING, MemberStatus.JOINED, MemberStatus.DISCONNECTED)))
                     .willReturn(true);
@@ -302,7 +286,7 @@ class ChatRoomServiceTest {
         void leftOnly_canCreateNewRoom() {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
-            given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     eq(USER_ID), any())).willReturn(false);
@@ -316,134 +300,6 @@ class ChatRoomServiceTest {
             // then
             assertThat(response).isNotNull();
             then(chattingRoomRepository).should().save(any(ChattingRoom.class));
-        }
-    }
-
-    @Nested
-    @DisplayName("채팅방 목록 조회")
-    class GetChatRooms {
-
-        private ChattingRoom createRoom(Long id, String topic, int capacity, int currentMemberCount) {
-            ChattingRoom room = ChattingRoom.builder()
-                    .topic(topic)
-                    .description("설명")
-                    .capacity(capacity)
-                    .build();
-            ReflectionTestUtils.setField(room, "id", id);
-            ReflectionTestUtils.setField(room, "currentMemberCount", currentMemberCount);
-            return room;
-        }
-
-        @Test
-        @DisplayName("WAITING 상태의 방 목록을 반환한다")
-        void getChatRooms_returnsWaitingRooms() {
-            // given
-            int size = 10;
-            List<ChattingRoom> rooms = List.of(
-                    createRoom(3L, "주제3", 4, 2),
-                    createRoom(2L, "주제2", 6, 1)
-            );
-            given(chattingRoomRepository.findByStatusWithCursor(
-                    eq(RoomStatus.WAITING), eq(null), any(PageRequest.class)))
-                    .willReturn(rooms);
-
-            // when
-            ChatRoomListResponse response = chatRoomService.getChatRooms(null, size);
-
-            // then
-            assertThat(response.items()).hasSize(2);
-            assertThat(response.items().getFirst().roomId()).isEqualTo(3L);
-            assertThat(response.items().getFirst().topic()).isEqualTo("주제3");
-            assertThat(response.items().get(0).capacity()).isEqualTo(4);
-            assertThat(response.items().get(0).currentMemberCount()).isEqualTo(2);
-            assertThat(response.items().get(1).roomId()).isEqualTo(2L);
-        }
-
-        @Test
-        @DisplayName("다음 페이지가 있으면 hasNext=true, nextCursorId가 마지막 항목의 id이다")
-        void getChatRooms_hasNext_true() {
-            // given
-            int size = 2;
-            List<ChattingRoom> rooms = List.of(
-                    createRoom(5L, "주제5", 4, 1),
-                    createRoom(4L, "주제4", 4, 2),
-                    createRoom(3L, "주제3", 4, 0)
-            );
-            given(chattingRoomRepository.findByStatusWithCursor(
-                    eq(RoomStatus.WAITING), eq(null), any(PageRequest.class)))
-                    .willReturn(rooms);
-
-            // when
-            ChatRoomListResponse response = chatRoomService.getChatRooms(null, size);
-
-            // then
-            assertThat(response.items()).hasSize(2);
-            assertThat(response.pageInfo().hasNext()).isTrue();
-            assertThat(response.pageInfo().nextCursorId()).isEqualTo(4L);
-            assertThat(response.pageInfo().size()).isEqualTo(2);
-        }
-
-        @Test
-        @DisplayName("다음 페이지가 없으면 hasNext=false, nextCursorId는 null이다")
-        void getChatRooms_hasNext_false() {
-            // given
-            int size = 10;
-            List<ChattingRoom> rooms = List.of(
-                    createRoom(2L, "주제2", 4, 1),
-                    createRoom(1L, "주제1", 6, 3)
-            );
-            given(chattingRoomRepository.findByStatusWithCursor(
-                    eq(RoomStatus.WAITING), eq(null), any(PageRequest.class)))
-                    .willReturn(rooms);
-
-            // when
-            ChatRoomListResponse response = chatRoomService.getChatRooms(null, size);
-
-            // then
-            assertThat(response.items()).hasSize(2);
-            assertThat(response.pageInfo().hasNext()).isFalse();
-            assertThat(response.pageInfo().nextCursorId()).isNull();
-        }
-
-        @Test
-        @DisplayName("결과가 없으면 빈 리스트를 반환한다")
-        void getChatRooms_emptyResult() {
-            // given
-            given(chattingRoomRepository.findByStatusWithCursor(
-                    eq(RoomStatus.WAITING), eq(null), any(PageRequest.class)))
-                    .willReturn(Collections.emptyList());
-
-            // when
-            ChatRoomListResponse response = chatRoomService.getChatRooms(null, 10);
-
-            // then
-            assertThat(response.items()).isEmpty();
-            assertThat(response.pageInfo().hasNext()).isFalse();
-            assertThat(response.pageInfo().nextCursorId()).isNull();
-        }
-
-        @Test
-        @DisplayName("cursorId가 주어지면 해당 id 이전의 방만 조회한다")
-        void getChatRooms_withCursorId() {
-            // given
-            Long cursorId = 5L;
-            int size = 10;
-            List<ChattingRoom> rooms = List.of(
-                    createRoom(4L, "주제4", 4, 1),
-                    createRoom(3L, "주제3", 6, 2)
-            );
-            given(chattingRoomRepository.findByStatusWithCursor(
-                    eq(RoomStatus.WAITING), eq(cursorId), any(PageRequest.class)))
-                    .willReturn(rooms);
-
-            // when
-            ChatRoomListResponse response = chatRoomService.getChatRooms(cursorId, size);
-
-            // then
-            assertThat(response.items()).hasSize(2);
-            assertThat(response.items().getFirst().roomId()).isEqualTo(4L);
-            then(chattingRoomRepository).should().findByStatusWithCursor(
-                    eq(RoomStatus.WAITING), eq(cursorId), any(PageRequest.class));
         }
     }
 
@@ -486,8 +342,6 @@ class ChatRoomServiceTest {
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
                     .willReturn(Optional.of(member));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
-                    .willReturn(Collections.emptyList());
 
             // when
             chatRoomService.leaveChatRoom(ROOM_ID, USER_ID);
@@ -534,8 +388,6 @@ class ChatRoomServiceTest {
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
                     .willReturn(Optional.of(member));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
-                    .willReturn(Collections.emptyList());
 
             // when
             chatRoomService.leaveChatRoom(ROOM_ID, USER_ID);
@@ -556,8 +408,6 @@ class ChatRoomServiceTest {
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
                     .willReturn(Optional.of(member));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
-                    .willReturn(Collections.emptyList());
 
             // when
             chatRoomService.leaveChatRoom(ROOM_ID, USER_ID);
@@ -659,12 +509,6 @@ class ChatRoomServiceTest {
             return room;
         }
 
-        private void stubQuiz() {
-            Quiz quiz = mock(Quiz.class);
-            lenient().when(quiz.isCorrect(1)).thenReturn(true);
-            lenient().when(quizRepository.findById(ROOM_ID)).thenReturn(Optional.of(quiz));
-        }
-
         @Test
         @DisplayName("유효한 요청으로 채팅방에 참여하면 WaitingRoomResponse를 반환한다")
         void joinChatRoom_success() {
@@ -675,21 +519,13 @@ class ChatRoomServiceTest {
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(eq(USER_ID), any()))
                     .willReturn(false);
-            stubQuiz();
             given(chattingRoomMemberRepository.countByChattingRoomIdAndPositionAndStatusIn(
                     eq(ROOM_ID), eq(Position.AGREE), any())).willReturn(0);
             stubUserInfo();
 
-            ChattingRoomMember host = ChattingRoomMember.builder()
-                    .chattingRoom(room).userId(99L).nickname("방장")
-                    .profileImageUrl("http://host.url")
-                    .role(MemberRole.HOST).position(Position.DISAGREE).build();
-            ChattingRoomMember participant = ChattingRoomMember.builder()
-                    .chattingRoom(room).userId(USER_ID).nickname("테스터")
-                    .profileImageUrl("http://profile.url")
-                    .role(MemberRole.PARTICIPANT).position(Position.AGREE).build();
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
-                    .willReturn(List.of(host, participant));
+            WaitingRoomResponse expectedResponse = new WaitingRoomResponse(
+                    ROOM_ID, 1, 1, 2, List.of());
+            given(chatRoomQueryService.buildWaitingRoomResponse(room)).willReturn(expectedResponse);
 
             // when
             WaitingRoomResponse response = chatRoomService.joinChatRoom(ROOM_ID, USER_ID, request);
@@ -697,10 +533,6 @@ class ChatRoomServiceTest {
             // then
             assertThat(response).isNotNull();
             assertThat(response.roomId()).isEqualTo(ROOM_ID);
-            assertThat(response.agreeCount()).isEqualTo(1);
-            assertThat(response.disagreeCount()).isEqualTo(1);
-            assertThat(response.maxPerPosition()).isEqualTo(2);
-            assertThat(response.members()).hasSize(2);
             then(chattingRoomMemberRepository).should().save(any(ChattingRoomMember.class));
             assertThat(room.getCurrentMemberCount()).isEqualTo(2);
         }
@@ -760,12 +592,11 @@ class ChatRoomServiceTest {
         void joinChatRoom_quizWrongAnswer() {
             // given
             ChattingRoom room = createWaitingRoom(1);
-            Quiz quiz = mock(Quiz.class);
-            given(quiz.isCorrect(2)).willReturn(false);
-            given(quizRepository.findById(ROOM_ID)).willReturn(Optional.of(quiz));
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(eq(USER_ID), any()))
                     .willReturn(false);
+            org.mockito.BDDMockito.willThrow(new BusinessException(ErrorCode.CHAT_ROOM_QUIZ_WRONG_ANSWER))
+                    .given(quizService).validateQuizAnswer(ROOM_ID, 2);
             ChatRoomJoinRequest request = new ChatRoomJoinRequest(Position.AGREE, 2);
 
             // when & then
@@ -780,7 +611,6 @@ class ChatRoomServiceTest {
         void joinChatRoom_roomFull() {
             // given
             ChattingRoom room = createWaitingRoom(4);
-            stubQuiz();
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(eq(USER_ID), any()))
                     .willReturn(false);
@@ -798,7 +628,6 @@ class ChatRoomServiceTest {
         void joinChatRoom_positionFull() {
             // given
             ChattingRoom room = createWaitingRoom(2);
-            stubQuiz();
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(eq(USER_ID), any()))
                     .willReturn(false);
@@ -818,7 +647,6 @@ class ChatRoomServiceTest {
         void joinChatRoom_userNotFound() {
             // given
             ChattingRoom room = createWaitingRoom(1);
-            stubQuiz();
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(eq(USER_ID), any()))
                     .willReturn(false);
@@ -832,73 +660,6 @@ class ChatRoomServiceTest {
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.USER_NOT_FOUND);
-        }
-    }
-
-    @Nested
-    @DisplayName("대기실 조회")
-    class GetWaitingRoom {
-
-        @Test
-        @DisplayName("대기실 조회에 성공하면 WaitingRoomResponse를 반환한다")
-        void getWaitingRoom_success() {
-            // given
-            ChattingRoom room = ChattingRoom.builder()
-                    .topic("주제").description("설명").capacity(4).build();
-            ReflectionTestUtils.setField(room, "id", ROOM_ID);
-
-            ChattingRoomMember host = ChattingRoomMember.builder()
-                    .chattingRoom(room).userId(USER_ID).nickname("방장")
-                    .profileImageUrl("http://host.url")
-                    .role(MemberRole.HOST).position(Position.AGREE).build();
-
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
-                    .willReturn(Optional.of(host));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
-                    .willReturn(List.of(host));
-
-            // when
-            WaitingRoomResponse response = chatRoomService.getWaitingRoom(ROOM_ID, USER_ID);
-
-            // then
-            assertThat(response.roomId()).isEqualTo(ROOM_ID);
-            assertThat(response.agreeCount()).isEqualTo(1);
-            assertThat(response.disagreeCount()).isZero();
-            assertThat(response.maxPerPosition()).isEqualTo(2);
-            assertThat(response.members()).hasSize(1);
-        }
-
-        @Test
-        @DisplayName("존재하지 않는 채팅방이면 CHAT_ROOM_NOT_FOUND 예외가 발생한다")
-        void getWaitingRoom_roomNotFound() {
-            // given
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.empty());
-
-            // when & then
-            assertThatThrownBy(() -> chatRoomService.getWaitingRoom(ROOM_ID, USER_ID))
-                    .isInstanceOf(BusinessException.class)
-                    .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.CHAT_ROOM_NOT_FOUND);
-        }
-
-        @Test
-        @DisplayName("채팅방 멤버가 아니면 CHAT_ROOM_MEMBER_NOT_FOUND 예외가 발생한다")
-        void getWaitingRoom_memberNotFound() {
-            // given
-            ChattingRoom room = ChattingRoom.builder()
-                    .topic("주제").description("설명").capacity(4).build();
-            ReflectionTestUtils.setField(room, "id", ROOM_ID);
-
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
-                    .willReturn(Optional.empty());
-
-            // when & then
-            assertThatThrownBy(() -> chatRoomService.getWaitingRoom(ROOM_ID, USER_ID))
-                    .isInstanceOf(BusinessException.class)
-                    .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND);
         }
     }
 
@@ -942,7 +703,10 @@ class ChatRoomServiceTest {
             given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(
                     eq(ROOM_ID), eq(List.of(MemberStatus.WAITING, MemberStatus.JOINED, MemberStatus.DISCONNECTED))))
                     .willReturn(List.of(host, participant));
-            given(imageUrlResolver.toUrl("http://profile.url")).willReturn("http://profile.url");
+            given(chatRoomQueryService.toStartMemberItem(any())).willAnswer(invocation -> {
+                ChattingRoomMember m = invocation.getArgument(0);
+                return new ChatStartMemberItem(m.getNickname(), m.getProfileImageUrl());
+            });
 
             // when
             ChatRoomStartResponse response = chatRoomService.startChatRoom(ROOM_ID, USER_ID);
@@ -1047,145 +811,6 @@ class ChatRoomServiceTest {
     }
 
     @Nested
-    @DisplayName("채팅방 상세 조회")
-    class GetChatRoomDetail {
-
-        private ChattingRoom createChattingRoom() {
-            ChattingRoom room = ChattingRoom.builder()
-                    .topic("주제").description("설명").capacity(4).build();
-            ReflectionTestUtils.setField(room, "id", ROOM_ID);
-            ReflectionTestUtils.setField(room, "status", RoomStatus.CHATTING);
-            return room;
-        }
-
-        private ChattingRoomMember createMember(ChattingRoom room, Long userId,
-                                                 Position position) {
-            ChattingRoomMember member = ChattingRoomMember.builder()
-                    .chattingRoom(room).userId(userId).nickname("닉네임")
-                    .profileImageUrl("http://profile.url")
-                    .role(MemberRole.PARTICIPANT).position(position).build();
-            ReflectionTestUtils.setField(member, "status", MemberStatus.JOINED);
-            return member;
-        }
-
-        private RoomRound createActiveRound(ChattingRoom room, int roundNumber) {
-            RoomRound round = RoomRound.builder()
-                    .chattingRoom(room).roundNumber(roundNumber).build();
-            ReflectionTestUtils.setField(round, "id", 100L);
-            return round;
-        }
-
-        @Test
-        @DisplayName("CHATTING 상태의 방을 조회하면 멤버와 라운드 정보를 반환한다")
-        void getChatRoomDetail_success() {
-            // given
-            ChattingRoom room = createChattingRoom();
-            ChattingRoomMember agreeMember = createMember(room, USER_ID, Position.AGREE);
-            ChattingRoomMember disagreeMember = createMember(room, 2L, Position.DISAGREE);
-            RoomRound activeRound = createActiveRound(room, 1);
-
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
-                    .willReturn(Optional.of(agreeMember));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
-                    .willReturn(List.of(agreeMember, disagreeMember));
-            given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(ROOM_ID))
-                    .willReturn(Optional.of(activeRound));
-            given(imageUrlResolver.toUrl("http://profile.url")).willReturn("http://profile.url");
-
-            // when
-            ChatRoomStartResponse response = chatRoomService.getChatRoomDetail(ROOM_ID, USER_ID);
-
-            // then
-            assertThat(response.agreeMembers()).hasSize(1);
-            assertThat(response.disagreeMembers()).hasSize(1);
-            assertThat(response.currentRound()).isEqualTo(1);
-            assertThat(response.startedAt()).isNotNull();
-        }
-
-        @Test
-        @DisplayName("존재하지 않는 채팅방이면 CHAT_ROOM_NOT_FOUND 예외가 발생한다")
-        void getChatRoomDetail_roomNotFound() {
-            // given
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.empty());
-
-            // when & then
-            assertThatThrownBy(() -> chatRoomService.getChatRoomDetail(ROOM_ID, USER_ID))
-                    .isInstanceOf(BusinessException.class)
-                    .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.CHAT_ROOM_NOT_FOUND);
-        }
-
-        @Test
-        @DisplayName("WAITING 상태이면 CHAT_ROOM_NOT_CHATTING 예외가 발생한다")
-        void getChatRoomDetail_notChatting_waiting() {
-            // given
-            ChattingRoom room = createChattingRoom();
-            ReflectionTestUtils.setField(room, "status", RoomStatus.WAITING);
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
-
-            // when & then
-            assertThatThrownBy(() -> chatRoomService.getChatRoomDetail(ROOM_ID, USER_ID))
-                    .isInstanceOf(BusinessException.class)
-                    .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.CHAT_ROOM_NOT_CHATTING);
-        }
-
-        @Test
-        @DisplayName("ENDED 상태이면 CHAT_ROOM_NOT_CHATTING 예외가 발생한다")
-        void getChatRoomDetail_notChatting_ended() {
-            // given
-            ChattingRoom room = createChattingRoom();
-            ReflectionTestUtils.setField(room, "status", RoomStatus.ENDED);
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
-
-            // when & then
-            assertThatThrownBy(() -> chatRoomService.getChatRoomDetail(ROOM_ID, USER_ID))
-                    .isInstanceOf(BusinessException.class)
-                    .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.CHAT_ROOM_NOT_CHATTING);
-        }
-
-        @Test
-        @DisplayName("채팅방 멤버가 아니면 CHAT_ROOM_MEMBER_NOT_FOUND 예외가 발생한다")
-        void getChatRoomDetail_memberNotFound() {
-            // given
-            ChattingRoom room = createChattingRoom();
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
-                    .willReturn(Optional.empty());
-
-            // when & then
-            assertThatThrownBy(() -> chatRoomService.getChatRoomDetail(ROOM_ID, USER_ID))
-                    .isInstanceOf(BusinessException.class)
-                    .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND);
-        }
-
-        @Test
-        @DisplayName("활성 라운드가 없으면 CHAT_ROOM_ROUND_NOT_FOUND 예외가 발생한다")
-        void getChatRoomDetail_roundNotFound() {
-            // given
-            ChattingRoom room = createChattingRoom();
-            ChattingRoomMember member = createMember(room, USER_ID, Position.AGREE);
-
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
-                    .willReturn(Optional.of(member));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
-                    .willReturn(List.of(member));
-            given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(ROOM_ID))
-                    .willReturn(Optional.empty());
-
-            // when & then
-            assertThatThrownBy(() -> chatRoomService.getChatRoomDetail(ROOM_ID, USER_ID))
-                    .isInstanceOf(BusinessException.class)
-                    .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.CHAT_ROOM_ROUND_NOT_FOUND);
-        }
-    }
-
-    @Nested
     @DisplayName("다음 라운드 전환")
     class NextRound {
 
@@ -1220,9 +845,8 @@ class ChatRoomServiceTest {
             ChattingRoomMember host = createMember(room, USER_ID, MemberRole.HOST, Position.AGREE);
             RoomRound activeRound = createActiveRound(room, 1);
 
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
-                    .willReturn(Optional.of(host));
+            given(chatRoomQueryService.findChattingRoomAndMember(ROOM_ID, USER_ID))
+                    .willReturn(new ChatRoomQueryService.ChattingRoomAndMember(room, host));
             given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(ROOM_ID))
                     .willReturn(Optional.of(activeRound));
 
@@ -1239,7 +863,8 @@ class ChatRoomServiceTest {
         @DisplayName("존재하지 않는 채팅방이면 CHAT_ROOM_NOT_FOUND 예외가 발생한다")
         void nextRound_roomNotFound() {
             // given
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.empty());
+            given(chatRoomQueryService.findChattingRoomAndMember(ROOM_ID, USER_ID))
+                    .willThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
 
             // when & then
             assertThatThrownBy(() -> chatRoomService.nextRound(ROOM_ID, USER_ID))
@@ -1252,9 +877,8 @@ class ChatRoomServiceTest {
         @DisplayName("CHATTING 상태가 아니면 CHAT_ROOM_NOT_CHATTING 예외가 발생한다")
         void nextRound_notChatting() {
             // given
-            ChattingRoom room = createChattingRoom();
-            ReflectionTestUtils.setField(room, "status", RoomStatus.WAITING);
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
+            given(chatRoomQueryService.findChattingRoomAndMember(ROOM_ID, USER_ID))
+                    .willThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_CHATTING));
 
             // when & then
             assertThatThrownBy(() -> chatRoomService.nextRound(ROOM_ID, USER_ID))
@@ -1267,10 +891,8 @@ class ChatRoomServiceTest {
         @DisplayName("멤버가 아니면 CHAT_ROOM_MEMBER_NOT_FOUND 예외가 발생한다")
         void nextRound_memberNotFound() {
             // given
-            ChattingRoom room = createChattingRoom();
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
-                    .willReturn(Optional.empty());
+            given(chatRoomQueryService.findChattingRoomAndMember(ROOM_ID, USER_ID))
+                    .willThrow(new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND));
 
             // when & then
             assertThatThrownBy(() -> chatRoomService.nextRound(ROOM_ID, USER_ID))
@@ -1286,9 +908,8 @@ class ChatRoomServiceTest {
             ChattingRoom room = createChattingRoom();
             ChattingRoomMember participant = createMember(room, USER_ID, MemberRole.PARTICIPANT, Position.AGREE);
 
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
-                    .willReturn(Optional.of(participant));
+            given(chatRoomQueryService.findChattingRoomAndMember(ROOM_ID, USER_ID))
+                    .willReturn(new ChatRoomQueryService.ChattingRoomAndMember(room, participant));
 
             // when & then
             assertThatThrownBy(() -> chatRoomService.nextRound(ROOM_ID, USER_ID))
@@ -1305,9 +926,8 @@ class ChatRoomServiceTest {
             ChattingRoomMember host = createMember(room, USER_ID, MemberRole.HOST, Position.AGREE);
             RoomRound activeRound = createActiveRound(room, 3);
 
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
-                    .willReturn(Optional.of(host));
+            given(chatRoomQueryService.findChattingRoomAndMember(ROOM_ID, USER_ID))
+                    .willReturn(new ChatRoomQueryService.ChattingRoomAndMember(room, host));
             given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(ROOM_ID))
                     .willReturn(Optional.of(activeRound));
 
@@ -1350,9 +970,8 @@ class ChatRoomServiceTest {
             ChattingRoomMember participant = createMember(room, 2L, MemberRole.PARTICIPANT, Position.DISAGREE);
             RoomRound activeRound = RoomRound.builder().chattingRoom(room).roundNumber(3).build();
 
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
-                    .willReturn(Optional.of(host));
+            given(chatRoomQueryService.findChattingRoomAndMember(ROOM_ID, USER_ID))
+                    .willReturn(new ChatRoomQueryService.ChattingRoomAndMember(room, host));
             given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(ROOM_ID))
                     .willReturn(Optional.of(activeRound));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
@@ -1372,7 +991,8 @@ class ChatRoomServiceTest {
         @DisplayName("존재하지 않는 채팅방이면 CHAT_ROOM_NOT_FOUND 예외가 발생한다")
         void endChatRoom_roomNotFound() {
             // given
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.empty());
+            given(chatRoomQueryService.findChattingRoomAndMember(ROOM_ID, USER_ID))
+                    .willThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
 
             // when & then
             assertThatThrownBy(() -> chatRoomService.endChatRoom(ROOM_ID, USER_ID))
@@ -1385,9 +1005,8 @@ class ChatRoomServiceTest {
         @DisplayName("CHATTING 상태가 아니면 CHAT_ROOM_NOT_CHATTING 예외가 발생한다")
         void endChatRoom_notChatting() {
             // given
-            ChattingRoom room = createChattingRoom();
-            ReflectionTestUtils.setField(room, "status", RoomStatus.WAITING);
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
+            given(chatRoomQueryService.findChattingRoomAndMember(ROOM_ID, USER_ID))
+                    .willThrow(new BusinessException(ErrorCode.CHAT_ROOM_NOT_CHATTING));
 
             // when & then
             assertThatThrownBy(() -> chatRoomService.endChatRoom(ROOM_ID, USER_ID))
@@ -1400,10 +1019,8 @@ class ChatRoomServiceTest {
         @DisplayName("멤버가 아니면 CHAT_ROOM_MEMBER_NOT_FOUND 예외가 발생한다")
         void endChatRoom_memberNotFound() {
             // given
-            ChattingRoom room = createChattingRoom();
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
-                    .willReturn(Optional.empty());
+            given(chatRoomQueryService.findChattingRoomAndMember(ROOM_ID, USER_ID))
+                    .willThrow(new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND));
 
             // when & then
             assertThatThrownBy(() -> chatRoomService.endChatRoom(ROOM_ID, USER_ID))
@@ -1420,9 +1037,8 @@ class ChatRoomServiceTest {
             ChattingRoomMember host = createMember(room, USER_ID, MemberRole.HOST, Position.AGREE);
             RoomRound activeRound = RoomRound.builder().chattingRoom(room).roundNumber(2).build();
 
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
-                    .willReturn(Optional.of(host));
+            given(chatRoomQueryService.findChattingRoomAndMember(ROOM_ID, USER_ID))
+                    .willReturn(new ChatRoomQueryService.ChattingRoomAndMember(room, host));
             given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(ROOM_ID))
                     .willReturn(Optional.of(activeRound));
 
@@ -1440,9 +1056,8 @@ class ChatRoomServiceTest {
             ChattingRoom room = createChattingRoom();
             ChattingRoomMember participant = createMember(room, USER_ID, MemberRole.PARTICIPANT, Position.AGREE);
 
-            given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
-            given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
-                    .willReturn(Optional.of(participant));
+            given(chatRoomQueryService.findChattingRoomAndMember(ROOM_ID, USER_ID))
+                    .willReturn(new ChatRoomQueryService.ChattingRoomAndMember(room, participant));
 
             // when & then
             assertThatThrownBy(() -> chatRoomService.endChatRoom(ROOM_ID, USER_ID))
