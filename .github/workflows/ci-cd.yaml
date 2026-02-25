@@ -178,6 +178,8 @@ jobs:
           COMMANDS=$(jq -n --arg registry "${{ secrets.ECR_REGISTRY }}" '[
             "set -e",
             ("export ECR_REGISTRY=" + $registry),
+            "mkdir -p /home/ubuntu/app/secrets",
+            "aws ssm get-parameter --name /doktori/dev/firebase-credentials --with-decryption --query Parameter.Value --output text > /home/ubuntu/app/secrets/firebase-service-account.json",
             "docker compose -f /home/ubuntu/app/docker-compose.yml pull backend chat",
             "docker compose -f /home/ubuntu/app/docker-compose.yml up -d --no-deps backend chat",
             "sleep 10 && docker compose -f /home/ubuntu/app/docker-compose.yml exec -T nginx nginx -s reload",
