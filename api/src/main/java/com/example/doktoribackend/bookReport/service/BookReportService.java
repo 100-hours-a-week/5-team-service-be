@@ -29,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +42,7 @@ import java.util.stream.Collectors;
 public class BookReportService {
 
     private static final int DAILY_SUBMISSION_LIMIT = 3;
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final BookReportRepository bookReportRepository;
     private final MeetingRoundRepository meetingRoundRepository;
@@ -185,7 +188,7 @@ public class BookReportService {
                     if (bookReport != null) {
                         bookReportInfo = BookReportManagementResponse.BookReportInfo.builder()
                                 .status(bookReport.getStatus().name())
-                                .submittedAt(bookReport.getCreatedAt())
+                                .submittedAt(toKstOffset(bookReport.getCreatedAt()))
                                 .build();
                     }
 
@@ -243,8 +246,8 @@ public class BookReportService {
 
             // 둘 다 APPROVED면 submittedAt ASC
             if (m1Approved && m2Approved) {
-                LocalDateTime t1 = m1.bookReport().submittedAt();
-                LocalDateTime t2 = m2.bookReport().submittedAt();
+                OffsetDateTime t1 = m1.bookReport().submittedAt();
+                OffsetDateTime t2 = m2.bookReport().submittedAt();
                 if (t1 != null && t2 != null) {
                     return t1.compareTo(t2);
                 }
@@ -263,6 +266,13 @@ public class BookReportService {
         return meetingRoundRepository.findByMeetingIdAndRoundNo(
                 meetingRound.getMeeting().getId(), roundNo - 1
         ).orElse(null);
+    }
+
+    private OffsetDateTime toKstOffset(LocalDateTime time) {
+        if (time == null) {
+            return null;
+        }
+        return time.atZone(KST).toOffsetDateTime();
     }
 
     @Transactional(readOnly = true)

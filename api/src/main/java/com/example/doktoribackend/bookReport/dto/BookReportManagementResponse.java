@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Builder
@@ -47,7 +47,7 @@ public record BookReportManagementResponse(
 
             @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ssXXX")
             @Schema(description = "제출 시간", example = "2026-01-12T18:10:00+09:00")
-            LocalDateTime submittedAt
+            OffsetDateTime submittedAt
     ) {
     }
 }
