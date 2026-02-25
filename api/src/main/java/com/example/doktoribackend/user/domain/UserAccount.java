@@ -13,8 +13,11 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "user_accounts",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_provider_id",
-                        columnNames = {"provider", "provider_id"})
+                @UniqueConstraint(name = "uk_active_provider_id",
+                        columnNames = {"provider", "active_provider_id"})
+        },
+        indexes = {
+                @Index(name = "idx_user_accounts_deleted_at", columnList = "deleted_at")
         }
 )
 @Getter
@@ -37,6 +40,9 @@ public class UserAccount {
     @Column(name = "provider_id", nullable = false)
     private String providerId;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
@@ -46,5 +52,13 @@ public class UserAccount {
         this.user = user;
         this.provider = provider;
         this.providerId = providerId;
+    }
+
+    public void softDelete() {
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 }

@@ -2,6 +2,7 @@ package com.example.doktoribackend.user.controller;
 
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.response.ApiResult;
+import com.example.doktoribackend.common.util.CookieUtil;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.meeting.dto.MyMeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MyMeetingListResponse;
@@ -23,6 +24,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -34,11 +36,12 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/users")
-public class UserController {
+public class UserController implements UserWithdrawalApi {
 
     private final OnboardingService onboardingService;
     private final UserService userService;
     private final MeetingService meetingService;
+    private final CookieUtil cookieUtil;
 
     @Operation(summary = "내 정보 조회", description = "로그인 사용자의 프로필 정보를 조회합니다.")
     @GetMapping("/me")
@@ -270,5 +273,21 @@ public class UserController {
 
         MyMeetingDetailResponse response = meetingService.getMyMeetingDetail(userDetails.getId(), meetingId);
         return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Override
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> withdraw(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            HttpServletResponse response
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        userService.withdraw(userDetails.getId());
+        cookieUtil.removeRefreshTokenCookie(response);
+
+        return ResponseEntity.noContent().build();
     }
 }
