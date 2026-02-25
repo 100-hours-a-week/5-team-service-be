@@ -14,6 +14,7 @@ public final class UserMapper {
     public static UserProfileResponse toUserProfileResponse(User user, ImageUrlResolver resolver) {
 
         return new UserProfileResponse(
+                user.getId(),
                 user.getNickname(),
                 resolver.toUrl(user.getProfileImagePath()),
                 user.getProfileImagePath(),

@@ -5,6 +5,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(description = "사용자 프로필 응답")
 public record UserProfileResponse(
 
+        @Schema(description = "사용자 ID", example = "1")
+        Long userId,
+
         @Schema(description = "닉네임", example = "startup")
         String nickname,
 

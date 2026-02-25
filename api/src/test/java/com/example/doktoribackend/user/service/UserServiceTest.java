@@ -64,6 +64,7 @@ class UserServiceTest {
         UserProfileResponse response = userService.getMyProfile(1L);
 
         // then
+        assertThat(response.userId()).isEqualTo(1L);
         assertThat(response.nickname()).isEqualTo("nickname");
         assertThat(response.profileImagePath()).isEqualTo("https://bucket.s3.amazonaws.com/images/profiles/test.png");
         assertThat(response.profileImageKey()).isEqualTo("images/profiles/test.png");
@@ -142,6 +143,7 @@ class UserServiceTest {
         assertThat(user.getLeaderIntro()).isEqualTo("new leader");
         assertThat(user.getMemberIntro()).isEqualTo("new member");
 
+        assertThat(response.userId()).isEqualTo(5L);
         assertThat(response.nickname()).isEqualTo("newNick");
         assertThat(response.profileImagePath()).isEqualTo("https://bucket.s3.amazonaws.com/images/profiles/new.png");
         assertThat(response.leaderIntro()).isEqualTo("new leader");
