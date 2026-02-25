@@ -47,7 +47,7 @@ public class KakaoAuthService implements OAuthService {
         Long kakaoId = userResponse.id();
 
         UserAccount existingAccount = userAccountRepository
-                .findByProviderAndProviderId(OAuthProvider.KAKAO, String.valueOf(kakaoId))
+                .findByProviderAndProviderIdAndDeletedAtIsNull(OAuthProvider.KAKAO, String.valueOf(kakaoId))
                 .orElse(null);
 
         if (existingAccount != null && !existingAccount.getUser().isDeleted()) {
