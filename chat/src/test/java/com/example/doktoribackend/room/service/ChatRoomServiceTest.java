@@ -2,10 +2,11 @@ package com.example.doktoribackend.room.service;
 
 import com.example.doktoribackend.book.domain.Book;
 import com.example.doktoribackend.book.repository.BookRepository;
-import com.example.doktoribackend.common.client.KakaoBookClient;
+import com.example.doktoribackend.book.service.BookService;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.quiz.service.QuizService;
 import com.example.doktoribackend.room.domain.ChattingRoom;
 import com.example.doktoribackend.room.domain.ChattingRoomMember;
 import com.example.doktoribackend.room.domain.MemberRole;
@@ -13,8 +14,6 @@ import com.example.doktoribackend.room.domain.MemberStatus;
 import com.example.doktoribackend.room.domain.Position;
 import com.example.doktoribackend.room.domain.RoomRound;
 import com.example.doktoribackend.room.domain.RoomStatus;
-import com.example.doktoribackend.quiz.domain.Quiz;
-import com.example.doktoribackend.quiz.repository.QuizRepository;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
 import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
@@ -35,13 +34,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -74,19 +71,7 @@ class ChatRoomServiceTest {
     private RoomRoundRepository roomRoundRepository;
 
     @Mock
-    private BookRepository bookRepository;
-
-    @Mock
-    private KakaoBookClient kakaoBookClient;
-
-    @Mock
     private UserInfoRepository userInfoRepository;
-
-    @Mock
-    private WaitingRoomSseService waitingRoomSseService;
-
-    @Mock
-    private SimpMessagingTemplate messagingTemplate;
 
     @Mock
     private ImageUrlResolver imageUrlResolver;
@@ -101,7 +86,16 @@ class ChatRoomServiceTest {
     private VoteService voteService;
 
     @Mock
-    private QuizRepository quizRepository;
+    private BookService bookService;
+
+    @Mock
+    private QuizService quizService;
+
+    @Mock
+    private ChatRoomEventPublisher chatRoomEventPublisher;
+
+    @Mock
+    private BookRepository bookRepository;
 
     @InjectMocks
     private ChatRoomService chatRoomService;
@@ -159,7 +153,7 @@ class ChatRoomServiceTest {
         void createChatRoom_success() {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
-            given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     eq(USER_ID), any())).willReturn(false);
@@ -177,11 +171,11 @@ class ChatRoomServiceTest {
         }
 
         @Test
-        @DisplayName("생성된 방에 Quiz가 저장되고 QuizChoice 4개가 저장된다")
+        @DisplayName("생성된 방에 Quiz가 저장된다")
         void createChatRoom_quizCreated() {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
-            given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     eq(USER_ID), any())).willReturn(false);
@@ -189,19 +183,11 @@ class ChatRoomServiceTest {
                     .willAnswer(invocation -> invocation.getArgument(0));
             stubUserInfo();
 
-            ArgumentCaptor<Quiz> quizCaptor = ArgumentCaptor.forClass(Quiz.class);
-            given(quizRepository.save(quizCaptor.capture()))
-                    .willAnswer(invocation -> invocation.getArgument(0));
-
             // when
             chatRoomService.createChatRoom(USER_ID, request);
 
             // then
-            Quiz savedQuiz = quizCaptor.getValue();
-            assertThat(savedQuiz).isNotNull();
-            assertThat(savedQuiz.getQuestion()).isEqualTo("퀴즈 질문입니다");
-            assertThat(savedQuiz.getCorrectChoiceNumber()).isEqualTo(1);
-            assertThat(savedQuiz.getChoices()).hasSize(4);
+            then(quizService).should().createQuiz(any(ChattingRoom.class), eq(request.quiz()));
         }
 
         @Test
@@ -209,7 +195,7 @@ class ChatRoomServiceTest {
         void createChatRoom_hostMemberSaved() {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
-            given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     eq(USER_ID), any())).willReturn(false);
@@ -217,8 +203,8 @@ class ChatRoomServiceTest {
                     .willAnswer(invocation -> invocation.getArgument(0));
             stubUserInfo();
 
-            ArgumentCaptor<ChattingRoomMember> memberCaptor =
-                    ArgumentCaptor.forClass(ChattingRoomMember.class);
+            org.mockito.ArgumentCaptor<ChattingRoomMember> memberCaptor =
+                    org.mockito.ArgumentCaptor.forClass(ChattingRoomMember.class);
 
             // when
             chatRoomService.createChatRoom(USER_ID, request);
@@ -242,7 +228,7 @@ class ChatRoomServiceTest {
         void allowedCapacity_success(int capacity) {
             // given
             ChatRoomCreateRequest request = createValidRequest(capacity);
-            given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     eq(USER_ID), any())).willReturn(false);
@@ -283,7 +269,7 @@ class ChatRoomServiceTest {
         void alreadyJoined_throwsException() {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
-            given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     USER_ID, List.of(MemberStatus.WAITING, MemberStatus.JOINED, MemberStatus.DISCONNECTED)))
                     .willReturn(true);
@@ -302,7 +288,7 @@ class ChatRoomServiceTest {
         void leftOnly_canCreateNewRoom() {
             // given
             ChatRoomCreateRequest request = createValidRequest(4);
-            given(bookRepository.findByIsbn(TEST_ISBN)).willReturn(Optional.of(createTestBook()));
+            given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
                     eq(USER_ID), any())).willReturn(false);
@@ -659,12 +645,6 @@ class ChatRoomServiceTest {
             return room;
         }
 
-        private void stubQuiz() {
-            Quiz quiz = mock(Quiz.class);
-            lenient().when(quiz.isCorrect(1)).thenReturn(true);
-            lenient().when(quizRepository.findById(ROOM_ID)).thenReturn(Optional.of(quiz));
-        }
-
         @Test
         @DisplayName("유효한 요청으로 채팅방에 참여하면 WaitingRoomResponse를 반환한다")
         void joinChatRoom_success() {
@@ -675,7 +655,6 @@ class ChatRoomServiceTest {
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(eq(USER_ID), any()))
                     .willReturn(false);
-            stubQuiz();
             given(chattingRoomMemberRepository.countByChattingRoomIdAndPositionAndStatusIn(
                     eq(ROOM_ID), eq(Position.AGREE), any())).willReturn(0);
             stubUserInfo();
@@ -760,12 +739,11 @@ class ChatRoomServiceTest {
         void joinChatRoom_quizWrongAnswer() {
             // given
             ChattingRoom room = createWaitingRoom(1);
-            Quiz quiz = mock(Quiz.class);
-            given(quiz.isCorrect(2)).willReturn(false);
-            given(quizRepository.findById(ROOM_ID)).willReturn(Optional.of(quiz));
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(eq(USER_ID), any()))
                     .willReturn(false);
+            org.mockito.BDDMockito.willThrow(new BusinessException(ErrorCode.CHAT_ROOM_QUIZ_WRONG_ANSWER))
+                    .given(quizService).validateQuizAnswer(ROOM_ID, 2);
             ChatRoomJoinRequest request = new ChatRoomJoinRequest(Position.AGREE, 2);
 
             // when & then
@@ -780,7 +758,6 @@ class ChatRoomServiceTest {
         void joinChatRoom_roomFull() {
             // given
             ChattingRoom room = createWaitingRoom(4);
-            stubQuiz();
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(eq(USER_ID), any()))
                     .willReturn(false);
@@ -798,7 +775,6 @@ class ChatRoomServiceTest {
         void joinChatRoom_positionFull() {
             // given
             ChattingRoom room = createWaitingRoom(2);
-            stubQuiz();
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(eq(USER_ID), any()))
                     .willReturn(false);
@@ -818,7 +794,6 @@ class ChatRoomServiceTest {
         void joinChatRoom_userNotFound() {
             // given
             ChattingRoom room = createWaitingRoom(1);
-            stubQuiz();
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(eq(USER_ID), any()))
                     .willReturn(false);

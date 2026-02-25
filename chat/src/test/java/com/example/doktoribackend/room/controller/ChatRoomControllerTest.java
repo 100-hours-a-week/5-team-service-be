@@ -21,6 +21,7 @@ import com.example.doktoribackend.message.dto.MessageResponse;
 import com.example.doktoribackend.message.service.MessageService;
 import com.example.doktoribackend.room.dto.WaitingRoomMemberItem;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
+import com.example.doktoribackend.quiz.service.QuizService;
 import com.example.doktoribackend.room.service.ChatRoomService;
 import com.example.doktoribackend.room.service.WaitingRoomSseService;
 import com.example.doktoribackend.security.CustomUserDetails;
@@ -77,6 +78,9 @@ class ChatRoomControllerTest {
 
     @MockitoBean
     WaitingRoomSseService waitingRoomSseService;
+
+    @MockitoBean
+    QuizService quizService;
 
     @MockitoBean
     JwtTokenProvider jwtTokenProvider;
