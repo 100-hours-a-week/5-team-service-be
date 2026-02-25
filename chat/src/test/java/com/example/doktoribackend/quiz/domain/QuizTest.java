@@ -17,7 +17,7 @@ class QuizTest {
     }
 
     @Test
-    @DisplayName("Quiz 생성 시 ChattingRoom과 양방향 연결된다")
+    @DisplayName("Quiz 생성 시 ChattingRoom과 연결된다")
     void create() {
         ChattingRoom room = createRoom();
 
@@ -30,7 +30,6 @@ class QuizTest {
         assertThat(quiz.getQuestion()).isEqualTo("AI가 인간을 대체할 수 있을까?");
         assertThat(quiz.getCorrectChoiceNumber()).isEqualTo(2);
         assertThat(quiz.getChattingRoom()).isEqualTo(room);
-        assertThat(room.getQuiz()).isEqualTo(quiz);
     }
 
     @Test

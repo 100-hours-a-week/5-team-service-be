@@ -1,6 +1,5 @@
 package com.example.doktoribackend.room.domain;
 
-import com.example.doktoribackend.quiz.domain.Quiz;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -97,21 +96,4 @@ class ChattingRoomTest {
         assertThat(room.getMembers()).isNotNull().isEmpty();
     }
 
-    @Test
-    @DisplayName("linkQuiz 호출 시 Quiz가 연결된다")
-    void linkQuiz() {
-        ChattingRoom room = ChattingRoom.builder()
-                .topic("주제")
-                .description("설명")
-                .capacity(4)
-                .build();
-
-        Quiz quiz = Quiz.builder()
-                .chattingRoom(room)
-                .question("질문")
-                .correctChoiceNumber(1)
-                .build();
-
-        assertThat(room.getQuiz()).isEqualTo(quiz);
-    }
 }

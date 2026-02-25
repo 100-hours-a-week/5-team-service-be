@@ -1,7 +1,6 @@
 package com.example.doktoribackend.room.domain;
 
 import com.example.doktoribackend.book.domain.Book;
-import com.example.doktoribackend.quiz.domain.Quiz;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -52,9 +51,6 @@ public class ChattingRoom {
     @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
     private LocalDateTime createdAt;
 
-    @OneToOne(mappedBy = "chattingRoom", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private Quiz quiz;
-
     @OneToMany(mappedBy = "chattingRoom", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     private final List<RoomRound> rounds = new ArrayList<>();
 
@@ -95,9 +91,5 @@ public class ChattingRoom {
         if (this.currentMemberCount > 0) {
             this.currentMemberCount--;
         }
-    }
-
-    public void linkQuiz(Quiz quiz) {
-        this.quiz = quiz;
     }
 }

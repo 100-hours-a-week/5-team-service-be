@@ -7,6 +7,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.data.domain.Persistable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,11 +16,14 @@ import java.util.List;
 @Table(name = "quizzes")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Quiz {
+public class Quiz implements Persistable<Long> {
 
     @Id
     @Column(name = "room_id")
     private Long roomId;
+
+    @Transient
+    private boolean isNew = true;
 
     @OneToOne(fetch = FetchType.LAZY)
     @MapsId
@@ -45,7 +49,6 @@ public class Quiz {
         this.chattingRoom = chattingRoom;
         this.question = question;
         this.correctChoiceNumber = correctChoiceNumber;
-        chattingRoom.linkQuiz(this);
     }
 
     public boolean isCorrect(Integer choiceNumber) {
@@ -54,5 +57,21 @@ public class Quiz {
 
     public void addChoice(QuizChoice choice) {
         this.choices.add(choice);
+    }
+
+    @Override
+    public Long getId() {
+        return roomId;
+    }
+
+    @Override
+    public boolean isNew() {
+        return isNew;
+    }
+
+    @PostPersist
+    @PostLoad
+    void markNotNew() {
+        this.isNew = false;
     }
 }

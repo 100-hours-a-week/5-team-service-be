@@ -124,7 +124,12 @@ public enum ErrorCode {
     CHAT_ROOM_NOT_CHATTING(HttpStatus.CONFLICT, "CHAT_ROOM_NOT_CHATTING", "채팅 중인 채팅방이 아닙니다."),
     CHAT_ROOM_ROUND_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_ROOM_ROUND_NOT_FOUND", "진행 중인 라운드가 없습니다."),
     CHAT_ROOM_MAX_ROUND_REACHED(HttpStatus.CONFLICT, "CHAT_ROOM_MAX_ROUND_REACHED", "최대 라운드에 도달했습니다."),
-    CHAT_ROOM_NOT_LAST_ROUND(HttpStatus.CONFLICT, "CHAT_ROOM_NOT_LAST_ROUND", "마지막 라운드에서만 채팅을 종료할 수 있습니다.");
+    CHAT_ROOM_NOT_LAST_ROUND(HttpStatus.CONFLICT, "CHAT_ROOM_NOT_LAST_ROUND", "마지막 라운드에서만 채팅을 종료할 수 있습니다."),
+
+    // Vote
+    VOTE_NOT_FOUND(HttpStatus.NOT_FOUND, "VOTE_NOT_FOUND", "투표를 찾을 수 없습니다."),
+    VOTE_ALREADY_CLOSED(HttpStatus.CONFLICT, "VOTE_ALREADY_CLOSED", "이미 종료된 투표입니다."),
+    VOTE_ALREADY_CAST(HttpStatus.CONFLICT, "VOTE_ALREADY_CAST", "이미 투표하였습니다.");
 
 
     private final HttpStatus status;
