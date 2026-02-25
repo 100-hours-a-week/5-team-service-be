@@ -8,6 +8,7 @@ import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.config.WebSocketSessionRegistry;
 import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.vote.service.VoteService;
 import com.example.doktoribackend.quiz.domain.Quiz;
 import com.example.doktoribackend.quiz.domain.QuizChoice;
 import com.example.doktoribackend.room.domain.ChattingRoom;
@@ -68,6 +69,7 @@ public class ChatRoomService {
     private final ImageUrlResolver imageUrlResolver;
     private final WebSocketSessionRegistry sessionRegistry;
     private final PlatformTransactionManager transactionManager;
+    private final VoteService voteService;
 
     @Transactional(readOnly = true)
     public ChatRoomListResponse getChatRooms(Long cursorId, int size) {
@@ -321,8 +323,10 @@ public class ChatRoomService {
         roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(room.getId())
                 .ifPresent(RoomRound::endRound);
 
+        int memberCount = room.getCurrentMemberCount();
         room.endChatting();
         leaveAllActiveMembers(room.getId());
+        voteService.createVote(room, memberCount);
         sessionRegistry.removeAllForRoom(room.getId());
         broadcastEndedAfterCommit(room.getId());
     }
