@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,5 +36,30 @@ public interface MeetingMemberRepository extends JpaRepository<MeetingMember, Lo
             @Param("memberId") Long memberId,
             @Param("meetingId") Long meetingId
     );
+
+    @Query("SELECT mm FROM MeetingMember mm " +
+           "JOIN FETCH mm.meeting m " +
+           "WHERE mm.user.id = :userId " +
+           "AND mm.role = 'LEADER' " +
+           "AND m.status != 'CANCELED' " +
+           "AND m.deletedAt IS NULL")
+    List<MeetingMember> findActiveLeaderMeetingsByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT CASE WHEN COUNT(mm) > 0 THEN true ELSE false END " +
+           "FROM MeetingMember mm " +
+           "JOIN mm.meeting m " +
+           "JOIN MeetingRound mr ON mr.meeting.id = m.id AND mr.roundNo = 1 " +
+           "WHERE mm.user.id = :userId " +
+           "AND mm.role = 'LEADER' " +
+           "AND m.status != 'CANCELED' " +
+           "AND m.deletedAt IS NULL " +
+           "AND mr.startAt <= :now " +
+           "AND EXISTS (" +
+           "  SELECT 1 FROM MeetingMember mm2 " +
+           "  WHERE mm2.meeting.id = m.id " +
+           "  AND mm2.role = 'MEMBER' " +
+           "  AND mm2.status IN ('APPROVED', 'PENDING')" +
+           ")")
+    boolean existsWithdrawalBlockingMeeting(@Param("userId") Long userId, @Param("now") LocalDateTime now);
 
 }
