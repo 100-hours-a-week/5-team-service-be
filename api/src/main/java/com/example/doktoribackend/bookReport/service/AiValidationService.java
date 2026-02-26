@@ -6,51 +6,53 @@ import com.example.doktoribackend.bookReport.dto.AiValidationResponse;
 import com.example.doktoribackend.bookReport.repository.BookReportRepository;
 import com.example.doktoribackend.notification.domain.NotificationTypeCode;
 import com.example.doktoribackend.notification.service.NotificationService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class AiValidationService {
 
-    private final RestTemplate restTemplate;
+    private final RestClient restClient;
     private final BookReportRepository bookReportRepository;
     private final PlatformTransactionManager transactionManager;
     private final NotificationService notificationService;
 
-    @Value("${ai.base-url}")
-    private String aiValidationBaseUrl;
-
-    @Value("${ai.api-key}")
-    private String apiKey;
-
     private static final int MAX_RETRY = 3;
     private static final long RETRY_DELAY_MS = 2000;
+
+    public AiValidationService(
+            BookReportRepository bookReportRepository,
+            PlatformTransactionManager transactionManager,
+            NotificationService notificationService,
+            @Value("${ai.base-url}") String aiValidationBaseUrl,
+            @Value("${ai.api-key}") String apiKey
+    ) {
+        this.bookReportRepository = bookReportRepository;
+        this.transactionManager = transactionManager;
+        this.notificationService = notificationService;
+        this.restClient = RestClient.builder()
+                .baseUrl(aiValidationBaseUrl)
+                .defaultHeader("x-api-key", apiKey)
+                .build();
+    }
 
     @Async("aiValidationExecutor")
     public void validate(Long bookReportId, String bookTitle, String content) {
         AiValidationRequest request = new AiValidationRequest(bookTitle, content);
 
-        String url = aiValidationBaseUrl + "/book-reports/" + bookReportId + "/validate";
+        String uri = "/book-reports/" + bookReportId + "/validate";
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("x-api-key", apiKey);
-
-        HttpEntity<AiValidationRequest> httpRequest = new HttpEntity<>(request, headers);
-
-        AiValidationResponse response = executeWithRetry(url, httpRequest, bookReportId);
+        AiValidationResponse response = executeWithRetry(uri, request, bookReportId);
 
         if (response != null) {
             TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
@@ -61,18 +63,20 @@ public class AiValidationService {
         }
     }
 
-    private AiValidationResponse executeWithRetry(String url, HttpEntity<AiValidationRequest> request, Long bookReportId) {
+    private AiValidationResponse executeWithRetry(String uri, AiValidationRequest request, Long bookReportId) {
         int attempt = 0;
         while (attempt < MAX_RETRY) {
             try {
-                ResponseEntity<AiValidationResponse> response = restTemplate.exchange(
-                        url,
-                        HttpMethod.POST,
-                        request,
-                        AiValidationResponse.class
-                );
-                return response.getBody();
-            } catch (RestClientException ex) {
+                return restClient.post()
+                        .uri(uri)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(request)
+                        .retrieve()
+                        .onStatus(HttpStatusCode::isError, (req, res) -> {
+                            log.warn("AI validation failed: status={}", res.getStatusCode());
+                        })
+                        .body(AiValidationResponse.class);
+            } catch (Exception ex) {
                 attempt++;
                 log.warn("Retrying AI validation for bookReportId: {}, attempt: {}, error: {}",
                         bookReportId, attempt, ex.getMessage());

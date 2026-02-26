@@ -17,7 +17,6 @@ import com.example.doktoribackend.room.service.ChatRoomQueryService;
 import com.example.doktoribackend.room.service.ChatRoomService;
 import com.example.doktoribackend.room.service.WaitingRoomSseService;
 import com.example.doktoribackend.security.CustomUserDetails;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -109,15 +108,16 @@ public class ChatRoomController implements ChatRoomApi {
 
     @GetMapping(value = "/{roomId}/waiting-room/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Override
-    public SseEmitter subscribeWaitingRoom(
+    public ResponseEntity<SseEmitter> subscribeWaitingRoom(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @PathVariable Long roomId,
-            HttpServletResponse response
+            @PathVariable Long roomId
     ) {
-        response.setHeader("X-Accel-Buffering", "no");
-        response.setHeader("Cache-Control", "no-cache");
         chatRoomQueryService.getWaitingRoom(roomId, userDetails.getId());
-        return waitingRoomSseService.subscribe(roomId);
+        SseEmitter emitter = waitingRoomSseService.subscribe(roomId);
+        return ResponseEntity.ok()
+                .header("X-Accel-Buffering", "no")
+                .header("Cache-Control", "no-cache")
+                .body(emitter);
     }
 
     @GetMapping("/{roomId}")

@@ -18,7 +18,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -696,8 +695,7 @@ public interface ChatRoomApi {
                                             }
                                             """)
                     }))
-    SseEmitter subscribeWaitingRoom(
+    ResponseEntity<SseEmitter> subscribeWaitingRoom(
             @Parameter(hidden = true) CustomUserDetails userDetails,
-            @Parameter(description = "채팅방 ID", example = "1") Long roomId,
-            @Parameter(hidden = true) HttpServletResponse response);
+            @Parameter(description = "채팅방 ID", example = "1") Long roomId);
 }
