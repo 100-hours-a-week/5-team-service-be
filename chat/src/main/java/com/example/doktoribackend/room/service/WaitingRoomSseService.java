@@ -101,9 +101,8 @@ public class WaitingRoomSseService {
                 emitter.send(SseEmitter.event()
                         .name("room-cancelled")
                         .data("방장이 나가 채팅방이 취소되었습니다."));
-                emitter.complete();
             } catch (IOException e) {
-                emitter.complete();
+                remove(roomId, emitter);
             }
         }
     }
@@ -119,9 +118,8 @@ public class WaitingRoomSseService {
                 emitter.send(SseEmitter.event()
                         .name("room-started")
                         .data(response));
-                emitter.complete();
             } catch (IOException e) {
-                emitter.complete();
+                remove(roomId, emitter);
             }
         }
     }

@@ -17,6 +17,7 @@ import com.example.doktoribackend.room.service.ChatRoomQueryService;
 import com.example.doktoribackend.room.service.ChatRoomService;
 import com.example.doktoribackend.room.service.WaitingRoomSseService;
 import com.example.doktoribackend.security.CustomUserDetails;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -110,8 +111,11 @@ public class ChatRoomController implements ChatRoomApi {
     @Override
     public SseEmitter subscribeWaitingRoom(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @PathVariable Long roomId
+            @PathVariable Long roomId,
+            HttpServletResponse response
     ) {
+        response.setHeader("X-Accel-Buffering", "no");
+        response.setHeader("Cache-Control", "no-cache");
         chatRoomQueryService.getWaitingRoom(roomId, userDetails.getId());
         return waitingRoomSseService.subscribe(roomId);
     }
