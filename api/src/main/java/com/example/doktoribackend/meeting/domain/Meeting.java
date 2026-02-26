@@ -143,6 +143,12 @@ public class Meeting extends BaseTimeEntity {
         this.currentCount++;
     }
 
+    public void decrementCurrentCount() {
+        if (this.currentCount > 0) {
+            this.currentCount--;
+        }
+    }
+
     public void updateStatusToFinished() {
         this.status = MeetingStatus.FINISHED;
     }

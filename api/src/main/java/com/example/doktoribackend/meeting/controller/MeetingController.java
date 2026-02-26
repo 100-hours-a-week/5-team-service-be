@@ -42,7 +42,7 @@ import java.net.URI;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/meetings")
-public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi, LeaderDelegationApi {
+public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi, LeaderDelegationApi, CancelParticipationApi, LeaveMeetingApi {
 
     private final MeetingService meetingService;
     private final TopicRecommendationService topicRecommendationService;
@@ -514,5 +514,41 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
         LeaderDelegationResponse response = leaderDelegationService.delegateLeader(
                 userDetails.getId(), meetingId, request);
         return ResponseEntity.ok(ApiResult.ok("모임장 권한이 성공적으로 위임되었습니다.", response));
+    }
+
+    @Override
+    @DeleteMapping("/{meetingId}/participations/me")
+    public ResponseEntity<Void> cancelParticipation(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        meetingService.cancelParticipation(userDetails.getId(), meetingId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    @DeleteMapping("/{meetingId}/members/me")
+    public ResponseEntity<Void> leaveMeeting(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        meetingService.leaveMeeting(userDetails.getId(), meetingId);
+        return ResponseEntity.noContent().build();
     }
 }

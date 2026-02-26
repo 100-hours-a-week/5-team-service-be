@@ -794,4 +794,56 @@ public class MeetingService {
                 .status(newStatus.name())
                 .build();
     }
+
+    @Transactional
+    public void cancelParticipation(Long userId, Long meetingId) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. 모임 존재 여부 확인
+        if (!meetingRepository.existsByIdAndDeletedAtIsNull(meetingId)) {
+            throw new BusinessException(ErrorCode.MEETING_NOT_FOUND);
+        }
+
+        // 2. 본인 참여 요청 조회
+        MeetingMember myRequest = meetingMemberRepository.findByMeetingIdAndUserId(meetingId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.JOIN_REQUEST_NOT_FOUND));
+
+        // 3. PENDING 상태인지 확인
+        if (!myRequest.isPending()) {
+            throw new BusinessException(ErrorCode.PARTICIPATION_CANCEL_NOT_ALLOWED);
+        }
+
+        // 4. 취소 처리 (status = LEFT, left_at = now)
+        myRequest.cancel(now);
+    }
+
+    @Transactional
+    public void leaveMeeting(Long userId, Long meetingId) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. 모임 조회
+        Meeting meeting = meetingRepository.findByIdWithLeader(meetingId)
+                .filter(m -> m.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+
+        // 2. 나의 멤버 정보 조회
+        MeetingMember myMember = meetingMemberRepository.findByMeetingIdAndUserId(meetingId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_MEMBER_NOT_FOUND));
+
+        // 3. 모임장은 탈퇴 불가 (위임 후 탈퇴해야 함)
+        if (myMember.isLeader()) {
+            throw new BusinessException(ErrorCode.LEADER_CANNOT_LEAVE);
+        }
+
+        // 4. APPROVED 상태인지 확인
+        if (!myMember.isApproved()) {
+            throw new BusinessException(ErrorCode.LEAVE_NOT_ALLOWED);
+        }
+
+        // 5. 탈퇴 처리 (status = LEFT, left_at = now)
+        myMember.cancel(now);
+
+        // 6. 모임 인원 감소
+        meeting.decrementCurrentCount();
+    }
 }

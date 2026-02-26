@@ -43,4 +43,6 @@ public interface MeetingRepository extends JpaRepository<Meeting, Long>, Meeting
             "AND m.recruitmentDeadline < :today " +
             "AND m.deletedAt IS NULL")
     int bulkUpdateExpiredToFinished(@Param("today") LocalDate today);
+
+    boolean existsByIdAndDeletedAtIsNull(Long id);
 }

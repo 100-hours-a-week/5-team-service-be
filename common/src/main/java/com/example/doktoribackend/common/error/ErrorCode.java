@@ -74,6 +74,9 @@ public enum ErrorCode {
     JOIN_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "JOIN_REQUEST_NOT_FOUND", "존재하지 않는 참여 요청입니다."),
     JOIN_REQUEST_ALREADY_PROCESSED(HttpStatus.CONFLICT, "JOIN_REQUEST_ALREADY_PROCESSED", "이미 처리된 참여 요청입니다."),
     PARTICIPATION_UPDATE_FORBIDDEN(HttpStatus.FORBIDDEN, "PARTICIPATION_UPDATE_FORBIDDEN", "참여 요청을 처리할 권한이 없습니다."),
+    PARTICIPATION_CANCEL_NOT_ALLOWED(HttpStatus.CONFLICT, "PARTICIPATION_CANCEL_NOT_ALLOWED", "이미 승인된 참여 요청은 취소할 수 없습니다."),
+    LEADER_CANNOT_LEAVE(HttpStatus.CONFLICT, "LEADER_CANNOT_LEAVE", "모임장은 위임 후 탈퇴해야 합니다."),
+    LEAVE_NOT_ALLOWED(HttpStatus.CONFLICT, "LEAVE_NOT_ALLOWED", "탈퇴할 수 없는 상태입니다."),
 
     // LeaderDelegation
     LEADER_DELEGATION_FORBIDDEN(HttpStatus.FORBIDDEN, "LEADER_DELEGATION_FORBIDDEN", "모임장 위임 권한이 없습니다."),

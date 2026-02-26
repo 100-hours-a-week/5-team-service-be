@@ -91,6 +91,11 @@ public class MeetingMember extends BaseTimeEntity {
         this.rejectedAt = rejectedAt;
     }
 
+    public void cancel(LocalDateTime leftAt) {
+        this.status = MeetingMemberStatus.LEFT;
+        this.leftAt = leftAt;
+    }
+
     public boolean isLeader() {
         return this.role == MeetingMemberRole.LEADER;
     }
