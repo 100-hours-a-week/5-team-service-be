@@ -11,14 +11,47 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
 public class WaitingRoomSseService {
 
     private static final long SSE_TIMEOUT = 30 * 60 * 1000L;
+    private static final long HEARTBEAT_INTERVAL_SECONDS = 15;
 
     private final Map<Long, List<SseEmitter>> emitters = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService heartbeatExecutor =
+            Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "sse-heartbeat");
+                t.setDaemon(true);
+                return t;
+            });
+
+    @jakarta.annotation.PostConstruct
+    private void startHeartbeat() {
+        heartbeatExecutor.scheduleAtFixedRate(this::sendHeartbeatToAll,
+                HEARTBEAT_INTERVAL_SECONDS, HEARTBEAT_INTERVAL_SECONDS, TimeUnit.SECONDS);
+    }
+
+    @jakarta.annotation.PreDestroy
+    private void stopHeartbeat() {
+        heartbeatExecutor.shutdown();
+    }
+
+    private void sendHeartbeatToAll() {
+        emitters.forEach((roomId, roomEmitters) -> {
+            for (SseEmitter emitter : roomEmitters) {
+                try {
+                    emitter.send(SseEmitter.event().comment("heartbeat"));
+                } catch (IOException e) {
+                    remove(roomId, emitter);
+                }
+            }
+        });
+    }
 
     public SseEmitter subscribe(Long roomId) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
