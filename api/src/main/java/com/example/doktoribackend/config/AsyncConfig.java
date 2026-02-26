@@ -13,11 +13,6 @@ import java.util.concurrent.Executors;
 @EnableScheduling
 public class AsyncConfig {
 
-    @Bean(name = "notificationExecutor")
-    public Executor notificationExecutor() {
-        return Executors.newVirtualThreadPerTaskExecutor();
-    }
-
     @Bean(name = "aiValidationExecutor")
     public Executor aiValidationExecutor() {
         return Executors.newVirtualThreadPerTaskExecutor();

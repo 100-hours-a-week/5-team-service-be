@@ -7,6 +7,7 @@ import com.example.doktoribackend.notification.domain.Notification;
 import com.example.doktoribackend.notification.domain.NotificationType;
 import com.example.doktoribackend.notification.domain.NotificationTypeCode;
 import com.example.doktoribackend.notification.dto.HasUnreadResponse;
+import com.example.doktoribackend.notification.dto.NotificationDeliveryTask;
 import com.example.doktoribackend.notification.dto.NotificationListResponse;
 import com.example.doktoribackend.notification.dto.NotificationResponse;
 import com.example.doktoribackend.notification.dto.SseNotificationEvent;
@@ -17,13 +18,16 @@ import com.example.doktoribackend.notification.repository.NotificationTypeReposi
 import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
@@ -31,9 +35,8 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final NotificationTypeRepository notificationTypeRepository;
     private final UserRepository userRepository;
-    private final FcmService fcmService;
-    private final SseEmitterService sseEmitterService;
     private final TemplateRenderer templateRenderer;
+    private final BlockingQueue<NotificationDeliveryTask> notificationDeliveryQueue;
 
     private static final int RECENT_DAYS = 3;
 
@@ -63,8 +66,15 @@ public class NotificationService {
 
         notification = notificationRepository.save(notification);
 
-        sendSseNotification(userId, notification);
-        fcmService.sendToUser(userId, title, message, linkPath);
+        SseNotificationEvent sseEvent = new SseNotificationEvent(
+                notification.getId(),
+                notification.getType().getCode(),
+                notification.getTitle(),
+                notification.getMessage(),
+                notification.getLinkPath(),
+                notification.getCreatedAt()
+        );
+        enqueue(new NotificationDeliveryTask(List.of(userId), title, message, linkPath, sseEvent));
 
         return notification;
     }
@@ -108,21 +118,13 @@ public class NotificationService {
                 linkPath,
                 LocalDateTime.now()
         );
-        sseEmitterService.sendToUsers(userIds, sseEvent);
-
-        fcmService.sendToUsers(userIds, title, message, linkPath);
+        enqueue(new NotificationDeliveryTask(userIds, title, message, linkPath, sseEvent));
     }
 
-    private void sendSseNotification(Long userId, Notification notification) {
-        SseNotificationEvent event = new SseNotificationEvent(
-                notification.getId(),
-                notification.getType().getCode(),
-                notification.getTitle(),
-                notification.getMessage(),
-                notification.getLinkPath(),
-                notification.getCreatedAt()
-        );
-        sseEmitterService.sendToUser(userId, event);
+    private void enqueue(NotificationDeliveryTask task) {
+        if (!notificationDeliveryQueue.offer(task)) {
+            log.warn("Notification delivery queue is full, task dropped for userIds: {}", task.userIds());
+        }
     }
 
     @Transactional(readOnly = true)

@@ -7,6 +7,7 @@ import com.example.doktoribackend.notification.domain.Notification;
 import com.example.doktoribackend.notification.domain.NotificationType;
 import com.example.doktoribackend.notification.domain.NotificationTypeCode;
 import com.example.doktoribackend.notification.dto.HasUnreadResponse;
+import com.example.doktoribackend.notification.dto.NotificationDeliveryTask;
 import com.example.doktoribackend.notification.dto.NotificationListResponse;
 import com.example.doktoribackend.notification.exception.NotificationTypeNotFoundException;
 import com.example.doktoribackend.notification.repository.NotificationRepository;
@@ -25,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.BlockingQueue;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -49,13 +51,10 @@ class NotificationServiceTest {
     UserRepository userRepository;
 
     @Mock
-    FcmService fcmService;
-
-    @Mock
-    SseEmitterService sseEmitterService;
-
-    @Mock
     TemplateRenderer templateRenderer;
+
+    @Mock
+    BlockingQueue<NotificationDeliveryTask> notificationDeliveryQueue;
 
     @InjectMocks
     NotificationService notificationService;
@@ -105,8 +104,7 @@ class NotificationServiceTest {
         assertThat(result.getTitle()).isEqualTo("10분 후 토론이 시작돼요");
 
         then(notificationRepository).should().save(any(Notification.class));
-        then(sseEmitterService).should().sendToUser(eq(userId), any());
-        then(fcmService).should().sendToUser(eq(userId), anyString(), anyString(), anyString());
+        then(notificationDeliveryQueue).should().offer(any(NotificationDeliveryTask.class));
     }
 
     @Test
@@ -182,8 +180,7 @@ class NotificationServiceTest {
 
         // then
         then(notificationRepository).should().saveAll(anyList());
-        then(sseEmitterService).should().sendToUsers(eq(userIds), any());
-        then(fcmService).should().sendToUsers(eq(userIds), anyString(), anyString(), anyString());
+        then(notificationDeliveryQueue).should().offer(any(NotificationDeliveryTask.class));
     }
 
     @Test
@@ -198,7 +195,7 @@ class NotificationServiceTest {
 
         // then
         then(notificationRepository).should(never()).saveAll(anyList());
-        then(fcmService).should(never()).sendToUsers(anyList(), anyString(), anyString(), anyString());
+        then(notificationDeliveryQueue).should(never()).offer(any(NotificationDeliveryTask.class));
     }
 
     @Test

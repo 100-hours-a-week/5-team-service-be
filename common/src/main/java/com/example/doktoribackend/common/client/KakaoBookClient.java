@@ -2,83 +2,76 @@ package com.example.doktoribackend.common.client;
 
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.Optional;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class KakaoBookClient {
 
-    private final RestTemplate restTemplate;
+    private final WebClient webClient;
 
-    @Value("${kakao.book.base-url}")
-    private String baseUrl;
-
-    @Value("${kakao.book.rest-api-key}")
-    private String restApiKey;
+    public KakaoBookClient(
+            @Value("${kakao.book.base-url}") String baseUrl,
+            @Value("${kakao.book.rest-api-key}") String restApiKey
+    ) {
+        this.webClient = WebClient.builder()
+                .baseUrl(baseUrl)
+                .defaultHeader("Authorization", "KakaoAK " + restApiKey)
+                .build();
+    }
 
     public KakaoBookResponse search(String query, int page, int size) {
-        String url = UriComponentsBuilder.fromUriString(baseUrl)
-                .queryParam("query", query)
-                .queryParam("page", page)
-                .queryParam("size", size)
-                .build()
-                .toUriString();
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "KakaoAK " + restApiKey);
-
-        HttpEntity<Void> request = new HttpEntity<>(headers);
-
         try {
-            ResponseEntity<KakaoBookResponse> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    request,
-                    KakaoBookResponse.class
-            );
+            KakaoBookResponse response = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .queryParam("query", query)
+                            .queryParam("page", page)
+                            .queryParam("size", size)
+                            .build())
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, clientResponse ->
+                            clientResponse.createException().map(e -> {
+                                log.warn("Kakao book search failed: status={}", clientResponse.statusCode());
+                                return new BusinessException(ErrorCode.UPSTREAM_KAKAO_FAILED);
+                            }))
+                    .bodyToMono(KakaoBookResponse.class)
+                    .block();
 
-            if (response.getBody() == null) {
+            if (response == null) {
                 throw new BusinessException(ErrorCode.UPSTREAM_KAKAO_FAILED);
             }
-            return response.getBody();
-        } catch (RestClientException ex) {
+            return response;
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
             log.warn("Kakao book search failed: {}", ex.getMessage());
             throw new BusinessException(ErrorCode.UPSTREAM_KAKAO_FAILED);
         }
     }
 
     public Optional<KakaoBookResponse.KakaoBookDocument> searchByIsbn(String isbn) {
-        String url = UriComponentsBuilder.fromUriString(baseUrl)
-                .queryParam("query", isbn)
-                .queryParam("target", "isbn")
-                .queryParam("size", 1)
-                .build()
-                .toUriString();
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "KakaoAK " + restApiKey);
-
-        HttpEntity<Void> request = new HttpEntity<>(headers);
-
         try {
-            ResponseEntity<KakaoBookResponse> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    request,
-                    KakaoBookResponse.class
-            );
+            KakaoBookResponse body = webClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .queryParam("query", isbn)
+                            .queryParam("target", "isbn")
+                            .queryParam("size", 1)
+                            .build())
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, clientResponse ->
+                            clientResponse.createException().map(e -> {
+                                log.warn("Kakao book search by ISBN failed: isbn={}, status={}", isbn, clientResponse.statusCode());
+                                return e;
+                            }))
+                    .bodyToMono(KakaoBookResponse.class)
+                    .block();
 
-            KakaoBookResponse body = response.getBody();
             if (body == null || body.documents() == null || body.documents().isEmpty()) {
                 return Optional.empty();
             }

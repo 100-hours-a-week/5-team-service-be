@@ -17,6 +17,8 @@ bin/
 **/application-secret.yml
 .env
 **/src/main/resources/firebase-service-account.json
+reload-dev-backend.sh
+update-dev-param.sh
 
 ##################################
 # IntelliJ IDEA
