@@ -11,15 +11,14 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 
-@Tag(name = "Leader Delegation", description = "모임장 위임 API")
 public interface LeaderDelegationApi {
 
     @CommonErrorResponses
     @AuthErrorResponses
     @Operation(
+            tags = {"Leader Delegation"},
             summary = "모임장 위임",
             description = "모임장이 다른 모임원에게 모임장 권한을 위임합니다."
     )

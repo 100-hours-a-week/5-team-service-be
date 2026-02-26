@@ -11,15 +11,14 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 
-@Tag(name = "Topic Recommendation", description = "토론 주제 추천 API")
 public interface TopicRecommendationApi {
 
     @CommonErrorResponses
     @AuthErrorResponses
     @Operation(
+            tags = {"Topic Recommendation"},
             summary = "토론 주제 추천/저장",
             description = "모임장이 특정 회차의 토론 주제를 AI로 추천받거나 직접 입력합니다."
     )

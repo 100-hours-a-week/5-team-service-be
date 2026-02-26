@@ -11,15 +11,14 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 
-@Tag(name = "Meeting Participation", description = "모임 참여 관리 API")
 public interface MeetingParticipationApi {
 
     @CommonErrorResponses
     @AuthErrorResponses
     @Operation(
+            tags = {"Meeting Participation"},
             summary = "참여 요청 승인/거절",
             description = "모임장이 참여 요청을 승인하거나 거절합니다."
     )

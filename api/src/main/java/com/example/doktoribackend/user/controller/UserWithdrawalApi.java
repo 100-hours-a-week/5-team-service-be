@@ -7,15 +7,14 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.ResponseEntity;
 
-@Tag(name = "User", description = "사용자 API")
 public interface UserWithdrawalApi {
 
     @AuthErrorResponses
     @Operation(
+            tags = {"User"},
             summary = "회원 탈퇴",
             description = "본인 계정을 탈퇴 처리합니다. 성공 시 204 No Content를 반환하고 쿠키를 삭제합니다."
     )
