@@ -794,4 +794,10 @@ public class MeetingService {
                 .status(newStatus.name())
                 .build();
     }
+
+    @Transactional
+    public void cancelParticipation(Long userId, Long meetingId) {
+        // TODO: 커밋 2에서 구현
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
 }
