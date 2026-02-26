@@ -3,7 +3,6 @@ package com.example.doktoribackend.meeting.controller;
 import com.example.doktoribackend.common.response.ApiResult;
 import com.example.doktoribackend.common.swagger.AuthErrorResponses;
 import com.example.doktoribackend.common.swagger.CommonErrorResponses;
-import com.example.doktoribackend.meeting.dto.TopicRecommendationRequest;
 import com.example.doktoribackend.meeting.dto.TopicRecommendationResponse;
 import com.example.doktoribackend.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,8 +18,8 @@ public interface TopicRecommendationApi {
     @AuthErrorResponses
     @Operation(
             tags = {"Topic Recommendation"},
-            summary = "토론 주제 추천/저장",
-            description = "모임장이 특정 회차의 토론 주제를 AI로 추천받거나 직접 입력합니다."
+            summary = "토론 주제 AI 추천",
+            description = "모임장이 특정 회차의 토론 주제를 AI로 추천받습니다."
     )
     @ApiResponse(
             responseCode = "200",
@@ -34,11 +33,7 @@ public interface TopicRecommendationApi {
                               "data": {
                                 "meetingId": 123,
                                 "roundNo": 1,
-                                "topic": {
-                                  "topicNo": 1,
-                                  "topic": "주인공의 주요 선택들이 관계와 가치관을 어떻게 바꿨는지 토론합니다.",
-                                  "source": "AI"
-                                },
+                                "topic": "주인공의 주요 선택들이 관계와 가치관을 어떻게 바꿨는지 토론합니다.",
                                 "remainingCount": 14
                               }
                             }
@@ -115,7 +110,6 @@ public interface TopicRecommendationApi {
     ResponseEntity<ApiResult<TopicRecommendationResponse>> recommendTopic(
             @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(description = "모임 ID", example = "123") Long meetingId,
-            @Parameter(description = "회차 번호", example = "1") Integer roundNo,
-            TopicRecommendationRequest request
+            @Parameter(description = "회차 번호", example = "1") Integer roundNo
     );
 }

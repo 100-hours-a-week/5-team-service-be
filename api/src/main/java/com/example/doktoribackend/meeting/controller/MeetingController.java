@@ -15,7 +15,6 @@ import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
 import com.example.doktoribackend.meeting.dto.MeetingUpdateRequest;
 import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateRequest;
 import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateResponse;
-import com.example.doktoribackend.meeting.dto.TopicRecommendationRequest;
 import com.example.doktoribackend.meeting.dto.TopicRecommendationResponse;
 import com.example.doktoribackend.meeting.service.LeaderDelegationService;
 import com.example.doktoribackend.meeting.service.MeetingService;
@@ -471,8 +470,7 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
     public ResponseEntity<ApiResult<TopicRecommendationResponse>> recommendTopic(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long meetingId,
-            @PathVariable Integer roundNo,
-            @Valid @RequestBody TopicRecommendationRequest request
+            @PathVariable Integer roundNo
     ) {
         if (userDetails == null) {
             throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
@@ -486,13 +484,8 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        // mode=LEADER인데 topic이 없는 경우
-        if (request.isLeaderMode() && (request.topic() == null || request.topic().isBlank())) {
-            throw new BusinessException(ErrorCode.TOPIC_REQUIRED_FOR_LEADER_MODE);
-        }
-
         TopicRecommendationResponse response = topicRecommendationService.recommendTopic(
-                userDetails.getId(), meetingId, roundNo, request);
+                userDetails.getId(), meetingId, roundNo);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 

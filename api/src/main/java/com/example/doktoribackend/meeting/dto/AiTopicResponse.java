@@ -5,7 +5,6 @@ public record AiTopicResponse(
         Data data
 ) {
     public record Data(
-            Integer topicNo,
             String topic
     ) {
     }
