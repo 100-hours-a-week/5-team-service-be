@@ -25,6 +25,7 @@ import com.example.doktoribackend.meeting.dto.MeetingDetailResponse;
 import com.example.doktoribackend.meeting.dto.JoinMeetingResponse;
 import com.example.doktoribackend.meeting.dto.MeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MeetingListResponse;
+import com.example.doktoribackend.meeting.dto.MeetingMembersResponse;
 import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
 import com.example.doktoribackend.meeting.dto.MeetingUpdateRequest;
 import com.example.doktoribackend.meeting.dto.MyMeetingListRequest;
@@ -52,6 +53,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -845,5 +847,55 @@ public class MeetingService {
 
         // 6. 모임 인원 감소
         meeting.decrementCurrentCount();
+    }
+
+    @Transactional(readOnly = true)
+    public MeetingMembersResponse getMeetingMembers(Long userId, Long meetingId) {
+        // 1. 모임 조회
+        Meeting meeting = meetingRepository.findByIdWithLeader(meetingId)
+                .filter(m -> m.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+
+        // 2. 권한 체크 (모임장만)
+        if (!meeting.isLeader(userId)) {
+            throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+        }
+
+        // 3. APPROVED 멤버 목록 조회
+        List<MeetingMember> approvedMembers = meetingMemberRepository
+                .findApprovedMembersByMeetingIdOrderByCreatedAt(meetingId);
+
+        // 4. approvedAt 기준 정렬 (joinedAt)
+        List<MeetingMember> sortedMembers = approvedMembers.stream()
+                .sorted((m1, m2) -> {
+                    if (m1.getApprovedAt() == null && m2.getApprovedAt() == null) return 0;
+                    if (m1.getApprovedAt() == null) return 1;
+                    if (m2.getApprovedAt() == null) return -1;
+                    return m1.getApprovedAt().compareTo(m2.getApprovedAt());
+                })
+                .toList();
+
+        // 5. 응답 생성
+        List<MeetingMembersResponse.MemberInfo> memberInfos = sortedMembers.stream()
+                .map(member -> MeetingMembersResponse.MemberInfo.builder()
+                        .meetingMemberId(member.getId())
+                        .nickname(member.getUser().getNickname())
+                        .profileImagePath(imageUrlResolver.toUrl(member.getUser().getProfileImagePath()))
+                        .joinedAt(toKstOffset(member.getApprovedAt()))
+                        .build())
+                .toList();
+
+        return MeetingMembersResponse.builder()
+                .meetingId(meetingId)
+                .memberCount(memberInfos.size())
+                .members(memberInfos)
+                .build();
+    }
+
+    private OffsetDateTime toKstOffset(LocalDateTime time) {
+        if (time == null) {
+            return null;
+        }
+        return time.atZone(java.time.ZoneId.of("Asia/Seoul")).toOffsetDateTime();
     }
 }
