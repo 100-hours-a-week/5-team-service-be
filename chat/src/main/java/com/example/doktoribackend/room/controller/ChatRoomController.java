@@ -13,6 +13,7 @@ import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
 import com.example.doktoribackend.room.dto.ChatRoomListResponse;
 import com.example.doktoribackend.room.dto.ChatRoomStartResponse;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
+import com.example.doktoribackend.summary.dto.ChatRoomSummaryResponse;
 import com.example.doktoribackend.message.dto.MessageListResponse;
 import com.example.doktoribackend.message.service.MessageService;
 import com.example.doktoribackend.quiz.service.QuizService;
@@ -187,6 +188,16 @@ public class ChatRoomController implements ChatRoomApi {
     ) {
         chatRoomService.leaveChatRoom(roomId, userDetails.getId());
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{roomId}/summary")
+    @Override
+    public ResponseEntity<ApiResult<ChatRoomSummaryResponse>> getRoomSummary(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId
+    ) {
+        ChatRoomSummaryResponse response = chatRoomQueryService.getRoomSummary(roomId);
+        return ResponseEntity.ok(ApiResult.ok(response));
     }
 
     @PostMapping("/quiz-recommendations")
