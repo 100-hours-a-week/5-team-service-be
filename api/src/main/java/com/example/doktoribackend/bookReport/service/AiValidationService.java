@@ -6,8 +6,8 @@ import com.example.doktoribackend.bookReport.dto.AiValidationResponse;
 import com.example.doktoribackend.bookReport.repository.BookReportRepository;
 import com.example.doktoribackend.notification.domain.NotificationTypeCode;
 import com.example.doktoribackend.notification.service.NotificationService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
@@ -19,32 +19,17 @@ import org.springframework.web.client.RestClient;
 import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class AiValidationService {
 
-    private final RestClient restClient;
     private final BookReportRepository bookReportRepository;
     private final PlatformTransactionManager transactionManager;
     private final NotificationService notificationService;
+    private final RestClient aiRestClient;
 
     private static final int MAX_RETRY = 3;
-    private static final long RETRY_DELAY_MS = 2000;
-
-    public AiValidationService(
-            BookReportRepository bookReportRepository,
-            PlatformTransactionManager transactionManager,
-            NotificationService notificationService,
-            @Value("${ai.base-url}") String aiValidationBaseUrl,
-            @Value("${ai.api-key}") String apiKey
-    ) {
-        this.bookReportRepository = bookReportRepository;
-        this.transactionManager = transactionManager;
-        this.notificationService = notificationService;
-        this.restClient = RestClient.builder()
-                .baseUrl(aiValidationBaseUrl)
-                .defaultHeader("x-api-key", apiKey)
-                .build();
-    }
+    private long retryDelayMs = 2000L;
 
     @Async("aiValidationExecutor")
     public void validate(Long bookReportId, String bookTitle, String content) {
@@ -67,7 +52,7 @@ public class AiValidationService {
         int attempt = 0;
         while (attempt < MAX_RETRY) {
             try {
-                return restClient.post()
+                return aiRestClient.post()
                         .uri(uri)
                         .contentType(MediaType.APPLICATION_JSON)
                         .body(request)
@@ -83,7 +68,7 @@ public class AiValidationService {
 
                 if (attempt < MAX_RETRY) {
                     try {
-                        Thread.sleep(RETRY_DELAY_MS * attempt);
+                        Thread.sleep(retryDelayMs * attempt);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         log.error("AI validation retry interrupted for bookReportId: {}", bookReportId);
