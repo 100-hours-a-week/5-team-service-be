@@ -935,8 +935,53 @@ public class MeetingService {
 
     @Transactional(readOnly = true)
     public ParticipationListResponse getParticipations(Long userId, Long meetingId, Integer size, Long cursorId) {
-        // TODO: 커밋 2에서 구현
-        throw new UnsupportedOperationException("Not implemented yet");
+        // 1. 모임 조회
+        Meeting meeting = meetingRepository.findByIdWithLeader(meetingId)
+                .filter(m -> m.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+
+        // 2. 권한 체크 (모임장만)
+        if (!meeting.isLeader(userId)) {
+            throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+        }
+
+        // 3. size 기본값 및 최대값 처리
+        final int DEFAULT_PAGE_SIZE = 10;
+        final int MAX_PAGE_SIZE = 100;
+        int requestedSize = (size == null || size <= 0) ? DEFAULT_PAGE_SIZE : size;
+        int pageSize = Math.min(requestedSize, MAX_PAGE_SIZE);
+
+        // 4. PENDING 멤버 조회 (size + 1 for hasNext)
+        List<MeetingMember> pendingMembers = meetingMemberRepository.findPendingMembersByMeetingId(
+                meetingId,
+                cursorId,
+                org.springframework.data.domain.PageRequest.of(0, pageSize + 1)
+        );
+
+        // 5. hasNext 판단
+        boolean hasNext = pendingMembers.size() > pageSize;
+        List<MeetingMember> sliced = hasNext ? pendingMembers.subList(0, pageSize) : pendingMembers;
+
+        // 6. 응답 생성
+        List<ParticipationListResponse.ParticipationItem> items = sliced.stream()
+                .map(member -> ParticipationListResponse.ParticipationItem.builder()
+                        .meetingMemberId(member.getId())
+                        .status(member.getStatus().name())
+                        .requestedAt(toKstOffset(member.getCreatedAt()))
+                        .nickname(member.getUser().getNickname())
+                        .memberIntro(member.getMemberIntro())
+                        .profileImagePath(imageUrlResolver.toUrl(member.getUser().getProfileImagePath()))
+                        .build())
+                .toList();
+
+        Long nextCursorId = hasNext ? sliced.get(sliced.size() - 1).getId() : null;
+        PageInfo pageInfo = new PageInfo(nextCursorId, hasNext, pageSize);
+
+        return ParticipationListResponse.builder()
+                .meetingId(meetingId)
+                .items(items)
+                .pageInfo(pageInfo)
+                .build();
     }
 
     private OffsetDateTime toKstOffset(LocalDateTime time) {

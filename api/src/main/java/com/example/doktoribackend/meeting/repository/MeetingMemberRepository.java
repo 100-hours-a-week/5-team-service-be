@@ -62,4 +62,16 @@ public interface MeetingMemberRepository extends JpaRepository<MeetingMember, Lo
            ")")
     boolean existsWithdrawalBlockingMeeting(@Param("userId") Long userId, @Param("now") LocalDateTime now);
 
+    @Query("SELECT mm FROM MeetingMember mm " +
+           "JOIN FETCH mm.user " +
+           "WHERE mm.meeting.id = :meetingId " +
+           "AND mm.status = 'PENDING' " +
+           "AND (:cursorId IS NULL OR mm.id > :cursorId) " +
+           "ORDER BY mm.createdAt ASC, mm.id ASC")
+    List<MeetingMember> findPendingMembersByMeetingId(
+            @Param("meetingId") Long meetingId,
+            @Param("cursorId") Long cursorId,
+            org.springframework.data.domain.Pageable pageable
+    );
+
 }
