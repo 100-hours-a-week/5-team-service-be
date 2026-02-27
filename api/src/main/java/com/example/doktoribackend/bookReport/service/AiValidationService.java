@@ -8,6 +8,7 @@ import com.example.doktoribackend.notification.domain.NotificationTypeCode;
 import com.example.doktoribackend.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
@@ -29,7 +30,9 @@ public class AiValidationService {
     private final RestClient aiRestClient;
 
     private static final int MAX_RETRY = 3;
-    private long retryDelayMs = 2000L;
+
+    @Value("${ai.retry-delay-ms:2000}")
+    private long retryDelayMs;
 
     @Async("aiValidationExecutor")
     public void validate(Long bookReportId, String bookTitle, String content) {
