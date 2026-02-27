@@ -187,6 +187,7 @@ public class BookReportService {
                     BookReportManagementResponse.BookReportInfo bookReportInfo = null;
                     if (bookReport != null) {
                         bookReportInfo = BookReportManagementResponse.BookReportInfo.builder()
+                                .id(bookReport.getId())
                                 .status(bookReport.getStatus().name())
                                 .submittedAt(toKstOffset(bookReport.getCreatedAt()))
                                 .build();
