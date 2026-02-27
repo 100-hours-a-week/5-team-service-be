@@ -26,6 +26,7 @@ import com.example.doktoribackend.meeting.dto.JoinMeetingResponse;
 import com.example.doktoribackend.meeting.dto.MeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MeetingListResponse;
 import com.example.doktoribackend.meeting.dto.MeetingMembersResponse;
+import com.example.doktoribackend.meeting.dto.PendingMembersResponse;
 import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
 import com.example.doktoribackend.meeting.dto.MeetingUpdateRequest;
 import com.example.doktoribackend.meeting.dto.MyMeetingListRequest;
@@ -48,6 +49,7 @@ import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -889,6 +891,40 @@ public class MeetingService {
                 .meetingId(meetingId)
                 .memberCount(memberInfos.size())
                 .members(memberInfos)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public PendingMembersResponse getPendingMembers(Long userId, Long meetingId, Long cursorId, int size) {
+        Meeting meeting = meetingRepository.findByIdWithLeader(meetingId)
+                .filter(m -> m.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+
+        if (!meeting.isLeader(userId)) {
+            throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+        }
+
+        List<MeetingMember> pendingMembers = meetingMemberRepository
+                .findPendingMembersByMeetingIdWithCursor(meetingId, cursorId, PageRequest.of(0, size + 1));
+
+        boolean hasNext = pendingMembers.size() > size;
+        List<MeetingMember> content = hasNext ? pendingMembers.subList(0, size) : pendingMembers;
+
+        List<PendingMembersResponse.PendingMemberInfo> memberInfos = content.stream()
+                .map(member -> PendingMembersResponse.PendingMemberInfo.builder()
+                        .meetingMemberId(member.getId())
+                        .nickname(member.getUser().getNickname())
+                        .memberIntro(member.getMemberIntro())
+                        .profileImagePath(imageUrlResolver.toUrl(member.getUser().getProfileImagePath()))
+                        .build())
+                .toList();
+
+        Long nextCursorId = hasNext ? content.getLast().getId() : null;
+        PageInfo pageInfo = new PageInfo(nextCursorId, hasNext, size);
+
+        return PendingMembersResponse.builder()
+                .members(memberInfos)
+                .pageInfo(pageInfo)
                 .build();
     }
 

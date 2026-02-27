@@ -12,6 +12,7 @@ import com.example.doktoribackend.meeting.dto.JoinMeetingResponse;
 import com.example.doktoribackend.meeting.dto.MeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MeetingListResponse;
 import com.example.doktoribackend.meeting.dto.MeetingMembersResponse;
+import com.example.doktoribackend.meeting.dto.PendingMembersResponse;
 import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
 import com.example.doktoribackend.meeting.dto.MeetingUpdateRequest;
 import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateRequest;
@@ -42,7 +43,7 @@ import java.net.URI;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/meetings")
-public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi, LeaderDelegationApi, CancelParticipationApi, LeaveMeetingApi, MeetingMembersApi, KickMemberApi {
+public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi, LeaderDelegationApi, CancelParticipationApi, LeaveMeetingApi, MeetingMembersApi, KickMemberApi, PendingMembersApi {
 
     private final MeetingService meetingService;
     private final TopicRecommendationService topicRecommendationService;
@@ -585,5 +586,36 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
 
         meetingService.kickMember(userDetails.getId(), meetingId, memberId);
         return ResponseEntity.noContent().build();
+    }
+
+    private static final int MAX_PENDING_SIZE = 20;
+
+    @Override
+    @GetMapping("/{meetingId}/participants")
+    public ResponseEntity<ApiResult<PendingMembersResponse>> getPendingMembers(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "20") Integer size
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        if (size < 1 || size > MAX_PENDING_SIZE) {
+            throw new BusinessException(ErrorCode.PAGINATION_SIZE_OUT_OF_RANGE);
+        }
+
+        if (cursorId != null && cursorId < 1) {
+            throw new BusinessException(ErrorCode.PAGINATION_INVALID_CURSOR);
+        }
+
+        PendingMembersResponse response = meetingService.getPendingMembers(
+                userDetails.getId(), meetingId, cursorId, size);
+        return ResponseEntity.ok(ApiResult.ok(response));
     }
 }
