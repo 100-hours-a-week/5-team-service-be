@@ -6,6 +6,7 @@ import com.example.doktoribackend.book.service.BookService;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.quiz.service.QuizService;
+import com.example.doktoribackend.summary.service.RoundSummaryService;
 import com.example.doktoribackend.room.domain.ChattingRoom;
 import com.example.doktoribackend.room.domain.ChattingRoomMember;
 import com.example.doktoribackend.room.domain.MemberRole;
@@ -94,6 +95,9 @@ class ChatRoomServiceTest {
 
     @Mock
     private ChatRoomQueryService chatRoomQueryService;
+
+    @Mock
+    private RoundSummaryService roundSummaryService;
 
     @InjectMocks
     private ChatRoomService chatRoomService;

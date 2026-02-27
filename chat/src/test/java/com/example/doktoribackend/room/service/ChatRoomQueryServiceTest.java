@@ -16,6 +16,7 @@ import com.example.doktoribackend.room.dto.WaitingRoomResponse;
 import com.example.doktoribackend.room.repository.ChattingRoomMemberRepository;
 import com.example.doktoribackend.room.repository.ChattingRoomRepository;
 import com.example.doktoribackend.room.repository.RoomRoundRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,9 @@ class ChatRoomQueryServiceTest {
 
     @Mock
     private ImageUrlResolver imageUrlResolver;
+
+    @Mock
+    private ObjectMapper objectMapper;
 
     @InjectMocks
     private ChatRoomQueryService chatRoomQueryService;
