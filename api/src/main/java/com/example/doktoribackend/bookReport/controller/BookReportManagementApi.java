@@ -39,6 +39,7 @@ public interface BookReportManagementApi {
                                     "meetingMemberId": 10,
                                     "nickname": "startup",
                                     "bookReport": {
+                                      "id": 1,
                                       "status": "APPROVED",
                                       "submittedAt": "2026-01-12T18:10:00+09:00"
                                     },
@@ -48,6 +49,7 @@ public interface BookReportManagementApi {
                                     "meetingMemberId": 11,
                                     "nickname": "ella",
                                     "bookReport": {
+                                      "id": 2,
                                       "status": "REJECTED",
                                       "submittedAt": "2026-01-12T19:00:00+09:00"
                                     },

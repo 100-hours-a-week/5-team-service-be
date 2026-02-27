@@ -42,6 +42,9 @@ public record BookReportManagementResponse(
     @Builder
     @Schema(description = "독후감 정보")
     public record BookReportInfo(
+            @Schema(description = "독후감 ID", example = "123")
+            Long id,
+
             @Schema(description = "독후감 상태", example = "APPROVED")
             String status,
 
