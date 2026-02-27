@@ -25,6 +25,7 @@ import com.example.doktoribackend.meeting.dto.MeetingDetailResponse;
 import com.example.doktoribackend.meeting.dto.JoinMeetingResponse;
 import com.example.doktoribackend.meeting.dto.MeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MeetingListResponse;
+import com.example.doktoribackend.meeting.dto.MeetingMembersResponse;
 import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
 import com.example.doktoribackend.meeting.dto.MeetingUpdateRequest;
 import com.example.doktoribackend.meeting.dto.MyMeetingListRequest;
@@ -845,5 +846,11 @@ public class MeetingService {
 
         // 6. 모임 인원 감소
         meeting.decrementCurrentCount();
+    }
+
+    @Transactional(readOnly = true)
+    public MeetingMembersResponse getMeetingMembers(Long userId, Long meetingId) {
+        // TODO: 커밋 2에서 구현
+        throw new UnsupportedOperationException("Not implemented yet");
     }
 }
