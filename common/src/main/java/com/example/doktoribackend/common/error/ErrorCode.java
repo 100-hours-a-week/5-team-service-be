@@ -77,6 +77,8 @@ public enum ErrorCode {
     PARTICIPATION_CANCEL_NOT_ALLOWED(HttpStatus.CONFLICT, "PARTICIPATION_CANCEL_NOT_ALLOWED", "이미 승인된 참여 요청은 취소할 수 없습니다."),
     LEADER_CANNOT_LEAVE(HttpStatus.CONFLICT, "LEADER_CANNOT_LEAVE", "모임장은 위임 후 탈퇴해야 합니다."),
     LEAVE_NOT_ALLOWED(HttpStatus.CONFLICT, "LEAVE_NOT_ALLOWED", "탈퇴할 수 없는 상태입니다."),
+    CANNOT_KICK_SELF(HttpStatus.CONFLICT, "CANNOT_KICK_SELF", "자기 자신을 강퇴할 수 없습니다."),
+    KICK_NOT_ALLOWED(HttpStatus.CONFLICT, "KICK_NOT_ALLOWED", "강퇴할 수 없는 상태입니다."),
 
     // LeaderDelegation
     LEADER_DELEGATION_FORBIDDEN(HttpStatus.FORBIDDEN, "LEADER_DELEGATION_FORBIDDEN", "모임장 위임 권한이 없습니다."),

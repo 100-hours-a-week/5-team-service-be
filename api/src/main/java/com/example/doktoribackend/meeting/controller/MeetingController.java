@@ -42,7 +42,7 @@ import java.net.URI;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/meetings")
-public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi, LeaderDelegationApi, CancelParticipationApi, LeaveMeetingApi, MeetingMembersApi {
+public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi, LeaderDelegationApi, CancelParticipationApi, LeaveMeetingApi, MeetingMembersApi, KickMemberApi {
 
     private final MeetingService meetingService;
     private final TopicRecommendationService topicRecommendationService;
@@ -562,5 +562,28 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
 
         MeetingMembersResponse response = meetingService.getMeetingMembers(userDetails.getId(), meetingId);
         return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Override
+    @DeleteMapping("/{meetingId}/members/{memberId}")
+    public ResponseEntity<Void> kickMember(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId,
+            @PathVariable Long memberId
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        if (memberId == null || memberId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        meetingService.kickMember(userDetails.getId(), meetingId, memberId);
+        return ResponseEntity.noContent().build();
     }
 }

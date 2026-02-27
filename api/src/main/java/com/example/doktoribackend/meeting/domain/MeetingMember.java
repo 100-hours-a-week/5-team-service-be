@@ -96,6 +96,11 @@ public class MeetingMember extends BaseTimeEntity {
         this.leftAt = leftAt;
     }
 
+    public void kick(LocalDateTime leftAt) {
+        this.status = MeetingMemberStatus.KICKED;
+        this.leftAt = leftAt;
+    }
+
     public boolean isLeader() {
         return this.role == MeetingMemberRole.LEADER;
     }

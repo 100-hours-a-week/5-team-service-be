@@ -892,6 +892,12 @@ public class MeetingService {
                 .build();
     }
 
+    @Transactional
+    public void kickMember(Long userId, Long meetingId, Long memberId) {
+        // TODO: 커밋 2에서 구현
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
     private OffsetDateTime toKstOffset(LocalDateTime time) {
         if (time == null) {
             return null;
