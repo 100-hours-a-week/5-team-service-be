@@ -19,13 +19,17 @@ import com.example.doktoribackend.room.dto.WaitingRoomResponse;
 import com.example.doktoribackend.room.repository.ChattingRoomMemberRepository;
 import com.example.doktoribackend.room.repository.ChattingRoomRepository;
 import com.example.doktoribackend.room.repository.RoomRoundRepository;
+import com.example.doktoribackend.summary.dto.ChatRoomSummaryResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -38,6 +42,7 @@ public class ChatRoomQueryService {
     private final ChattingRoomMemberRepository chattingRoomMemberRepository;
     private final RoomRoundRepository roomRoundRepository;
     private final ImageUrlResolver imageUrlResolver;
+    private final ObjectMapper objectMapper;
 
     public ChatRoomListResponse getChatRooms(Long cursorId, int size) {
         List<ChattingRoom> rooms = chattingRoomRepository.findByStatusWithCursor(
@@ -105,6 +110,37 @@ public class ChatRoomQueryService {
 
     ChatStartMemberItem toStartMemberItem(ChattingRoomMember member) {
         return ChatStartMemberItem.from(member, imageUrlResolver);
+    }
+
+    public ChatRoomSummaryResponse getRoomSummary(Long roomId) {
+        ChattingRoom room = findRoom(roomId);
+
+        if (room.getStatus() != RoomStatus.ENDED) {
+            throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_ENDED);
+        }
+
+        List<RoomRound> rounds = roomRoundRepository.findByChattingRoomIdOrderByRoundNumberAsc(roomId);
+
+        List<ChatRoomSummaryResponse.RoundSummaryItem> roundItems = rounds.stream()
+                .map(round -> new ChatRoomSummaryResponse.RoundSummaryItem(
+                        round.getRoundNumber(),
+                        parseSummary(round.getSummary())
+                ))
+                .toList();
+
+        return new ChatRoomSummaryResponse(roomId, room.getTopic(), roundItems);
+    }
+
+    private ChatRoomSummaryResponse.RoundSummaryContent parseSummary(String summaryJson) {
+        if (summaryJson == null) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(summaryJson, ChatRoomSummaryResponse.RoundSummaryContent.class);
+        } catch (Exception e) {
+            log.error("Failed to parse round summary JSON: {}", e.getMessage());
+            return null;
+        }
     }
 
     private ChattingRoom findRoom(Long roomId) {

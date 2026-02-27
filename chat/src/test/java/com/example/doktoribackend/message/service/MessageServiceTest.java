@@ -317,7 +317,7 @@ class MessageServiceTest {
         }
 
         @Test
-        @DisplayName("DISCONNECTED 상태 멤버면 CHAT_ROOM_MEMBER_NOT_FOUND 예외")
+        @DisplayName("DISCONNECTED 상태 멤버도 메시지를 전송할 수 있다")
         void sendMessage_disconnectedMember() {
             // given
             MessageSendRequest request = createRequest();
@@ -325,13 +325,20 @@ class MessageServiceTest {
                     .willReturn(Optional.of(createRoomWithStatus(RoomStatus.CHATTING)));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, SENDER_ID))
                     .willReturn(Optional.of(createMemberWithStatus(MemberStatus.DISCONNECTED)));
+            given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(ROOM_ID))
+                    .willReturn(Optional.of(createActiveRound()));
+            given(messageRepository.findByRoomIdAndSenderIdAndClientMessageId(
+                    ROOM_ID, SENDER_ID, CLIENT_MESSAGE_ID))
+                    .willReturn(Optional.empty());
+            given(imageUrlResolver.toUrl(any())).willAnswer(invocation -> invocation.getArgument(0));
 
-            // when & then
-            assertThatThrownBy(() -> messageService.sendMessage(
-                    ROOM_ID, SENDER_ID, SENDER_NICKNAME, request))
-                    .isInstanceOf(BusinessException.class)
-                    .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND);
+            // when
+            MessageResponse response = messageService.sendMessage(
+                    ROOM_ID, SENDER_ID, SENDER_NICKNAME, request);
+
+            // then
+            assertThat(response).isNotNull();
+            assertThat(response.senderId()).isEqualTo(SENDER_ID);
         }
 
         @Test
@@ -655,7 +662,7 @@ class MessageServiceTest {
         }
 
         @Test
-        @DisplayName("DISCONNECTED 상태 멤버면 메시지 조회 시 CHAT_ROOM_MEMBER_NOT_FOUND 예외가 발생한다")
+        @DisplayName("DISCONNECTED 상태 멤버도 메시지를 조회할 수 있다")
         void getMessages_disconnectedMember() {
             // given
             given(chattingRoomRepository.findById(ROOM_ID))
@@ -664,12 +671,15 @@ class MessageServiceTest {
             ReflectionTestUtils.setField(disconnectedMember, "status", MemberStatus.DISCONNECTED);
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, SENDER_ID))
                     .willReturn(Optional.of(disconnectedMember));
+            given(messageRepository.findByRoomIdWithCursor(eq(ROOM_ID), eq(null), any(PageRequest.class)))
+                    .willReturn(Collections.emptyList());
 
-            // when & then
-            assertThatThrownBy(() -> messageService.getMessages(ROOM_ID, SENDER_ID, null, 20))
-                    .isInstanceOf(BusinessException.class)
-                    .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND);
+            // when
+            MessageListResponse response = messageService.getMessages(ROOM_ID, SENDER_ID, null, 20);
+
+            // then
+            assertThat(response.messages()).isEmpty();
+            assertThat(response.pageInfo().hasNext()).isFalse();
         }
 
         @Test

@@ -15,4 +15,7 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     @Query("SELECT m FROM Message m WHERE m.roomId = :roomId AND (:cursorId IS NULL OR m.id < :cursorId) ORDER BY m.id DESC")
     List<Message> findByRoomIdWithCursor(@Param("roomId") Long roomId, @Param("cursorId") Long cursorId, Pageable pageable);
+
+    @Query("SELECT m FROM Message m WHERE m.roundId = :roundId AND m.messageType = 'TEXT' ORDER BY m.id DESC")
+    List<Message> findTextMessagesByRoundIdDesc(@Param("roundId") Long roundId);
 }

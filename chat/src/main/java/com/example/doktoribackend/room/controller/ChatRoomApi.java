@@ -12,6 +12,7 @@ import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
 import com.example.doktoribackend.room.dto.ChatRoomListResponse;
 import com.example.doktoribackend.room.dto.ChatRoomStartResponse;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
+import com.example.doktoribackend.summary.dto.ChatRoomSummaryResponse;
 import com.example.doktoribackend.message.dto.MessageListResponse;
 import com.example.doktoribackend.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -321,6 +322,57 @@ public interface ChatRoomApi {
                                     }
                                     """)))
     ResponseEntity<ApiResult<QuizResponse>> getQuiz(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
+            @Parameter(description = "채팅방 ID", example = "1") Long roomId);
+
+    @CommonErrorResponses
+    @AuthErrorResponses
+    @Operation(summary = "채팅방 요약 조회", description = "종료된 채팅방의 라운드별 AI 요약을 조회합니다. summary가 null이면 아직 AI 처리 중입니다.")
+    @ApiResponse(responseCode = "200", description = "OK",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {
+                              "message": "OK",
+                              "data": {
+                                "roomId": 1,
+                                "topic": "AI가 인간의 일자리를 대체할 수 있는가",
+                                "rounds": [
+                                  {
+                                    "roundNumber": 1,
+                                    "summary": {
+                                      "pro": ["AI는 반복 업무에서 인간보다 효율적"],
+                                      "con": ["인간의 창의성은 AI로 대체 불가"],
+                                      "mainIssues": ["효율성 vs 창의성 대립"],
+                                      "unresolvedIssues": ["새로운 일자리 창출 여부"]
+                                    }
+                                  },
+                                  {
+                                    "roundNumber": 2,
+                                    "summary": null
+                                  }
+                                ]
+                              }
+                            }
+                            """)))
+    @ApiResponse(responseCode = "404", description = "Not Found",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(name = "채팅방 없음",
+                            value = """
+                                    {
+                                      "code": "CHAT_ROOM_NOT_FOUND",
+                                      "message": "존재하지 않는 채팅방입니다."
+                                    }
+                                    """)))
+    @ApiResponse(responseCode = "409", description = "Conflict",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(name = "채팅방 미종료",
+                            value = """
+                                    {
+                                      "code": "CHAT_ROOM_NOT_ENDED",
+                                      "message": "종료된 채팅방만 요약을 조회할 수 있습니다."
+                                    }
+                                    """)))
+    ResponseEntity<ApiResult<ChatRoomSummaryResponse>> getRoomSummary(
             @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(description = "채팅방 ID", example = "1") Long roomId);
 

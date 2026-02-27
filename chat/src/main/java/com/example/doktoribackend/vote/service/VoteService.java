@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class VoteService {
 
-    private static final Duration VOTE_DURATION = Duration.ofMinutes(2);
+    private static final Duration VOTE_DURATION = Duration.ofMinutes(1);
 
     private final VoteRepository voteRepository;
     private final VoteCastRepository voteCastRepository;

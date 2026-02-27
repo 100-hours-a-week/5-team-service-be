@@ -6,6 +6,7 @@ import com.example.doktoribackend.book.repository.BookRepository;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.config.WebSocketSessionRegistry;
 import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.summary.service.RoundSummaryService;
 import com.example.doktoribackend.vote.service.VoteService;
 import com.example.doktoribackend.quiz.service.QuizService;
 import com.example.doktoribackend.room.domain.ChattingRoom;
@@ -30,6 +31,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
@@ -56,6 +59,7 @@ public class ChatRoomService {
     private final ChatRoomEventPublisher chatRoomEventPublisher;
     private final BookRepository bookRepository;
     private final ChatRoomQueryService chatRoomQueryService;
+    private final RoundSummaryService roundSummaryService;
 
     public ChatRoomCreateResponse createChatRoom(Long userId, ChatRoomCreateRequest request) {
         validateCapacity(request.capacity());
@@ -204,12 +208,23 @@ public class ChatRoomService {
             throw new BusinessException(ErrorCode.CHAT_ROOM_MAX_ROUND_REACHED);
         }
 
+        int completedRoundNumber = currentRound.getRoundNumber();
+        Long completedRoundId = currentRound.getId();
+        String topic = room.getTopic();
+
         currentRound.endRound();
 
-        RoomRound newRound = createRound(room, currentRound.getRoundNumber() + 1);
+        RoomRound newRound = createRound(room, completedRoundNumber + 1);
 
         NextRoundResponse response = new NextRoundResponse(newRound.getRoundNumber(), newRound.getStartedAt());
         chatRoomEventPublisher.broadcastNextRound(roomId, response);
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                roundSummaryService.generateSummaryAsync(roomId, completedRoundId, topic, completedRoundNumber);
+            }
+        });
     }
 
     @Transactional
@@ -240,11 +255,15 @@ public class ChatRoomService {
     }
 
     private void endRoom(ChattingRoom room, RoomRound currentRound) {
-        if (currentRound != null) {
-            currentRound.endRound();
+        RoomRound lastRound = currentRound;
+        if (lastRound != null) {
+            lastRound.endRound();
         } else {
-            roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(room.getId())
-                    .ifPresent(RoomRound::endRound);
+            lastRound = roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(room.getId())
+                    .orElse(null);
+            if (lastRound != null) {
+                lastRound.endRound();
+            }
         }
 
         int memberCount = room.getCurrentMemberCount();
@@ -253,6 +272,20 @@ public class ChatRoomService {
         voteService.createVote(room, memberCount);
         sessionRegistry.removeAllForRoom(room.getId());
         chatRoomEventPublisher.broadcastEnded(room.getId());
+
+        if (lastRound != null) {
+            Long roomId = room.getId();
+            Long roundId = lastRound.getId();
+            String topic = room.getTopic();
+            int roundNumber = lastRound.getRoundNumber();
+
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    roundSummaryService.generateSummaryAsync(roomId, roundId, topic, roundNumber);
+                }
+            });
+        }
     }
 
     private ChattingRoom findRoom(Long roomId) {

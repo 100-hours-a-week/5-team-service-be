@@ -37,6 +37,9 @@ public class RoomRound {
     @Column(name = "ended_at")
     private LocalDateTime endedAt;
 
+    @Column(columnDefinition = "TEXT")
+    private String summary;
+
     @Builder
     public RoomRound(ChattingRoom chattingRoom, Integer roundNumber) {
         this.chattingRoom = chattingRoom;
@@ -46,5 +49,9 @@ public class RoomRound {
 
     public void endRound() {
         this.endedAt = LocalDateTime.now();
+    }
+
+    public void updateSummary(String summary) {
+        this.summary = summary;
     }
 }

@@ -37,3 +37,7 @@ kakao:
   book:
     base-url: https://dapi.kakao.com/v3/search/book
     rest-api-key: test-key
+
+ai:
+  base-url: http://localhost:9999
+  api-key: test-ai-key
