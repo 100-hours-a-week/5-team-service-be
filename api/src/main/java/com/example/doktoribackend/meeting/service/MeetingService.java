@@ -894,8 +894,42 @@ public class MeetingService {
 
     @Transactional
     public void kickMember(Long userId, Long meetingId, Long memberId) {
-        // TODO: 커밋 2에서 구현
-        throw new UnsupportedOperationException("Not implemented yet");
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. 모임 조회
+        Meeting meeting = meetingRepository.findByIdWithLeader(meetingId)
+                .filter(m -> m.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+
+        // 2. 권한 체크 (모임장만)
+        if (!meeting.isLeader(userId)) {
+            throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+        }
+
+        // 3. 강퇴 대상 멤버 조회
+        MeetingMember targetMember = meetingMemberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_MEMBER_NOT_FOUND));
+
+        // 4. 해당 모임의 멤버인지 확인
+        if (!targetMember.belongsTo(meetingId)) {
+            throw new BusinessException(ErrorCode.MEETING_MEMBER_NOT_FOUND);
+        }
+
+        // 5. 본인 강퇴 방지
+        if (targetMember.getUser().getId().equals(userId)) {
+            throw new BusinessException(ErrorCode.CANNOT_KICK_SELF);
+        }
+
+        // 6. APPROVED 상태인지 확인
+        if (!targetMember.isApproved()) {
+            throw new BusinessException(ErrorCode.KICK_NOT_ALLOWED);
+        }
+
+        // 7. 강퇴 처리
+        targetMember.kick(now);
+
+        // 8. 모임 인원 감소
+        meeting.decrementCurrentCount();
     }
 
     private OffsetDateTime toKstOffset(LocalDateTime time) {
