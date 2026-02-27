@@ -14,7 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "Meeting Round", description = "모임 회차 API")
+@Tag(name = "Meeting", description = "독서 모임 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/meeting-rounds")
