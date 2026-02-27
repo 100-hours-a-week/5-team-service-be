@@ -10,6 +10,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.WebMvcStompEndpointRegistry;
 
 @Configuration
 @EnableWebSocketMessageBroker
@@ -17,6 +18,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final StompChannelInterceptor stompChannelInterceptor;
+    private final WebSocketErrorHandler webSocketErrorHandler;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
@@ -37,6 +39,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
+        if (registry instanceof WebMvcStompEndpointRegistry webMvcRegistry) {
+            webMvcRegistry.setErrorHandler(webSocketErrorHandler);
+        }
         registry.addEndpoint("/ws")
                 .setAllowedOrigins(
                         "http://localhost:3000",

@@ -1,7 +1,7 @@
 package com.example.doktoribackend.config;
 
 import com.example.doktoribackend.common.error.ErrorCode;
-import com.example.doktoribackend.exception.CustomException;
+import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.security.CustomUserDetails;
 import com.example.doktoribackend.security.jwt.JwtTokenProvider;
 import org.junit.jupiter.api.Assertions;
@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessageDeliveryException;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
@@ -74,27 +75,40 @@ class StompChannelInterceptorTest {
     }
 
     @Test
-    @DisplayName("CONNECT 시 Authorization 헤더가 없으면 예외가 발생한다")
+    @DisplayName("CONNECT 시 Authorization 헤더가 없으면 MessageDeliveryException이 발생한다")
     void connectWithoutAuthHeaderThrowsException() {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
         Message<?> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
 
         assertThatThrownBy(() -> interceptor.preSend(message, channel))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.AUTH_UNAUTHORIZED);
+                .isInstanceOf(MessageDeliveryException.class)
+                .hasMessageContaining("인증이 필요합니다");
     }
 
     @Test
-    @DisplayName("CONNECT 시 Bearer 접두사가 없으면 예외가 발생한다")
+    @DisplayName("CONNECT 시 Bearer 접두사가 없으면 MessageDeliveryException이 발생한다")
     void connectWithInvalidPrefixThrowsException() {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
         accessor.addNativeHeader("Authorization", "InvalidPrefix " + VALID_TOKEN);
         Message<?> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
 
         assertThatThrownBy(() -> interceptor.preSend(message, channel))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.AUTH_UNAUTHORIZED);
+                .isInstanceOf(MessageDeliveryException.class)
+                .hasMessageContaining("인증이 필요합니다");
+    }
+
+    @Test
+    @DisplayName("CONNECT 시 만료된 토큰이면 MessageDeliveryException이 발생한다")
+    void connectWithExpiredTokenThrowsException() {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
+        accessor.addNativeHeader("Authorization", "Bearer expired.token");
+        Message<?> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+
+        given(jwtTokenProvider.getUserIdFromAccessToken("expired.token"))
+                .willThrow(new BusinessException(ErrorCode.TOKEN_EXPIRED));
+
+        assertThatThrownBy(() -> interceptor.preSend(message, channel))
+                .isInstanceOf(MessageDeliveryException.class)
+                .hasMessageContaining("토큰이 만료되었습니다");
     }
 }
