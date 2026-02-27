@@ -29,6 +29,7 @@ import com.example.doktoribackend.meeting.dto.MeetingMembersResponse;
 import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
 import com.example.doktoribackend.meeting.dto.MeetingUpdateRequest;
 import com.example.doktoribackend.meeting.dto.MyMeetingListRequest;
+import com.example.doktoribackend.meeting.dto.ParticipationListResponse;
 import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateRequest;
 import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateResponse;
 import com.example.doktoribackend.meeting.dto.RoundRequest;
@@ -930,6 +931,12 @@ public class MeetingService {
 
         // 8. 모임 인원 감소
         meeting.decrementCurrentCount();
+    }
+
+    @Transactional(readOnly = true)
+    public ParticipationListResponse getParticipations(Long userId, Long meetingId, Integer size, Long cursorId) {
+        // TODO: 커밋 2에서 구현
+        throw new UnsupportedOperationException("Not implemented yet");
     }
 
     private OffsetDateTime toKstOffset(LocalDateTime time) {

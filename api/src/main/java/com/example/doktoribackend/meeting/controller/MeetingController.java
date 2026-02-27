@@ -14,6 +14,7 @@ import com.example.doktoribackend.meeting.dto.MeetingListResponse;
 import com.example.doktoribackend.meeting.dto.MeetingMembersResponse;
 import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
 import com.example.doktoribackend.meeting.dto.MeetingUpdateRequest;
+import com.example.doktoribackend.meeting.dto.ParticipationListResponse;
 import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateRequest;
 import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateResponse;
 import com.example.doktoribackend.meeting.dto.TopicRecommendationResponse;
@@ -42,7 +43,7 @@ import java.net.URI;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/meetings")
-public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi, LeaderDelegationApi, CancelParticipationApi, LeaveMeetingApi, MeetingMembersApi, KickMemberApi {
+public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi, LeaderDelegationApi, CancelParticipationApi, LeaveMeetingApi, MeetingMembersApi, KickMemberApi, ParticipationListApi {
 
     private final MeetingService meetingService;
     private final TopicRecommendationService topicRecommendationService;
@@ -585,5 +586,26 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
 
         meetingService.kickMember(userDetails.getId(), meetingId, memberId);
         return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    @GetMapping("/{meetingId}/participations")
+    public ResponseEntity<ApiResult<ParticipationListResponse>> getParticipations(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) Long cursorId
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        ParticipationListResponse response = meetingService.getParticipations(
+                userDetails.getId(), meetingId, size, cursorId);
+        return ResponseEntity.ok(ApiResult.ok(response));
     }
 }
