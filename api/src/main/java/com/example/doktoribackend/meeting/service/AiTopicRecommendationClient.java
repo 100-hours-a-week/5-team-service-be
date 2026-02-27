@@ -4,34 +4,25 @@ import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.meeting.dto.AiTopicRequest;
 import com.example.doktoribackend.meeting.dto.AiTopicResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 @Component
+@RequiredArgsConstructor
 @Slf4j
 public class AiTopicRecommendationClient {
 
-    private final RestClient restClient;
-
-    public AiTopicRecommendationClient(
-            @Value("${ai.base-url}") String aiBaseUrl,
-            @Value("${ai.api-key}") String apiKey
-    ) {
-        this.restClient = RestClient.builder()
-                .baseUrl(aiBaseUrl)
-                .defaultHeader("x-api-key", apiKey)
-                .build();
-    }
+    private final RestClient aiRestClient;
 
     public AiTopicResponse requestTopicRecommendation(Long meetingRoundId, AiTopicRequest request) {
         String uri = "/meeting-rounds/" + meetingRoundId + "/discussion-topics/generate";
 
         try {
-            AiTopicResponse body = restClient.post()
+            AiTopicResponse body = aiRestClient.post()
                     .uri(uri)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(request)

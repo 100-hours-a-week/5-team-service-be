@@ -21,6 +21,9 @@ import com.example.doktoribackend.message.dto.MessageResponse;
 import com.example.doktoribackend.message.service.MessageService;
 import com.example.doktoribackend.room.dto.WaitingRoomMemberItem;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
+import com.example.doktoribackend.quiz.dto.AiQuizSuggestRequest;
+import com.example.doktoribackend.quiz.dto.AiQuizSuggestResponse;
+import com.example.doktoribackend.quiz.service.AiQuizGenerationService;
 import com.example.doktoribackend.quiz.service.QuizService;
 import com.example.doktoribackend.room.service.ChatRoomQueryService;
 import com.example.doktoribackend.room.service.ChatRoomService;
@@ -85,6 +88,9 @@ class ChatRoomControllerTest {
 
     @MockitoBean
     QuizService quizService;
+
+    @MockitoBean
+    AiQuizGenerationService aiQuizGenerationService;
 
     @MockitoBean
     JwtTokenProvider jwtTokenProvider;
@@ -949,6 +955,116 @@ class ChatRoomControllerTest {
                             .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
                             .with(csrf()))
                     .andExpect(status().isConflict());
+        }
+    }
+
+    @Nested
+    @DisplayName("AI 퀴즈 추천 - POST /chat-rooms/quiz-recommendations")
+    class SuggestQuiz {
+
+        private AiQuizSuggestResponse validSuggestResponse() {
+            List<AiQuizSuggestResponse.ChoiceItem> choices = List.of(
+                    new AiQuizSuggestResponse.ChoiceItem(1, "윤재"),
+                    new AiQuizSuggestResponse.ChoiceItem(2, "곤이"),
+                    new AiQuizSuggestResponse.ChoiceItem(3, "선아"),
+                    new AiQuizSuggestResponse.ChoiceItem(4, "데니스")
+            );
+            return new AiQuizSuggestResponse("주인공의 이름은?", 1, choices);
+        }
+
+        private String validRequestBody() throws Exception {
+            AiQuizSuggestRequest req = new AiQuizSuggestRequest("손원평", "아몬드", 0L);
+            return objectMapper.writeValueAsString(req);
+        }
+
+        @Test
+        @DisplayName("유효한 요청이면 200 OK와 퀴즈 추천 결과를 반환한다")
+        void suggestQuiz_success() throws Exception {
+            given(aiQuizGenerationService.suggest(eq(USER_ID), any()))
+                    .willReturn(validSuggestResponse());
+
+            mockMvc.perform(post("/chat-rooms/quiz-recommendations")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(validRequestBody()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.message").value("OK"))
+                    .andExpect(jsonPath("$.data.question").value("주인공의 이름은?"))
+                    .andExpect(jsonPath("$.data.correctChoiceNumber").value(1))
+                    .andExpect(jsonPath("$.data.choices").isArray())
+                    .andExpect(jsonPath("$.data.choices.length()").value(4))
+                    .andExpect(jsonPath("$.data.choices[0].choiceNumber").value(1))
+                    .andExpect(jsonPath("$.data.choices[0].choiceText").value("윤재"));
+        }
+
+        @Test
+        @DisplayName("author가 빈 문자열이면 422를 반환한다")
+        void suggestQuiz_authorBlank_returns422() throws Exception {
+            AiQuizSuggestRequest req = new AiQuizSuggestRequest("", "아몬드", 0L);
+
+            mockMvc.perform(post("/chat-rooms/quiz-recommendations")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isUnprocessableEntity());
+        }
+
+        @Test
+        @DisplayName("title이 null이면 422를 반환한다")
+        void suggestQuiz_titleNull_returns422() throws Exception {
+            AiQuizSuggestRequest req = new AiQuizSuggestRequest("손원평", null, 0L);
+
+            mockMvc.perform(post("/chat-rooms/quiz-recommendations")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isUnprocessableEntity());
+        }
+
+        @Test
+        @DisplayName("roomId가 null이면 422를 반환한다")
+        void suggestQuiz_roomIdNull_returns422() throws Exception {
+            AiQuizSuggestRequest req = new AiQuizSuggestRequest("손원평", "아몬드", null);
+
+            mockMvc.perform(post("/chat-rooms/quiz-recommendations")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isUnprocessableEntity());
+        }
+
+        @Test
+        @DisplayName("일일 한도 초과이면 429를 반환한다")
+        void suggestQuiz_limitExceeded_returns429() throws Exception {
+            willThrow(new BusinessException(ErrorCode.AI_QUIZ_GENERATION_LIMIT_EXCEEDED))
+                    .given(aiQuizGenerationService).suggest(eq(USER_ID), any());
+
+            mockMvc.perform(post("/chat-rooms/quiz-recommendations")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(validRequestBody()))
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(jsonPath("$.code").value("AI_QUIZ_GENERATION_LIMIT_EXCEEDED"));
+        }
+
+        @Test
+        @DisplayName("AI 서버 오류이면 502를 반환한다")
+        void suggestQuiz_aiFailed_returns502() throws Exception {
+            willThrow(new BusinessException(ErrorCode.AI_QUIZ_GENERATION_FAILED))
+                    .given(aiQuizGenerationService).suggest(eq(USER_ID), any());
+
+            mockMvc.perform(post("/chat-rooms/quiz-recommendations")
+                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
+                            .with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(validRequestBody()))
+                    .andExpect(status().isBadGateway())
+                    .andExpect(jsonPath("$.code").value("AI_QUIZ_GENERATION_FAILED"));
         }
     }
 }

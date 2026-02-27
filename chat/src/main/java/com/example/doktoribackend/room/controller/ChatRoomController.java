@@ -3,7 +3,10 @@ package com.example.doktoribackend.room.controller;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.response.ApiResult;
 import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.quiz.dto.AiQuizSuggestRequest;
+import com.example.doktoribackend.quiz.dto.AiQuizSuggestResponse;
 import com.example.doktoribackend.quiz.dto.QuizResponse;
+import com.example.doktoribackend.quiz.service.AiQuizGenerationService;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
 import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
@@ -46,6 +49,7 @@ public class ChatRoomController implements ChatRoomApi {
     private final MessageService messageService;
     private final WaitingRoomSseService waitingRoomSseService;
     private final QuizService quizService;
+    private final AiQuizGenerationService aiQuizGenerationService;
 
     @GetMapping
     @Override
@@ -183,6 +187,16 @@ public class ChatRoomController implements ChatRoomApi {
     ) {
         chatRoomService.leaveChatRoom(roomId, userDetails.getId());
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/quiz-recommendations")
+    @Override
+    public ResponseEntity<ApiResult<AiQuizSuggestResponse>> suggestQuiz(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody AiQuizSuggestRequest request
+    ) {
+        AiQuizSuggestResponse response = aiQuizGenerationService.suggest(userDetails.getId(), request);
+        return ResponseEntity.ok(ApiResult.ok(response));
     }
 
     private void validateSize(int size) {

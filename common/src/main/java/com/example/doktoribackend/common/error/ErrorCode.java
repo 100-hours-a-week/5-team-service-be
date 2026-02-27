@@ -133,6 +133,8 @@ public enum ErrorCode {
     CHAT_ROOM_ROUND_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_ROOM_ROUND_NOT_FOUND", "진행 중인 라운드가 없습니다."),
     CHAT_ROOM_MAX_ROUND_REACHED(HttpStatus.CONFLICT, "CHAT_ROOM_MAX_ROUND_REACHED", "최대 라운드에 도달했습니다."),
     CHAT_ROOM_NOT_LAST_ROUND(HttpStatus.CONFLICT, "CHAT_ROOM_NOT_LAST_ROUND", "마지막 라운드에서만 채팅을 종료할 수 있습니다."),
+    AI_QUIZ_GENERATION_FAILED(HttpStatus.BAD_GATEWAY, "AI_QUIZ_GENERATION_FAILED", "AI 퀴즈 생성에 실패했습니다."),
+    AI_QUIZ_GENERATION_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "AI_QUIZ_GENERATION_LIMIT_EXCEEDED", "일일 AI 퀴즈 추천 횟수(3회)를 초과했습니다."),
 
     // Vote
     VOTE_NOT_FOUND(HttpStatus.NOT_FOUND, "VOTE_NOT_FOUND", "투표를 찾을 수 없습니다."),

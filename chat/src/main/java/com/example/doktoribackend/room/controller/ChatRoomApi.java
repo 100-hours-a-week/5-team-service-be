@@ -3,6 +3,8 @@ package com.example.doktoribackend.room.controller;
 import com.example.doktoribackend.common.response.ApiResult;
 import com.example.doktoribackend.common.swagger.AuthErrorResponses;
 import com.example.doktoribackend.common.swagger.CommonErrorResponses;
+import com.example.doktoribackend.quiz.dto.AiQuizSuggestRequest;
+import com.example.doktoribackend.quiz.dto.AiQuizSuggestResponse;
 import com.example.doktoribackend.quiz.dto.QuizResponse;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
 import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
@@ -321,6 +323,48 @@ public interface ChatRoomApi {
     ResponseEntity<ApiResult<QuizResponse>> getQuiz(
             @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(description = "채팅방 ID", example = "1") Long roomId);
+
+    @CommonErrorResponses
+    @AuthErrorResponses
+    @Operation(summary = "AI 퀴즈 추천", description = "책 정보를 기반으로 AI가 입장 퀴즈를 자동 생성합니다. 일일 3회 제한.")
+    @ApiResponse(responseCode = "200", description = "OK",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {
+                              "message": "OK",
+                              "data": {
+                                "question": "이 책의 주인공 이름은?",
+                                "correctChoiceNumber": 1,
+                                "choices": [
+                                  { "choiceNumber": 1, "choiceText": "윤재" },
+                                  { "choiceNumber": 2, "choiceText": "곤이" },
+                                  { "choiceNumber": 3, "choiceText": "선아" },
+                                  { "choiceNumber": 4, "choiceText": "데니스" }
+                                ]
+                              }
+                            }
+                            """)))
+    @ApiResponse(responseCode = "429", description = "Too Many Requests",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(name = "일일 한도 초과",
+                            value = """
+                                    {
+                                      "code": "AI_QUIZ_GENERATION_LIMIT_EXCEEDED",
+                                      "message": "일일 AI 퀴즈 추천 횟수(3회)를 초과했습니다."
+                                    }
+                                    """)))
+    @ApiResponse(responseCode = "502", description = "Bad Gateway",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(name = "AI 서버 오류",
+                            value = """
+                                    {
+                                      "code": "AI_QUIZ_GENERATION_FAILED",
+                                      "message": "AI 퀴즈 생성에 실패했습니다."
+                                    }
+                                    """)))
+    ResponseEntity<ApiResult<AiQuizSuggestResponse>> suggestQuiz(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
+            AiQuizSuggestRequest request);
 
     @CommonErrorResponses
     @AuthErrorResponses
