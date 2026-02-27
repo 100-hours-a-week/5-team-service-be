@@ -18,7 +18,7 @@ public interface MeetingRoundTopicsApi {
     @CommonErrorResponses
     @AuthErrorResponses
     @Operation(
-            tags = {"Meeting Round Topics"},
+            tags = {"Meeting Round"},
             summary = "회차별 토론 주제 저장",
             description = "모임장이 특정 회차의 토론 주제 3개를 저장합니다. 기존 주제는 전체 덮어쓰기됩니다."
     )
