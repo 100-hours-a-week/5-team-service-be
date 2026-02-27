@@ -48,7 +48,7 @@ public class MessageService {
         ChattingRoomMember member = chattingRoomMemberRepository.findByChattingRoomIdAndUserId(roomId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND));
 
-        if (member.getStatus() != MemberStatus.JOINED) {
+        if (member.getStatus() != MemberStatus.JOINED && member.getStatus() != MemberStatus.DISCONNECTED) {
             throw new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND);
         }
 
@@ -97,7 +97,7 @@ public class MessageService {
                 .findByChattingRoomIdAndUserId(roomId, senderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND));
 
-        if (member.getStatus() != MemberStatus.JOINED) {
+        if (member.getStatus() != MemberStatus.JOINED && member.getStatus() != MemberStatus.DISCONNECTED) {
             throw new BusinessException(ErrorCode.CHAT_ROOM_MEMBER_NOT_FOUND);
         }
 
