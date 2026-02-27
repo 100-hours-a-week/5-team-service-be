@@ -73,7 +73,7 @@ public class AiValidationService {
                         .body(request)
                         .retrieve()
                         .onStatus(HttpStatusCode::isError, (req, res) -> {
-                            log.warn("AI validation failed: status={}", res.getStatusCode());
+                            throw new RuntimeException("AI validation HTTP error: status=" + res.getStatusCode());
                         })
                         .body(AiValidationResponse.class);
             } catch (Exception ex) {
@@ -109,6 +109,9 @@ public class AiValidationService {
             bookReport.approve();
         } else if ("REJECTED".equals(response.status())) {
             bookReport.reject(response.rejectionReason());
+        } else {
+            log.error("Unknown AI response status: '{}' for bookReportId: {}", response.status(), bookReportId);
+            return;
         }
 
         bookReportRepository.save(bookReport);
@@ -125,7 +128,7 @@ public class AiValidationService {
                             "meetingTitle", meetingTitle)
             );
         } catch (Exception e) {
-            log.error("Failed to send notification");
+            log.error("Failed to send notification for bookReportId: {}", bookReportId, e);
         }
     }
 }
