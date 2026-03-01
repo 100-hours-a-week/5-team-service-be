@@ -37,6 +37,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -118,6 +119,30 @@ public class ChatRoomService {
 
         if (room.getStatus() != RoomStatus.WAITING) {
             throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_WAITING);
+        }
+
+        Optional<ChattingRoomMember> existingMember =
+                chattingRoomMemberRepository.findByChattingRoomIdAndUserId(roomId, userId);
+
+        if (existingMember.isPresent()) {
+            ChattingRoomMember member = existingMember.get();
+
+            if (member.getStatus() == MemberStatus.WAITING) {
+                return chatRoomQueryService.buildWaitingRoomResponse(room);
+            }
+
+            if (member.getStatus() == MemberStatus.LEFT) {
+                quizService.validateQuizAnswer(roomId, request.quizAnswer());
+                validateRoomNotFull(room);
+                validatePositionNotFull(roomId, room.getCapacity(), member.getPosition());
+                member.rejoin();
+                room.increaseMemberCount();
+                WaitingRoomResponse response = chatRoomQueryService.buildWaitingRoomResponse(room);
+                chatRoomEventPublisher.broadcastWaitingRoomUpdate(roomId, response);
+                return response;
+            }
+
+            throw new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_JOINED);
         }
 
         validateNotAlreadyJoined(userId);
