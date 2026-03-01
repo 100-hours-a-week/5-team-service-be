@@ -33,7 +33,7 @@ public class AiQuizGenerationService {
         checkDailyLimit(userId);
 
         AiQuizGenerateResponse aiResponse = aiQuizClient.generate(
-                new AiQuizGenerateRequest(request.author(), request.title(), request.roomId()));
+                new AiQuizGenerateRequest(request.author(), request.title()));
 
         saveLog(userId);
 
