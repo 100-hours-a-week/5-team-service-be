@@ -15,7 +15,8 @@ import java.util.List;
 @Entity
 @Table(name = "meetings", indexes = {
         @Index(name = "idx_meeting_list", columnList = "status,deleted_at,id"),
-        @Index(name = "idx_meeting_genre_status", columnList = "reading_genre_id,status,deleted_at,id")
+        @Index(name = "idx_meeting_genre_status", columnList = "reading_genre_id,status,deleted_at,id"),
+        @Index(name = "idx_meeting_scheduler", columnList = "status,deleted_at,recruitment_deadline")
 })
 @Getter
 @Builder
@@ -142,6 +143,12 @@ public class Meeting extends BaseTimeEntity {
         this.currentCount++;
     }
 
+    public void decrementCurrentCount() {
+        if (this.currentCount > 0) {
+            this.currentCount--;
+        }
+    }
+
     public void updateStatusToFinished() {
         this.status = MeetingStatus.FINISHED;
     }
@@ -154,5 +161,45 @@ public class Meeting extends BaseTimeEntity {
         // 모집 마감일이 지났거나 정원이 가득 찬 경우
         LocalDate today = LocalDate.now();
         return today.isAfter(recruitmentDeadline) || currentCount >= capacity;
+    }
+
+    public boolean isLeader(Long userId) {
+        return this.leaderUser != null && this.leaderUser.getId().equals(userId);
+    }
+
+    public boolean isCanceled() {
+        return this.status == MeetingStatus.CANCELED;
+    }
+
+    public void update(
+            String meetingImagePath,
+            String title,
+            String description,
+            Long readingGenreId,
+            Integer capacity,
+            Integer roundCount,
+            LocalTime startTime,
+            Integer durationMinutes,
+            LocalDate recruitmentDeadline,
+            String leaderIntro,
+            MeetingDayOfWeek dayOfWeek,
+            LocalDateTime firstRoundAt
+    ) {
+        this.meetingImagePath = meetingImagePath;
+        this.title = title;
+        this.description = description;
+        this.readingGenreId = readingGenreId;
+        this.capacity = capacity;
+        this.roundCount = roundCount;
+        this.startTime = startTime;
+        this.durationMinutes = durationMinutes;
+        this.recruitmentDeadline = recruitmentDeadline;
+        this.leaderIntro = leaderIntro;
+        this.dayOfWeek = dayOfWeek;
+        this.firstRoundAt = firstRoundAt;
+    }
+
+    public void changeLeader(User newLeader) {
+        this.leaderUser = newLeader;
     }
 }

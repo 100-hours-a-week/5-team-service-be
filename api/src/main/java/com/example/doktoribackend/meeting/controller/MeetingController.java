@@ -3,14 +3,24 @@ package com.example.doktoribackend.meeting.controller;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.response.ApiResult;
 import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.meeting.dto.LeaderDelegationRequest;
+import com.example.doktoribackend.meeting.dto.LeaderDelegationResponse;
 import com.example.doktoribackend.meeting.dto.MeetingCreateRequest;
 import com.example.doktoribackend.meeting.dto.MeetingCreateResponse;
 import com.example.doktoribackend.meeting.dto.MeetingDetailResponse;
 import com.example.doktoribackend.meeting.dto.JoinMeetingResponse;
 import com.example.doktoribackend.meeting.dto.MeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MeetingListResponse;
+import com.example.doktoribackend.meeting.dto.MeetingMembersResponse;
+import com.example.doktoribackend.meeting.dto.PendingMembersResponse;
 import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
+import com.example.doktoribackend.meeting.dto.MeetingUpdateRequest;
+import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateRequest;
+import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateResponse;
+import com.example.doktoribackend.meeting.dto.TopicRecommendationResponse;
+import com.example.doktoribackend.meeting.service.LeaderDelegationService;
 import com.example.doktoribackend.meeting.service.MeetingService;
+import com.example.doktoribackend.meeting.service.TopicRecommendationService;
 import com.example.doktoribackend.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -33,9 +43,11 @@ import java.net.URI;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/meetings")
-public class MeetingController {
+public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi, LeaderDelegationApi, CancelParticipationApi, LeaveMeetingApi, MeetingMembersApi, KickMemberApi, PendingMembersApi {
 
     private final MeetingService meetingService;
+    private final TopicRecommendationService topicRecommendationService;
+    private final LeaderDelegationService leaderDelegationService;
 
     @Operation(summary = "모임 생성", description = "로그인 사용자가 모임을 생성합니다.")
     @ApiResponses({
@@ -352,6 +364,258 @@ public class MeetingController {
             @Valid @ParameterObject MeetingSearchRequest request
     ) {
         MeetingListResponse response = meetingService.searchMeetings(request);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Operation(summary = "모임 수정", description = "모임장이 모임 정보를 수정합니다. 진행된 회차와 진행 중인 회차는 수정할 수 없습니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResult.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "message": "독서 모임이 성공적으로 수정되었습니다.",
+                                      "data": {
+                                        "meetingId": 123
+                                      }
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "AUTH_UNAUTHORIZED",
+                                      "message": "인증이 필요합니다."
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "MEETING_UPDATE_FORBIDDEN",
+                                      "message": "모임을 수정할 권한이 없습니다."
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "404", description = "Meeting not found",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "MEETING_NOT_FOUND",
+                                      "message": "존재하지 않는 모임입니다."
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "409", description = "Conflict",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "MEETING_ROUND_UPDATE_NOT_ALLOWED",
+                                      "message": "진행된 회차 또는 진행 중인 회차는 수정할 수 없습니다."
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "422", description = "Validation failed",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "VALIDATION_FAILED",
+                                      "message": "요청 값이 유효하지 않습니다.",
+                                      "errors": [
+                                        { "field": "durationMinutes", "reason": "ValidMeetingUpdateRequest", "message": "진행 시간은 30분이어야 합니다" }
+                                      ]
+                                    }
+                                    """)))
+    })
+    @PutMapping("/{meetingId}")
+    public ResponseEntity<ApiResult<MeetingCreateResponse>> updateMeeting(
+            @PathVariable Long meetingId,
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody MeetingUpdateRequest request
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        MeetingCreateResponse response = meetingService.updateMeeting(userDetails.getId(), meetingId, request);
+        return ResponseEntity.ok(ApiResult.ok("독서 모임이 성공적으로 수정되었습니다.", response));
+    }
+
+    @Override
+    @PatchMapping("/{meetingId}/participations/{joinRequestId}")
+    public ResponseEntity<ApiResult<ParticipationStatusUpdateResponse>> updateParticipationStatus(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId,
+            @PathVariable Long joinRequestId,
+            @Valid @RequestBody ParticipationStatusUpdateRequest request
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        if (joinRequestId == null || joinRequestId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        ParticipationStatusUpdateResponse response = meetingService.updateParticipationStatus(
+                userDetails.getId(), meetingId, joinRequestId, request);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Override
+    @PostMapping("/{meetingId}/rounds/{roundNo}/topic-recommendations")
+    public ResponseEntity<ApiResult<TopicRecommendationResponse>> recommendTopic(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId,
+            @PathVariable Integer roundNo
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        if (roundNo == null || roundNo <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        TopicRecommendationResponse response = topicRecommendationService.recommendTopic(
+                userDetails.getId(), meetingId, roundNo);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Override
+    @PatchMapping("/{meetingId}/leader")
+    public ResponseEntity<ApiResult<LeaderDelegationResponse>> delegateLeader(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId,
+            @Valid @RequestBody LeaderDelegationRequest request
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        LeaderDelegationResponse response = leaderDelegationService.delegateLeader(
+                userDetails.getId(), meetingId, request);
+        return ResponseEntity.ok(ApiResult.ok("모임장 권한이 성공적으로 위임되었습니다.", response));
+    }
+
+    @Override
+    @DeleteMapping("/{meetingId}/participations/me")
+    public ResponseEntity<Void> cancelParticipation(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        meetingService.cancelParticipation(userDetails.getId(), meetingId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    @DeleteMapping("/{meetingId}/members/me")
+    public ResponseEntity<Void> leaveMeeting(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        meetingService.leaveMeeting(userDetails.getId(), meetingId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    @GetMapping("/{meetingId}/members")
+    public ResponseEntity<ApiResult<MeetingMembersResponse>> getMeetingMembers(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        MeetingMembersResponse response = meetingService.getMeetingMembers(userDetails.getId(), meetingId);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Override
+    @DeleteMapping("/{meetingId}/members/{memberId}")
+    public ResponseEntity<Void> kickMember(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId,
+            @PathVariable Long memberId
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        if (memberId == null || memberId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        meetingService.kickMember(userDetails.getId(), meetingId, memberId);
+        return ResponseEntity.noContent().build();
+    }
+
+    private static final int MAX_PENDING_SIZE = 20;
+
+    @Override
+    @GetMapping("/{meetingId}/participants")
+    public ResponseEntity<ApiResult<PendingMembersResponse>> getPendingMembers(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "20") Integer size
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        if (size < 1 || size > MAX_PENDING_SIZE) {
+            throw new BusinessException(ErrorCode.PAGINATION_SIZE_OUT_OF_RANGE);
+        }
+
+        if (cursorId != null && cursorId < 1) {
+            throw new BusinessException(ErrorCode.PAGINATION_INVALID_CURSOR);
+        }
+
+        PendingMembersResponse response = meetingService.getPendingMembers(
+                userDetails.getId(), meetingId, cursorId, size);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 }

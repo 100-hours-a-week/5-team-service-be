@@ -1,0 +1,224 @@
+package com.example.doktoribackend.room.controller;
+
+import com.example.doktoribackend.common.error.ErrorCode;
+import com.example.doktoribackend.common.response.ApiResult;
+import com.example.doktoribackend.exception.BusinessException;
+import com.example.doktoribackend.quiz.dto.AiQuizSuggestRequest;
+import com.example.doktoribackend.quiz.dto.AiQuizSuggestResponse;
+import com.example.doktoribackend.quiz.dto.QuizResponse;
+import com.example.doktoribackend.quiz.service.AiQuizGenerationService;
+import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
+import com.example.doktoribackend.room.dto.ChatRoomCreateResponse;
+import com.example.doktoribackend.room.dto.ChatRoomJoinRequest;
+import com.example.doktoribackend.room.dto.ChatRoomListResponse;
+import com.example.doktoribackend.room.dto.ChatRoomStartResponse;
+import com.example.doktoribackend.room.dto.WaitingRoomResponse;
+import com.example.doktoribackend.summary.dto.ChatRoomSummaryResponse;
+import com.example.doktoribackend.message.dto.MessageListResponse;
+import com.example.doktoribackend.message.service.MessageService;
+import com.example.doktoribackend.quiz.service.QuizService;
+import com.example.doktoribackend.room.service.ChatRoomQueryService;
+import com.example.doktoribackend.room.service.ChatRoomService;
+import com.example.doktoribackend.room.service.WaitingRoomSseService;
+import com.example.doktoribackend.security.CustomUserDetails;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/chat-rooms")
+public class ChatRoomController implements ChatRoomApi {
+
+    private static final int MAX_SIZE = 20;
+
+    private final ChatRoomService chatRoomService;
+    private final ChatRoomQueryService chatRoomQueryService;
+    private final MessageService messageService;
+    private final WaitingRoomSseService waitingRoomSseService;
+    private final QuizService quizService;
+    private final AiQuizGenerationService aiQuizGenerationService;
+
+    @GetMapping
+    @Override
+    public ResponseEntity<ApiResult<ChatRoomListResponse>> getChatRooms(
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "10") Integer size
+    ) {
+        validateSize(size);
+        validateCursorId(cursorId);
+
+        ChatRoomListResponse response = chatRoomQueryService.getChatRooms(cursorId, size);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @PostMapping
+    @Override
+    public ResponseEntity<ApiResult<ChatRoomCreateResponse>> createChatRoom(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody ChatRoomCreateRequest request
+    ) {
+        ChatRoomCreateResponse response = chatRoomService.createChatRoom(
+                userDetails.getId(), request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResult.ok(response));
+    }
+
+    @PostMapping("/{roomId}/members")
+    @Override
+    public ResponseEntity<ApiResult<WaitingRoomResponse>> joinChatRoom(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId,
+            @Valid @RequestBody ChatRoomJoinRequest request
+    ) {
+        WaitingRoomResponse response = chatRoomService.joinChatRoom(
+                roomId, userDetails.getId(), request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResult.ok(response));
+    }
+
+    @GetMapping("/{roomId}/quiz")
+    @Override
+    public ResponseEntity<ApiResult<QuizResponse>> getQuiz(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId
+    ) {
+        QuizResponse response = quizService.getQuiz(roomId);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @GetMapping("/{roomId}/waiting-room")
+    @Override
+    public ResponseEntity<ApiResult<WaitingRoomResponse>> getWaitingRoom(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId
+    ) {
+        WaitingRoomResponse response = chatRoomQueryService.getWaitingRoom(
+                roomId, userDetails.getId());
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @GetMapping(value = "/{roomId}/waiting-room/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Override
+    public ResponseEntity<SseEmitter> subscribeWaitingRoom(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId
+    ) {
+        chatRoomQueryService.getWaitingRoom(roomId, userDetails.getId());
+        SseEmitter emitter = waitingRoomSseService.subscribe(roomId);
+        return ResponseEntity.ok()
+                .header("X-Accel-Buffering", "no")
+                .header("Cache-Control", "no-cache")
+                .body(emitter);
+    }
+
+    @GetMapping("/{roomId}")
+    @Override
+    public ResponseEntity<ApiResult<ChatRoomStartResponse>> getChatRoomDetail(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId
+    ) {
+        ChatRoomStartResponse response = chatRoomQueryService.getChatRoomDetail(roomId, userDetails.getId());
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @GetMapping("/{roomId}/messages")
+    @Override
+    public ResponseEntity<ApiResult<MessageListResponse>> getMessages(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "20") Integer size
+    ) {
+        validateSize(size);
+        validateCursorId(cursorId);
+
+        MessageListResponse response = messageService.getMessages(roomId, userDetails.getId(), cursorId, size);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @PatchMapping("/{roomId}")
+    @Override
+    public ResponseEntity<ApiResult<ChatRoomStartResponse>> startChatRoom(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId
+    ) {
+        ChatRoomStartResponse response = chatRoomService.startChatRoom(roomId, userDetails.getId());
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @DeleteMapping("/{roomId}")
+    @Override
+    public ResponseEntity<Void> endChatRoom(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId
+    ) {
+        chatRoomService.endChatRoom(roomId, userDetails.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{roomId}/next-round")
+    @Override
+    public ResponseEntity<Void> nextRound(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId
+    ) {
+        chatRoomService.nextRound(roomId, userDetails.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{roomId}/members/me")
+    @Override
+    public ResponseEntity<Void> leaveChatRoom(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId
+    ) {
+        chatRoomService.leaveChatRoom(roomId, userDetails.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{roomId}/summary")
+    @Override
+    public ResponseEntity<ApiResult<ChatRoomSummaryResponse>> getRoomSummary(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roomId
+    ) {
+        ChatRoomSummaryResponse response = chatRoomQueryService.getRoomSummary(roomId);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @PostMapping("/quiz-recommendations")
+    @Override
+    public ResponseEntity<ApiResult<AiQuizSuggestResponse>> suggestQuiz(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody AiQuizSuggestRequest request
+    ) {
+        AiQuizSuggestResponse response = aiQuizGenerationService.suggest(userDetails.getId(), request);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    private void validateSize(int size) {
+        if (size < 1 || size > MAX_SIZE) {
+            throw new BusinessException(ErrorCode.PAGINATION_SIZE_OUT_OF_RANGE);
+        }
+    }
+
+    private void validateCursorId(Long cursorId) {
+        if (cursorId != null && cursorId < 1) {
+            throw new BusinessException(ErrorCode.PAGINATION_INVALID_CURSOR);
+        }
+    }
+}

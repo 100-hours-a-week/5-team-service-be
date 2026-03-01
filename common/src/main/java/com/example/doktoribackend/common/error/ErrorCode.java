@@ -42,6 +42,7 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "존재하지 않는 사용자입니다."),
     PROFILE_ALREADY_COMPLETED(HttpStatus.CONFLICT, "PROFILE_ALREADY_COMPLETED", "이미 프로필 필수 정보를 완료했습니다."),
     ONBOARDING_ALREADY_COMPLETED(HttpStatus.CONFLICT, "ONBOARDING_ALREADY_COMPLETED", "이미 온보딩을 완료했습니다."),
+    WITHDRAWAL_BLOCKED_ACTIVE_LEADER(HttpStatus.CONFLICT, "WITHDRAWAL_BLOCKED_ACTIVE_LEADER", "모임장으로 진행중인 모임이 있습니다. 모임장 위임 후 다시 진행해주세요."),
 
     // Policy
     POLICY_NOT_FOUND(HttpStatus.NOT_FOUND, "POLICY_NOT_FOUND", "정책을 찾을 수 없습니다."),
@@ -67,6 +68,24 @@ public enum ErrorCode {
     JOIN_REQUEST_BLOCKED(HttpStatus.FORBIDDEN, "JOIN_REQUEST_BLOCKED", "해당 모임에 참여할 수 없습니다."),
     RECRUITMENT_CLOSED(HttpStatus.CONFLICT, "RECRUITMENT_CLOSED", "모집이 마감된 모임입니다."),
     CAPACITY_FULL(HttpStatus.CONFLICT, "CAPACITY_FULL", "모집 정원이 가득 찼습니다."),
+    MEETING_UPDATE_FORBIDDEN(HttpStatus.FORBIDDEN, "MEETING_UPDATE_FORBIDDEN", "모임을 수정할 권한이 없습니다."),
+    MEETING_UPDATE_NOT_ALLOWED(HttpStatus.CONFLICT, "MEETING_UPDATE_NOT_ALLOWED", "취소된 모임은 수정할 수 없습니다."),
+    MEETING_ROUND_UPDATE_NOT_ALLOWED(HttpStatus.CONFLICT, "MEETING_ROUND_UPDATE_NOT_ALLOWED", "진행된 회차 또는 진행 중인 회차는 수정할 수 없습니다."),
+    JOIN_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "JOIN_REQUEST_NOT_FOUND", "존재하지 않는 참여 요청입니다."),
+    JOIN_REQUEST_ALREADY_PROCESSED(HttpStatus.CONFLICT, "JOIN_REQUEST_ALREADY_PROCESSED", "이미 처리된 참여 요청입니다."),
+    PARTICIPATION_UPDATE_FORBIDDEN(HttpStatus.FORBIDDEN, "PARTICIPATION_UPDATE_FORBIDDEN", "참여 요청을 처리할 권한이 없습니다."),
+    PARTICIPATION_CANCEL_NOT_ALLOWED(HttpStatus.CONFLICT, "PARTICIPATION_CANCEL_NOT_ALLOWED", "이미 승인된 참여 요청은 취소할 수 없습니다."),
+    LEADER_CANNOT_LEAVE(HttpStatus.CONFLICT, "LEADER_CANNOT_LEAVE", "모임장은 위임 후 탈퇴해야 합니다."),
+    LEAVE_NOT_ALLOWED(HttpStatus.CONFLICT, "LEAVE_NOT_ALLOWED", "탈퇴할 수 없는 상태입니다."),
+    CANNOT_KICK_SELF(HttpStatus.CONFLICT, "CANNOT_KICK_SELF", "자기 자신을 강퇴할 수 없습니다."),
+    KICK_NOT_ALLOWED(HttpStatus.CONFLICT, "KICK_NOT_ALLOWED", "강퇴할 수 없는 상태입니다."),
+
+    // LeaderDelegation
+    LEADER_DELEGATION_FORBIDDEN(HttpStatus.FORBIDDEN, "LEADER_DELEGATION_FORBIDDEN", "모임장 위임 권한이 없습니다."),
+    MEETING_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "MEETING_MEMBER_NOT_FOUND", "존재하지 않는 모임 멤버입니다."),
+    DELEGATION_TARGET_NOT_APPROVED(HttpStatus.CONFLICT, "DELEGATION_TARGET_NOT_APPROVED", "승인된 모임원에게만 위임할 수 있습니다."),
+    DELEGATION_TARGET_ALREADY_LEADER(HttpStatus.CONFLICT, "DELEGATION_TARGET_ALREADY_LEADER", "이미 모임장인 멤버에게 위임할 수 없습니다."),
+    CANNOT_DELEGATE_TO_SELF(HttpStatus.CONFLICT, "CANNOT_DELEGATE_TO_SELF", "자기 자신에게 위임할 수 없습니다."),
 
     // Pagination
     PAGINATION_INVALID_CURSOR(HttpStatus.BAD_REQUEST, "PAGINATION_INVALID_CURSOR", "cursorId는 1 이상의 정수여야 합니다."),
@@ -80,10 +99,49 @@ public enum ErrorCode {
     // MeetingRound
     ROUND_NOT_FOUND(HttpStatus.NOT_FOUND, "ROUND_NOT_FOUND", "모임 회차를 찾을 수 없습니다."),
 
+    // TopicRecommendation
+    TOPIC_RECOMMENDATION_FORBIDDEN(HttpStatus.FORBIDDEN, "TOPIC_RECOMMENDATION_FORBIDDEN", "토론 주제 추천 권한이 없습니다."),
+    TOPIC_UPDATE_FORBIDDEN(HttpStatus.FORBIDDEN, "TOPIC_UPDATE_FORBIDDEN", "토론 주제 수정 권한이 없습니다."),
+    DUPLICATE_TOPIC_NO(HttpStatus.CONFLICT, "DUPLICATE_TOPIC_NO", "중복된 주제 번호가 있습니다."),
+    NO_BOOK_REPORTS_FOR_TOPIC(HttpStatus.CONFLICT, "NO_BOOK_REPORTS_FOR_TOPIC", "제출된 독후감이 없어 AI 추천을 할 수 없습니다."),
+    TOPIC_RECOMMENDATION_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "TOPIC_RECOMMENDATION_LIMIT_EXCEEDED", "일일 AI 추천 횟수(15회)를 초과했습니다."),
+    TOPIC_REQUIRED_FOR_LEADER_MODE(HttpStatus.BAD_REQUEST, "TOPIC_REQUIRED_FOR_LEADER_MODE", "LEADER 모드에서는 주제 입력이 필수입니다."),
+    AI_TOPIC_RECOMMENDATION_FAILED(HttpStatus.BAD_GATEWAY, "AI_TOPIC_RECOMMENDATION_FAILED", "AI 주제 추천에 실패했습니다."),
+
     // BookReport
     BOOK_REPORT_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "BOOK_REPORT_ALREADY_SUBMITTED", "이미 독후감을 제출했습니다."),
     BOOK_REPORT_NOT_WRITABLE(HttpStatus.CONFLICT, "BOOK_REPORT_NOT_WRITABLE", "독후감 작성 가능 시간이 아닙니다."),
-    DAILY_SUBMISSION_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "DAILY_SUBMISSION_LIMIT_EXCEEDED", "일일 독후감 제출 횟수(3회)를 초과했습니다.");
+    DAILY_SUBMISSION_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "DAILY_SUBMISSION_LIMIT_EXCEEDED", "일일 독후감 제출 횟수(3회)를 초과했습니다."),
+    BOOK_REPORT_MANAGEMENT_FORBIDDEN(HttpStatus.FORBIDDEN, "BOOK_REPORT_MANAGEMENT_FORBIDDEN", "독후감 관리 권한이 없습니다."),
+    BOOK_REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_REPORT_NOT_FOUND", "독후감을 찾을 수 없습니다."),
+
+    // ChatRoom
+    CHAT_ROOM_INVALID_CAPACITY(HttpStatus.BAD_REQUEST, "CHAT_ROOM_INVALID_CAPACITY", "채팅방 정원은 2, 4, 6명만 가능합니다."),
+    CHAT_ROOM_ALREADY_JOINED(HttpStatus.CONFLICT, "CHAT_ROOM_ALREADY_JOINED", "이미 참여 중인 채팅방이 있어 새 채팅방을 생성할 수 없습니다."),
+    CHAT_ROOM_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_ROOM_NOT_FOUND", "존재하지 않는 채팅방입니다."),
+    CHAT_ROOM_ALREADY_ENDED(HttpStatus.CONFLICT, "CHAT_ROOM_ALREADY_ENDED", "이미 종료되거나 취소된 채팅방입니다."),
+    CHAT_ROOM_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_ROOM_MEMBER_NOT_FOUND", "채팅방 멤버가 아닙니다."),
+    CHAT_ROOM_ALREADY_LEFT(HttpStatus.CONFLICT, "CHAT_ROOM_ALREADY_LEFT", "이미 나간 채팅방입니다."),
+    CHAT_ROOM_FULL(HttpStatus.CONFLICT, "CHAT_ROOM_FULL", "채팅방 정원이 가득 찼습니다."),
+    CHAT_ROOM_POSITION_FULL(HttpStatus.CONFLICT, "CHAT_ROOM_POSITION_FULL", "해당 포지션의 정원이 가득 찼습니다."),
+    CHAT_ROOM_QUIZ_WRONG_ANSWER(HttpStatus.FORBIDDEN, "CHAT_ROOM_QUIZ_WRONG_ANSWER", "퀴즈 정답이 아닙니다."),
+    CHAT_ROOM_QUIZ_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_ROOM_QUIZ_NOT_FOUND", "채팅방에 퀴즈가 존재하지 않습니다."),
+    CHAT_ROOM_NOT_WAITING(HttpStatus.CONFLICT, "CHAT_ROOM_NOT_WAITING", "대기 중인 채팅방만 참여할 수 있습니다."),
+    CHAT_ROOM_NOT_HOST(HttpStatus.FORBIDDEN, "CHAT_ROOM_NOT_HOST", "방장만 채팅을 시작할 수 있습니다."),
+    CHAT_ROOM_INSUFFICIENT_MEMBERS(HttpStatus.CONFLICT, "CHAT_ROOM_INSUFFICIENT_MEMBERS", "상대 포지션에 최소 1명 이상의 멤버가 필요합니다."),
+    CHAT_ROOM_NOT_CHATTING(HttpStatus.CONFLICT, "CHAT_ROOM_NOT_CHATTING", "채팅 중인 채팅방이 아닙니다."),
+    CHAT_ROOM_ROUND_NOT_FOUND(HttpStatus.NOT_FOUND, "CHAT_ROOM_ROUND_NOT_FOUND", "진행 중인 라운드가 없습니다."),
+    CHAT_ROOM_MAX_ROUND_REACHED(HttpStatus.CONFLICT, "CHAT_ROOM_MAX_ROUND_REACHED", "최대 라운드에 도달했습니다."),
+    CHAT_ROOM_NOT_LAST_ROUND(HttpStatus.CONFLICT, "CHAT_ROOM_NOT_LAST_ROUND", "마지막 라운드에서만 채팅을 종료할 수 있습니다."),
+    CHAT_ROOM_NOT_ENDED(HttpStatus.CONFLICT, "CHAT_ROOM_NOT_ENDED", "종료된 채팅방만 요약을 조회할 수 있습니다."),
+    AI_QUIZ_GENERATION_FAILED(HttpStatus.BAD_GATEWAY, "AI_QUIZ_GENERATION_FAILED", "AI 퀴즈 생성에 실패했습니다."),
+    AI_QUIZ_GENERATION_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "AI_QUIZ_GENERATION_LIMIT_EXCEEDED", "일일 AI 퀴즈 추천 횟수(3회)를 초과했습니다."),
+    AI_SUMMARY_GENERATION_FAILED(HttpStatus.BAD_GATEWAY, "AI_SUMMARY_GENERATION_FAILED", "AI 요약 생성에 실패했습니다."),
+
+    // Vote
+    VOTE_NOT_FOUND(HttpStatus.NOT_FOUND, "VOTE_NOT_FOUND", "투표를 찾을 수 없습니다."),
+    VOTE_ALREADY_CLOSED(HttpStatus.CONFLICT, "VOTE_ALREADY_CLOSED", "이미 종료된 투표입니다."),
+    VOTE_ALREADY_CAST(HttpStatus.CONFLICT, "VOTE_ALREADY_CAST", "이미 투표하였습니다.");
 
 
     private final HttpStatus status;

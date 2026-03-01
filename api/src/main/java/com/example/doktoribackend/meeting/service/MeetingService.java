@@ -1,8 +1,8 @@
 package com.example.doktoribackend.meeting.service;
 
-import com.example.doktoribackend.book.client.KakaoBookClient;
+import com.example.doktoribackend.common.client.KakaoBookClient;
 import com.example.doktoribackend.book.domain.Book;
-import com.example.doktoribackend.book.dto.KakaoBookResponse;
+import com.example.doktoribackend.common.client.KakaoBookResponse;
 import com.example.doktoribackend.book.repository.BookRepository;
 import com.example.doktoribackend.bookReport.domain.BookReport;
 import com.example.doktoribackend.bookReport.domain.BookReportStatus;
@@ -16,6 +16,7 @@ import com.example.doktoribackend.meeting.domain.MeetingDayOfWeek;
 import com.example.doktoribackend.meeting.domain.MeetingMember;
 import com.example.doktoribackend.meeting.domain.MeetingMemberStatus;
 import com.example.doktoribackend.meeting.domain.MeetingRound;
+import com.example.doktoribackend.meeting.domain.MeetingRoundStatus;
 import com.example.doktoribackend.meeting.domain.MeetingStatus;
 import com.example.doktoribackend.meeting.dto.BookRequest;
 import com.example.doktoribackend.meeting.dto.MeetingCreateRequest;
@@ -24,8 +25,14 @@ import com.example.doktoribackend.meeting.dto.MeetingDetailResponse;
 import com.example.doktoribackend.meeting.dto.JoinMeetingResponse;
 import com.example.doktoribackend.meeting.dto.MeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MeetingListResponse;
+import com.example.doktoribackend.meeting.dto.MeetingMembersResponse;
+import com.example.doktoribackend.meeting.dto.PendingMembersResponse;
 import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
+import com.example.doktoribackend.meeting.dto.MeetingUpdateRequest;
 import com.example.doktoribackend.meeting.dto.MyMeetingListRequest;
+import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateRequest;
+import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateResponse;
+import com.example.doktoribackend.meeting.dto.RoundRequest;
 import com.example.doktoribackend.meeting.dto.MyMeetingListResponse;
 import com.example.doktoribackend.meeting.dto.MyMeetingItem;
 import com.example.doktoribackend.meeting.dto.MyMeetingDetailResponse;
@@ -38,20 +45,23 @@ import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
 import com.example.doktoribackend.meeting.repository.NextRoundProjection;
 import com.example.doktoribackend.reading.domain.ReadingGenre;
 import com.example.doktoribackend.reading.repository.ReadingGenreRepository;
-import com.example.doktoribackend.s3.ImageUrlResolver;
+import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -216,19 +226,11 @@ public class MeetingService {
                     // REJECTED, LEFT: 재신청 가능 (if문 통과)
                 });
 
-        // 7. 참여 요청 생성 (현재 정책: 즉시 승인)
+        // 7. 참여 요청 생성 (PENDING 상태)
         MeetingMember member = MeetingMember.createParticipant(meeting, user);
         meetingMemberRepository.save(member);
 
-        // 8. 현재 인원수 증가
-        meeting.incrementCurrentCount();
-
-        // 9. 모집 완료 상태 확인 및 업데이트
-        if (meeting.isRecruitmentClosed()) {
-            meeting.updateStatusToFinished();
-        }
-
-        // 10. 응답 반환
+        // 8. 응답 반환 (current_count 증가는 승인 시점에 수행)
         return JoinMeetingResponse.from(member);
     }
 
@@ -350,6 +352,7 @@ public class MeetingService {
         return MyMeetingDetailResponse.builder()
                 .meetingId(meeting.getId())
                 .meetingImagePath(imageUrlResolver.toUrl(meeting.getMeetingImagePath()))
+                .meetingImageKey(meeting.getMeetingImagePath())
                 .title(meeting.getTitle())
                 .readingGenreName(readingGenre.getName())
                 .leaderInfo(MyMeetingDetailResponse.LeaderInfo.builder()
@@ -578,5 +581,397 @@ public class MeetingService {
         if (!completedMeetings.isEmpty()) {
             meeting.updateStatusToCanceled();
         }
+    }
+
+    @Transactional
+    public MeetingCreateResponse updateMeeting(Long userId, Long meetingId, MeetingUpdateRequest request) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. 모임 조회
+        Meeting meeting = meetingRepository.findByIdWithLeader(meetingId)
+                .filter(m -> m.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+
+        // 2. 권한 체크 (리더만 수정 가능)
+        if (!meeting.isLeader(userId)) {
+            throw new BusinessException(ErrorCode.MEETING_UPDATE_FORBIDDEN);
+        }
+
+        // 3. 상태 체크 (CANCELED 모임은 수정 불가)
+        if (meeting.isCanceled()) {
+            throw new BusinessException(ErrorCode.MEETING_UPDATE_NOT_ALLOWED);
+        }
+
+        // 4. readingGenre 유효성 체크
+        if (!readingGenreRepository.existsByIdAndDeletedAtIsNull(request.readingGenreId())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        // 5. 기존 rounds 조회
+        List<MeetingRound> existingRounds = meetingRoundRepository.findByMeetingIdWithBook(meetingId);
+
+        // 6. 잠금 회차 식별 (DONE 또는 진행중)
+        Set<Integer> lockedRoundNos = identifyLockedRounds(existingRounds, now);
+
+        // 7. 잠금 회차 검증
+        validateLockedRounds(lockedRoundNos, existingRounds, request.rounds());
+
+        // 8. 잠금되지 않은 기존 회차 삭제
+        List<MeetingRound> roundsToDelete = existingRounds.stream()
+                .filter(r -> !lockedRoundNos.contains(r.getRoundNo()))
+                .toList();
+        meetingRoundRepository.deleteAll(roundsToDelete);
+
+        // 9. 새 회차 생성 (잠금 회차 제외)
+        LocalTime startTime = request.startTime();
+        int durationMinutes = request.durationMinutes();
+
+        List<MeetingRound> newRounds = request.rounds().stream()
+                .filter(r -> !lockedRoundNos.contains(r.roundNo()))
+                .map(round -> {
+                    Book book = resolveBook(round.book());
+                    LocalDateTime startAt = LocalDateTime.of(round.date(), startTime);
+                    LocalDateTime endAt = startAt.plusMinutes(durationMinutes);
+                    return MeetingRound.create(meeting, book, round.roundNo(), startAt, endAt);
+                })
+                .toList();
+        meetingRoundRepository.saveAll(newRounds);
+
+        // 10. Meeting 엔티티 업데이트
+        LocalDate firstRoundDate = request.firstRoundAt();
+        LocalDateTime firstRoundAt = LocalDateTime.of(firstRoundDate, startTime);
+        MeetingDayOfWeek dayOfWeek = MeetingDayOfWeek.from(firstRoundDate);
+
+        meeting.update(
+                request.meetingImageKey(),
+                request.title(),
+                request.description(),
+                request.readingGenreId(),
+                request.capacity(),
+                request.roundCount(),
+                startTime,
+                durationMinutes,
+                request.recruitmentDeadline(),
+                request.leaderIntro(),
+                dayOfWeek,
+                firstRoundAt
+        );
+
+        // 11. leaderIntroSavePolicy 처리
+        if (Boolean.TRUE.equals(request.leaderIntroSavePolicy())) {
+            User leader = meeting.getLeaderUser();
+            leader.updateLeaderIntro(request.leaderIntro());
+        }
+
+        return new MeetingCreateResponse(meeting.getId());
+    }
+
+    /**
+     * 잠금 회차 식별: DONE 상태이거나 진행중인 회차
+     * 진행중 회차: 이전 회차 endAt ≤ now < 현재 회차 endAt
+     * 1회차의 경우: startAt ≤ now < endAt
+     */
+    private Set<Integer> identifyLockedRounds(List<MeetingRound> rounds, LocalDateTime now) {
+        Map<Integer, MeetingRound> roundMap = rounds.stream()
+                .collect(Collectors.toMap(MeetingRound::getRoundNo, r -> r));
+
+        return rounds.stream()
+                .filter(round -> isRoundLocked(round, roundMap.get(round.getRoundNo() - 1), now))
+                .map(MeetingRound::getRoundNo)
+                .collect(Collectors.toSet());
+    }
+
+    private boolean isRoundLocked(MeetingRound round, MeetingRound prevRound, LocalDateTime now) {
+        // DONE 상태면 잠금
+        if (round.getStatus() == MeetingRoundStatus.DONE) {
+            return true;
+        }
+
+        // 진행중 회차 판단
+        // 1회차: startAt ≤ now < endAt
+        // N회차: (N-1)회차 endAt ≤ now < N회차 endAt
+        LocalDateTime progressStart = (prevRound != null) ? prevRound.getEndAt() : round.getStartAt();
+        return !now.isBefore(progressStart) && now.isBefore(round.getEndAt());
+    }
+
+    /**
+     * 잠금 회차 검증:
+     * 1. 잠금된 roundNo가 요청에 반드시 존재해야 함 (삭제 불가)
+     * 2. 잠금된 roundNo의 date, book.isbn이 DB와 동일해야 함
+     */
+    private void validateLockedRounds(
+            Set<Integer> lockedRoundNos,
+            List<MeetingRound> existingRounds,
+            List<RoundRequest> requestRounds
+    ) {
+        if (lockedRoundNos.isEmpty()) {
+            return;
+        }
+
+        Map<Integer, MeetingRound> existingMap = existingRounds.stream()
+                .collect(Collectors.toMap(MeetingRound::getRoundNo, r -> r));
+
+        Map<Integer, RoundRequest> requestMap = requestRounds.stream()
+                .collect(Collectors.toMap(RoundRequest::roundNo, r -> r));
+
+        for (Integer lockedRoundNo : lockedRoundNos) {
+            // 잠금 회차가 요청에 없으면 삭제 시도 → 409
+            if (!requestMap.containsKey(lockedRoundNo)) {
+                throw new BusinessException(ErrorCode.MEETING_ROUND_UPDATE_NOT_ALLOWED);
+            }
+
+            MeetingRound existing = existingMap.get(lockedRoundNo);
+            RoundRequest requested = requestMap.get(lockedRoundNo);
+
+            // date 비교
+            LocalDate existingDate = existing.getStartAt().toLocalDate();
+            if (!existingDate.equals(requested.date())) {
+                throw new BusinessException(ErrorCode.MEETING_ROUND_UPDATE_NOT_ALLOWED);
+            }
+
+            // book isbn 비교
+            String existingIsbn = existing.getBook().getIsbn();
+            if (!existingIsbn.equals(requested.book().isbn())) {
+                throw new BusinessException(ErrorCode.MEETING_ROUND_UPDATE_NOT_ALLOWED);
+            }
+        }
+    }
+
+    @Transactional
+    public ParticipationStatusUpdateResponse updateParticipationStatus(
+            Long userId,
+            Long meetingId,
+            Long joinRequestId,
+            ParticipationStatusUpdateRequest request
+    ) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. 모임 조회
+        Meeting meeting = meetingRepository.findByIdWithLeader(meetingId)
+                .filter(m -> m.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+
+        // 2. 권한 체크 (모임장만 처리 가능)
+        if (!meeting.isLeader(userId)) {
+            throw new BusinessException(ErrorCode.PARTICIPATION_UPDATE_FORBIDDEN);
+        }
+
+        // 3. 참여 요청 조회
+        MeetingMember joinRequest = meetingMemberRepository.findById(joinRequestId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.JOIN_REQUEST_NOT_FOUND));
+
+        // 4. 참여 요청이 해당 모임에 속하는지 확인
+        if (!joinRequest.belongsTo(meetingId)) {
+            throw new BusinessException(ErrorCode.JOIN_REQUEST_NOT_FOUND);
+        }
+
+        // 5. PENDING 상태인지 확인
+        if (!joinRequest.isPending()) {
+            throw new BusinessException(ErrorCode.JOIN_REQUEST_ALREADY_PROCESSED);
+        }
+
+        // 6. 상태 변경 처리
+        MeetingMemberStatus newStatus = MeetingMemberStatus.valueOf(request.status());
+
+        if (newStatus == MeetingMemberStatus.APPROVED) {
+            // 정원 체크
+            if (meeting.getCurrentCount() >= meeting.getCapacity()) {
+                throw new BusinessException(ErrorCode.CAPACITY_FULL);
+            }
+
+            // 승인 처리
+            joinRequest.approve(now);
+            meeting.incrementCurrentCount();
+
+            // 모집 완료 상태 확인 및 업데이트
+            if (meeting.isRecruitmentClosed()) {
+                meeting.updateStatusToFinished();
+            }
+        } else if (newStatus == MeetingMemberStatus.REJECTED) {
+            // 거절 처리
+            joinRequest.reject(now);
+        }
+
+        return ParticipationStatusUpdateResponse.builder()
+                .meetingId(meetingId)
+                .joinRequestId(joinRequestId)
+                .status(newStatus.name())
+                .build();
+    }
+
+    @Transactional
+    public void cancelParticipation(Long userId, Long meetingId) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. 모임 존재 여부 확인
+        if (!meetingRepository.existsByIdAndDeletedAtIsNull(meetingId)) {
+            throw new BusinessException(ErrorCode.MEETING_NOT_FOUND);
+        }
+
+        // 2. 본인 참여 요청 조회
+        MeetingMember myRequest = meetingMemberRepository.findByMeetingIdAndUserId(meetingId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.JOIN_REQUEST_NOT_FOUND));
+
+        // 3. PENDING 상태인지 확인
+        if (!myRequest.isPending()) {
+            throw new BusinessException(ErrorCode.PARTICIPATION_CANCEL_NOT_ALLOWED);
+        }
+
+        // 4. 취소 처리 (status = LEFT, left_at = now)
+        myRequest.cancel(now);
+    }
+
+    @Transactional
+    public void leaveMeeting(Long userId, Long meetingId) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. 모임 조회
+        Meeting meeting = meetingRepository.findByIdWithLeader(meetingId)
+                .filter(m -> m.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+
+        // 2. 나의 멤버 정보 조회
+        MeetingMember myMember = meetingMemberRepository.findByMeetingIdAndUserId(meetingId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_MEMBER_NOT_FOUND));
+
+        // 3. 모임장은 탈퇴 불가 (위임 후 탈퇴해야 함)
+        if (myMember.isLeader()) {
+            throw new BusinessException(ErrorCode.LEADER_CANNOT_LEAVE);
+        }
+
+        // 4. APPROVED 상태인지 확인
+        if (!myMember.isApproved()) {
+            throw new BusinessException(ErrorCode.LEAVE_NOT_ALLOWED);
+        }
+
+        // 5. 탈퇴 처리 (status = LEFT, left_at = now)
+        myMember.cancel(now);
+
+        // 6. 모임 인원 감소
+        meeting.decrementCurrentCount();
+    }
+
+    @Transactional(readOnly = true)
+    public MeetingMembersResponse getMeetingMembers(Long userId, Long meetingId) {
+        // 1. 모임 조회
+        Meeting meeting = meetingRepository.findByIdWithLeader(meetingId)
+                .filter(m -> m.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+
+        // 2. 권한 체크 (모임장만)
+        if (!meeting.isLeader(userId)) {
+            throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+        }
+
+        // 3. APPROVED 멤버 목록 조회
+        List<MeetingMember> approvedMembers = meetingMemberRepository
+                .findApprovedMembersByMeetingIdOrderByCreatedAt(meetingId);
+
+        // 4. approvedAt 기준 정렬 (joinedAt)
+        List<MeetingMember> sortedMembers = approvedMembers.stream()
+                .sorted((m1, m2) -> {
+                    if (m1.getApprovedAt() == null && m2.getApprovedAt() == null) return 0;
+                    if (m1.getApprovedAt() == null) return 1;
+                    if (m2.getApprovedAt() == null) return -1;
+                    return m1.getApprovedAt().compareTo(m2.getApprovedAt());
+                })
+                .toList();
+
+        // 5. 응답 생성
+        List<MeetingMembersResponse.MemberInfo> memberInfos = sortedMembers.stream()
+                .map(member -> MeetingMembersResponse.MemberInfo.builder()
+                        .meetingMemberId(member.getId())
+                        .nickname(member.getUser().getNickname())
+                        .profileImagePath(imageUrlResolver.toUrl(member.getUser().getProfileImagePath()))
+                        .joinedAt(toKstOffset(member.getApprovedAt()))
+                        .build())
+                .toList();
+
+        return MeetingMembersResponse.builder()
+                .meetingId(meetingId)
+                .memberCount(memberInfos.size())
+                .members(memberInfos)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public PendingMembersResponse getPendingMembers(Long userId, Long meetingId, Long cursorId, int size) {
+        Meeting meeting = meetingRepository.findByIdWithLeader(meetingId)
+                .filter(m -> m.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+
+        if (!meeting.isLeader(userId)) {
+            throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+        }
+
+        List<MeetingMember> pendingMembers = meetingMemberRepository
+                .findPendingMembersByMeetingIdWithCursor(meetingId, cursorId, PageRequest.of(0, size + 1));
+
+        boolean hasNext = pendingMembers.size() > size;
+        List<MeetingMember> content = hasNext ? pendingMembers.subList(0, size) : pendingMembers;
+
+        List<PendingMembersResponse.PendingMemberInfo> memberInfos = content.stream()
+                .map(member -> PendingMembersResponse.PendingMemberInfo.builder()
+                        .meetingMemberId(member.getId())
+                        .nickname(member.getUser().getNickname())
+                        .memberIntro(member.getMemberIntro())
+                        .profileImagePath(imageUrlResolver.toUrl(member.getUser().getProfileImagePath()))
+                        .build())
+                .toList();
+
+        Long nextCursorId = hasNext ? content.getLast().getId() : null;
+        PageInfo pageInfo = new PageInfo(nextCursorId, hasNext, size);
+
+        return PendingMembersResponse.builder()
+                .members(memberInfos)
+                .pageInfo(pageInfo)
+                .build();
+    }
+
+    @Transactional
+    public void kickMember(Long userId, Long meetingId, Long memberId) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. 모임 조회
+        Meeting meeting = meetingRepository.findByIdWithLeader(meetingId)
+                .filter(m -> m.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+
+        // 2. 권한 체크 (모임장만)
+        if (!meeting.isLeader(userId)) {
+            throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+        }
+
+        // 3. 강퇴 대상 멤버 조회
+        MeetingMember targetMember = meetingMemberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_MEMBER_NOT_FOUND));
+
+        // 4. 해당 모임의 멤버인지 확인
+        if (!targetMember.belongsTo(meetingId)) {
+            throw new BusinessException(ErrorCode.MEETING_MEMBER_NOT_FOUND);
+        }
+
+        // 5. 본인 강퇴 방지
+        if (targetMember.getUser().getId().equals(userId)) {
+            throw new BusinessException(ErrorCode.CANNOT_KICK_SELF);
+        }
+
+        // 6. APPROVED 상태인지 확인
+        if (!targetMember.isApproved()) {
+            throw new BusinessException(ErrorCode.KICK_NOT_ALLOWED);
+        }
+
+        // 7. 강퇴 처리
+        targetMember.kick(now);
+
+        // 8. 모임 인원 감소
+        meeting.decrementCurrentCount();
+    }
+
+    private OffsetDateTime toKstOffset(LocalDateTime time) {
+        if (time == null) {
+            return null;
+        }
+        return time.atZone(java.time.ZoneId.of("Asia/Seoul")).toOffsetDateTime();
     }
 }

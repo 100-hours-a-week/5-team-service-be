@@ -1,0 +1,32 @@
+services:
+  mysql:
+    image: mysql:8.0.39
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: doktoridb
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -u root -p$$MYSQL_ROOT_PASSWORD -e 'SELECT 1' 2>/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  app:
+    build: .
+    env_file: .env
+    environment:
+      DB_URL: "jdbc:mysql://mysql:3306/doktoridb?serverTimezone=Asia/Seoul&useSSL=false"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/doktoridb?serverTimezone=Asia/Seoul&useSSL=false&allowPublicKeyRetrieval=true"
+    ports:
+      - "8080:8080"
+    restart: on-failure:5
+    depends_on:
+      mysql:
+        condition: service_started
+
+volumes:
+  mysql-data:

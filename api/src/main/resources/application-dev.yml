@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: 'aws-parameterstore:/doktori/dev/'
   jpa:
     hibernate:
       ddl-auto: validate

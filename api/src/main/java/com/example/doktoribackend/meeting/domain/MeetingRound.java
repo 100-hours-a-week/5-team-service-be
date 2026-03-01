@@ -66,6 +66,14 @@ public class MeetingRound extends BaseTimeEntity {
         this.meetingLink = meetingLink;
     }
 
+    public void complete() {
+        this.status = MeetingRoundStatus.DONE;
+    }
+
+    public void cancel() {
+        this.status = MeetingRoundStatus.CANCELED;
+    }
+
     // 양방향 관계 설정을 위한 메서드
     public void setMeeting(Meeting meeting) {
         this.meeting = meeting;

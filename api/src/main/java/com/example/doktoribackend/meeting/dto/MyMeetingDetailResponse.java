@@ -16,6 +16,7 @@ public class MyMeetingDetailResponse {
     // 모임 기본 정보
     private Long meetingId;
     private String meetingImagePath;
+    private String meetingImageKey;
     private String title;
     private String readingGenreName;
     private LeaderInfo leaderInfo;

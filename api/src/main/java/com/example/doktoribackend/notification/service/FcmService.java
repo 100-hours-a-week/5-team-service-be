@@ -5,7 +5,6 @@ import com.example.doktoribackend.notification.repository.UserPushTokenRepositor
 import com.google.firebase.messaging.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -20,7 +19,6 @@ public class FcmService {
     private final UserPushTokenRepository userPushTokenRepository;
     private static final int BATCH_SIZE = 500;
 
-    @Async("notificationExecutor")
     public void sendToUser(Long userId, String title, String body, String linkPath) {
         List<UserPushToken> tokens = userPushTokenRepository
                 .findByUserIdsWithNotificationEnabled(List.of(userId));
@@ -33,7 +31,6 @@ public class FcmService {
         sendToToken(tokens.getFirst().getToken(), title, body, linkPath);
     }
 
-    @Async("notificationExecutor")
     public void sendToUsers(List<Long> userIds, String title, String body, String linkPath) {
         List<UserPushToken> tokens = userPushTokenRepository
                 .findByUserIdsWithNotificationEnabled(userIds);

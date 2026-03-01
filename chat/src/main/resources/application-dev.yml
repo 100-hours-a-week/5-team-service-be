@@ -1,0 +1,16 @@
+spring:
+  config:
+    import: 'aws-parameterstore:/doktori/dev/'
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+logging:
+  level:
+    org.hibernate.SQL: debug
+app:
+  cookie:
+    secure: true
+    same-site: None

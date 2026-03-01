@@ -33,7 +33,7 @@ server:
     context-path: /api
   tomcat:
     threads:
-      max: 100
+      max: 150
       min-spare: 20
     accept-count: 50
     mbeanregistry:
@@ -44,7 +44,7 @@ springdoc:
     enabled: true
     path: /v1/api-docs
   swagger-ui:
-    path: /swagger-ui/index.html
+    path: /swagger-ui.html
     display-request-duration: true
     doc-expansion: list
     persistAuthorization: true
@@ -59,7 +59,7 @@ kakao:
     user-info-url: https://kapi.kakao.com/v2/user/me
     frontend-redirect: ${KAKAO_FRONTEND_REDIRECT}
   book:
-    base-url: https://dapi.kakao.com/v3/search/book
+    base-url: ${KAKAO_BOOK_BASE_URL:https://dapi.kakao.com/v3/search/book}
     rest-api-key: ${KAKAO_REST_API_KEY}
 
 app:

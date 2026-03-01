@@ -1,0 +1,43 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MYSQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    defer-datasource-initialization: true
+  flyway:
+    enabled: false
+  sql:
+    init:
+      mode: always
+  cloud:
+    aws:
+      parameterstore:
+        enabled: false
+
+cloud:
+  aws:
+    credentials:
+      instanceProfile: false
+    parameterstore:
+      enabled: false
+
+app:
+  jwt:
+    secret: test-secret-key-for-integration-testing-at-least-32-characters-long
+    access-exp-minutes: 30
+    refresh-exp-seconds: 1209600
+  s3:
+    public-base-url: https://test-bucket.s3.amazonaws.com
+
+kakao:
+  book:
+    base-url: https://dapi.kakao.com/v3/search/book
+    rest-api-key: test-key
+
+ai:
+  base-url: http://localhost:9999
+  api-key: test-ai-key

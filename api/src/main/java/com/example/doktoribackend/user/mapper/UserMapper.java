@@ -1,6 +1,6 @@
 package com.example.doktoribackend.user.mapper;
 
-import com.example.doktoribackend.s3.ImageUrlResolver;
+import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.dto.UserProfileResponse;
 
@@ -16,6 +16,7 @@ public final class UserMapper {
         return new UserProfileResponse(
                 user.getNickname(),
                 resolver.toUrl(user.getProfileImagePath()),
+                user.getProfileImagePath(),
                 user.isProfileCompleted(),
                 user.isOnboardingCompleted(),
                 user.getLeaderIntro(),

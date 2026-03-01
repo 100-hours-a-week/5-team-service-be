@@ -1,42 +1,76 @@
-HELP.md
-.gradle
-build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
+##################################
+# Build
+##################################
+.gradle/
+**/build/
+out/
 bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
 
-# secrets
+# Gradle wrapper (keep)
+!gradle/wrapper/gradle-wrapper.jar
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+##################################
+# Secrets
+##################################
 **/application-secret.yml
 .env
 **/src/main/resources/firebase-service-account.json
+reload-dev-backend.sh
+update-dev-param.sh
 
-### IntelliJ IDEA ###
-.idea
-*.iws
+##################################
+# IntelliJ IDEA
+##################################
+.idea/
 *.iml
 *.ipr
-out/
-!**/src/main/**/out/
-!**/src/test/**/out/
+*.iws
 
-### NetBeans ###
-/nbproject/private/
+# 공유할 설정만 허용 (선택)
+!.idea/codeStyles/
+!.idea/runConfigurations/
+
+##################################
+# Eclipse / STS
+##################################
+.project
+.classpath
+.settings/
+.factorypath
+.apt_generated
+.springBeans
+.sts4-cache
+
+##################################
+# NetBeans
+##################################
+/nbproject/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
 
-### VS Code ###
+##################################
+# VS Code
+##################################
 .vscode/
+
+##################################
+# macOS
+##################################
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+*.icloud
+
+##################################
+# Misc
+##################################
+*.hprof
+
+/.claude

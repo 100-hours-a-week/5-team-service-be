@@ -40,7 +40,7 @@ public class MeetingCreateRequestValidator
         }
 
         if (!isValidDurationMinutes(req)) {
-            addViolation(ctx, FIELD_DURATION_MINUTES, "진행 시간은 30분 단위여야 합니다");
+            addViolation(ctx, FIELD_DURATION_MINUTES, "진행 시간은 30분이어야 합니다");
             valid = false;
         }
 
@@ -108,7 +108,7 @@ public class MeetingCreateRequestValidator
         if (req.durationMinutes() == null) {
             return true;
         }
-        return req.durationMinutes() % 30 == 0;
+        return req.durationMinutes() == 30;
     }
 
     private boolean isRecruitmentDeadlineNotPast(MeetingCreateRequest req) {

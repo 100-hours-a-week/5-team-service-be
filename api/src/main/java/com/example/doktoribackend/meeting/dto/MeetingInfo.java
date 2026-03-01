@@ -1,7 +1,7 @@
 package com.example.doktoribackend.meeting.dto;
 
 import com.example.doktoribackend.meeting.domain.Meeting;
-import com.example.doktoribackend.s3.ImageUrlResolver;
+import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Builder;
 import lombok.Getter;

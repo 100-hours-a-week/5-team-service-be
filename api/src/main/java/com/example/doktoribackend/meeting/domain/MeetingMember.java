@@ -68,9 +68,52 @@ public class MeetingMember extends BaseTimeEntity {
                 .meeting(meeting)
                 .user(user)
                 .role(MeetingMemberRole.MEMBER)
-                .status(MeetingMemberStatus.APPROVED)
+                .status(MeetingMemberStatus.PENDING)
                 .memberIntro(user.getMemberIntro())
-                .approvedAt(LocalDateTime.now())
                 .build();
+    }
+
+    public boolean isPending() {
+        return this.status == MeetingMemberStatus.PENDING;
+    }
+
+    public boolean belongsTo(Long meetingId) {
+        return this.meeting != null && this.meeting.getId().equals(meetingId);
+    }
+
+    public void approve(LocalDateTime approvedAt) {
+        this.status = MeetingMemberStatus.APPROVED;
+        this.approvedAt = approvedAt;
+    }
+
+    public void reject(LocalDateTime rejectedAt) {
+        this.status = MeetingMemberStatus.REJECTED;
+        this.rejectedAt = rejectedAt;
+    }
+
+    public void cancel(LocalDateTime leftAt) {
+        this.status = MeetingMemberStatus.LEFT;
+        this.leftAt = leftAt;
+    }
+
+    public void kick(LocalDateTime leftAt) {
+        this.status = MeetingMemberStatus.KICKED;
+        this.leftAt = leftAt;
+    }
+
+    public boolean isLeader() {
+        return this.role == MeetingMemberRole.LEADER;
+    }
+
+    public boolean isApproved() {
+        return this.status == MeetingMemberStatus.APPROVED;
+    }
+
+    public void promoteToLeader() {
+        this.role = MeetingMemberRole.LEADER;
+    }
+
+    public void demoteToMember() {
+        this.role = MeetingMemberRole.MEMBER;
     }
 }
