@@ -15,7 +15,6 @@ public final class ValidationConstant {
     public static final int TOPIC_MAX_LENGTH = 50;
     public static final int DESCRIPTION_MIN_LENGTH = 2;
     public static final int DESCRIPTION_MAX_LENGTH = 50;
-    public static final String TEXT_PATTERN = "^[a-zA-Z0-9가-힣\\s]+$";
 
     // Quiz
     public static final int QUESTION_MIN_LENGTH = 2;
