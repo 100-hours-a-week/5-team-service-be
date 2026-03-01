@@ -19,7 +19,7 @@ public class AiSummaryClient {
     public AiSummaryResponse requestSummary(Long roomId, AiSummaryRequest request) {
         try {
             AiSummaryResponse body = aiRestClient.post()
-                    .uri("/ai/chat-rooms/" + roomId + "/discussion-summary")
+                    .uri("/chat-rooms/" + roomId + "/discussion-summary")
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(request)
                     .retrieve()
