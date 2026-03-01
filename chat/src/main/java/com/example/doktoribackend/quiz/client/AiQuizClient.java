@@ -24,7 +24,8 @@ public class AiQuizClient {
                     .body(request)
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, (req, res) -> {
-                        log.warn("AI quiz generation failed: status={}", res.getStatusCode());
+                        String errorBody = new String(res.getBody().readAllBytes());
+                        log.warn("AI quiz generation failed: status={}, body={}", res.getStatusCode(), errorBody);
                         throw new BusinessException(ErrorCode.AI_QUIZ_GENERATION_FAILED);
                     })
                     .body(AiQuizGenerateResponse.class);

@@ -12,9 +12,9 @@ public record AiQuizSuggestResponse(
     public record ChoiceItem(Integer choiceNumber, String choiceText) {}
 
     public static AiQuizSuggestResponse from(AiQuizGenerateResponse response) {
-        List<ChoiceItem> choices = response.choices().stream()
+        List<ChoiceItem> choices = response.quizChoices().stream()
                 .map(c -> new ChoiceItem(c.choiceNumber(), c.choiceText()))
                 .toList();
-        return new AiQuizSuggestResponse(response.question(), response.correctChoiceNumber(), choices);
+        return new AiQuizSuggestResponse(response.quiz().question(), response.quiz().correctChoiceNumber(), choices);
     }
 }

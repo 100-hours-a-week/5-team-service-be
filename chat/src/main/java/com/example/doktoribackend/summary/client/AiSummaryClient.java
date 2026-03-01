@@ -24,7 +24,8 @@ public class AiSummaryClient {
                     .body(request)
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, (req, res) -> {
-                        log.warn("AI summary generation failed: status={}", res.getStatusCode());
+                        String errorBody = new String(res.getBody().readAllBytes());
+                        log.warn("AI summary generation failed: status={}, body={}", res.getStatusCode(), errorBody);
                         throw new BusinessException(ErrorCode.AI_SUMMARY_GENERATION_FAILED);
                     })
                     .body(AiSummaryResponse.class);

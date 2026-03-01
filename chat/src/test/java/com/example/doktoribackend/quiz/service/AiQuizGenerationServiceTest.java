@@ -74,7 +74,8 @@ class AiQuizGenerationServiceTest {
                 new AiQuizGenerateResponse.ChoiceItem(3, "선아"),
                 new AiQuizGenerateResponse.ChoiceItem(4, "데니스")
         );
-        return new AiQuizGenerateResponse("주인공의 이름은?", 1, 0L, choices);
+        AiQuizGenerateResponse.Quiz quiz = new AiQuizGenerateResponse.Quiz("주인공의 이름은?", 1);
+        return new AiQuizGenerateResponse(quiz, choices);
     }
 
     @Nested
@@ -184,7 +185,7 @@ class AiQuizGenerationServiceTest {
     class RequestPropagation {
 
         @Test
-        @DisplayName("요청의 author, title, roomId가 AiQuizGenerateRequest에 그대로 전달된다")
+        @DisplayName("요청의 author, title이 AiQuizGenerateRequest에 그대로 전달된다")
         void suggest_propagatesRequestFields() {
             AiQuizSuggestRequest request = new AiQuizSuggestRequest("작가명", "책제목");
 

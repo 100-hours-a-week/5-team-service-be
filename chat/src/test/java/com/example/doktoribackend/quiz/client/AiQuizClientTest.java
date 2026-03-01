@@ -61,7 +61,8 @@ class AiQuizClientTest {
                 new AiQuizGenerateResponse.ChoiceItem(3, "선아"),
                 new AiQuizGenerateResponse.ChoiceItem(4, "데니스")
         );
-        return new AiQuizGenerateResponse("주인공의 이름은?", 1, 0L, choices);
+        AiQuizGenerateResponse.Quiz quiz = new AiQuizGenerateResponse.Quiz("주인공의 이름은?", 1);
+        return new AiQuizGenerateResponse(quiz, choices);
     }
 
     @Nested
@@ -75,11 +76,11 @@ class AiQuizClientTest {
 
             AiQuizGenerateResponse result = aiQuizClient.generate(request);
 
-            assertThat(result.question()).isEqualTo("주인공의 이름은?");
-            assertThat(result.correctChoiceNumber()).isEqualTo(1);
-            assertThat(result.choices()).hasSize(4);
-            assertThat(result.choices().get(0).choiceNumber()).isEqualTo(1);
-            assertThat(result.choices().get(0).choiceText()).isEqualTo("윤재");
+            assertThat(result.quiz().question()).isEqualTo("주인공의 이름은?");
+            assertThat(result.quiz().correctChoiceNumber()).isEqualTo(1);
+            assertThat(result.quizChoices()).hasSize(4);
+            assertThat(result.quizChoices().get(0).choiceNumber()).isEqualTo(1);
+            assertThat(result.quizChoices().get(0).choiceText()).isEqualTo("윤재");
         }
     }
 
