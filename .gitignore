@@ -72,3 +72,5 @@ update-dev-param.sh
 # Misc
 ##################################
 *.hprof
+
+/.claude
