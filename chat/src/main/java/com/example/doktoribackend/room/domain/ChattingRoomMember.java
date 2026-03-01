@@ -91,6 +91,10 @@ public class ChattingRoomMember extends BaseTimeEntity {
         this.status = MemberStatus.LEFT;
     }
 
+    public void rejoin() {
+        this.status = MemberStatus.WAITING;
+    }
+
     public boolean isHost() {
         return this.role == MemberRole.HOST;
     }
