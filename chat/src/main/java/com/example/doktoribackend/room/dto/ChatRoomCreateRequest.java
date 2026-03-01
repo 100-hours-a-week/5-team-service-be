@@ -17,16 +17,14 @@ import static com.example.doktoribackend.common.constants.ValidationConstant.*;
 @Schema(description = "채팅 토론방 생성 요청")
 public record ChatRoomCreateRequest(
 
-        @Schema(description = "토론 주제", example = "AI가 인간의 일자리를 대체할 수 있는가")
+        @Schema(description = "토론 주제", example = "AI가 인간의 일자리를 대체할 수 있는가?")
         @NotBlank(message = "주제는 필수입니다.")
         @Size(min = TOPIC_MIN_LENGTH, max = TOPIC_MAX_LENGTH, message = "주제는 2~50자 사이여야 합니다.")
-        @Pattern(regexp = TEXT_PATTERN, message = "주제에 특수문자나 이모지를 사용할 수 없습니다.")
         String topic,
 
-        @Schema(description = "주제에 대한 한 줄 설명", example = "AI 기술 발전에 따른 고용 시장 변화를 토론합니다")
+        @Schema(description = "주제에 대한 한 줄 설명", example = "AI 기술 발전에 따른 고용 시장 변화를 토론합니다.")
         @NotBlank(message = "설명은 필수입니다.")
         @Size(min = DESCRIPTION_MIN_LENGTH, max = DESCRIPTION_MAX_LENGTH, message = "설명은 2~50자 사이여야 합니다.")
-        @Pattern(regexp = TEXT_PATTERN, message = "설명에 특수문자나 이모지를 사용할 수 없습니다.")
         String description,
 
         @Schema(description = "도서 ISBN", example = "9781234567890")
