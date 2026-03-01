@@ -64,7 +64,7 @@ class AiQuizGenerationServiceTest {
     }
 
     private AiQuizSuggestRequest validRequest() {
-        return new AiQuizSuggestRequest("손원평", "아몬드", 0L);
+        return new AiQuizSuggestRequest("손원평", "아몬드");
     }
 
     private AiQuizGenerateResponse aiResponse() {
@@ -97,8 +97,8 @@ class AiQuizGenerationServiceTest {
             assertThat(result.question()).isEqualTo("주인공의 이름은?");
             assertThat(result.correctChoiceNumber()).isEqualTo(1);
             assertThat(result.choices()).hasSize(4);
-            assertThat(result.choices().get(0).choiceNumber()).isEqualTo(1);
-            assertThat(result.choices().get(0).choiceText()).isEqualTo("윤재");
+            assertThat(result.choices().getFirst().choiceNumber()).isEqualTo(1);
+            assertThat(result.choices().getFirst().choiceText()).isEqualTo("윤재");
 
             then(aiQuizClient).should().generate(any(AiQuizGenerateRequest.class));
             then(quizGenerationLogRepository).should().save(any(QuizGenerationLog.class));
@@ -186,7 +186,7 @@ class AiQuizGenerationServiceTest {
         @Test
         @DisplayName("요청의 author, title, roomId가 AiQuizGenerateRequest에 그대로 전달된다")
         void suggest_propagatesRequestFields() {
-            AiQuizSuggestRequest request = new AiQuizSuggestRequest("작가명", "책제목", 42L);
+            AiQuizSuggestRequest request = new AiQuizSuggestRequest("작가명", "책제목");
 
             given(quizGenerationLogRepository.countTodayByUserId(
                     any(Long.class), any(LocalDateTime.class), any(LocalDateTime.class)))
@@ -199,7 +199,7 @@ class AiQuizGenerationServiceTest {
             aiQuizGenerationService.suggest(USER_ID, request);
 
             then(aiQuizClient).should().generate(
-                    new AiQuizGenerateRequest("작가명", "책제목", 42L));
+                    new AiQuizGenerateRequest("작가명", "책제목"));
         }
     }
 }

@@ -44,7 +44,7 @@ class AiQuizClientTest {
 
     @BeforeEach
     void setUp() {
-        request = new AiQuizGenerateRequest("손원평", "아몬드", 0L);
+        request = new AiQuizGenerateRequest("손원평", "아몬드");
 
         doReturn(requestBodyUriSpec).when(aiRestClient).post();
         doReturn(requestBodySpec).when(requestBodyUriSpec).uri(anyString());

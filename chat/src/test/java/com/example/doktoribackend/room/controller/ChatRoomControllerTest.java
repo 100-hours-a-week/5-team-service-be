@@ -973,7 +973,7 @@ class ChatRoomControllerTest {
         }
 
         private String validRequestBody() throws Exception {
-            AiQuizSuggestRequest req = new AiQuizSuggestRequest("손원평", "아몬드", 0L);
+            AiQuizSuggestRequest req = new AiQuizSuggestRequest("손원평", "아몬드");
             return objectMapper.writeValueAsString(req);
         }
 
@@ -1001,7 +1001,7 @@ class ChatRoomControllerTest {
         @Test
         @DisplayName("author가 빈 문자열이면 422를 반환한다")
         void suggestQuiz_authorBlank_returns422() throws Exception {
-            AiQuizSuggestRequest req = new AiQuizSuggestRequest("", "아몬드", 0L);
+            AiQuizSuggestRequest req = new AiQuizSuggestRequest("", "아몬드");
 
             mockMvc.perform(post("/chat-rooms/quiz-recommendations")
                             .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
@@ -1014,20 +1014,7 @@ class ChatRoomControllerTest {
         @Test
         @DisplayName("title이 null이면 422를 반환한다")
         void suggestQuiz_titleNull_returns422() throws Exception {
-            AiQuizSuggestRequest req = new AiQuizSuggestRequest("손원평", null, 0L);
-
-            mockMvc.perform(post("/chat-rooms/quiz-recommendations")
-                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
-                            .with(csrf())
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(req)))
-                    .andExpect(status().isUnprocessableEntity());
-        }
-
-        @Test
-        @DisplayName("roomId가 null이면 422를 반환한다")
-        void suggestQuiz_roomIdNull_returns422() throws Exception {
-            AiQuizSuggestRequest req = new AiQuizSuggestRequest("손원평", "아몬드", null);
+            AiQuizSuggestRequest req = new AiQuizSuggestRequest("손원평", null);
 
             mockMvc.perform(post("/chat-rooms/quiz-recommendations")
                             .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
