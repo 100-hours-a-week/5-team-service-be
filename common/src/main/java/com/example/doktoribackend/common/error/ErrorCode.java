@@ -140,6 +140,7 @@ public enum ErrorCode {
 
     // Vote
     VOTE_NOT_FOUND(HttpStatus.NOT_FOUND, "VOTE_NOT_FOUND", "투표를 찾을 수 없습니다."),
+    VOTE_NOT_OPEN(HttpStatus.CONFLICT, "VOTE_NOT_OPEN", "아직 투표가 시작되지 않았습니다."),
     VOTE_ALREADY_CLOSED(HttpStatus.CONFLICT, "VOTE_ALREADY_CLOSED", "이미 종료된 투표입니다."),
     VOTE_ALREADY_CAST(HttpStatus.CONFLICT, "VOTE_ALREADY_CAST", "이미 투표하였습니다.");
 

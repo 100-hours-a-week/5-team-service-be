@@ -134,8 +134,8 @@ public class ChatRoomService {
             if (member.getStatus() == MemberStatus.LEFT) {
                 quizService.validateQuizAnswer(roomId, request.quizAnswer());
                 validateRoomNotFull(room);
-                validatePositionNotFull(roomId, room.getCapacity(), member.getPosition());
-                member.rejoin();
+                validatePositionNotFull(roomId, room.getCapacity(), request.position());
+                member.rejoin(request.position());
                 room.increaseMemberCount();
                 WaitingRoomResponse response = chatRoomQueryService.buildWaitingRoomResponse(room);
                 chatRoomEventPublisher.broadcastWaitingRoomUpdate(roomId, response);

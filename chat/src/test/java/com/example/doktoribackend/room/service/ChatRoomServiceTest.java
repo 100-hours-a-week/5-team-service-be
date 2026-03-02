@@ -630,7 +630,7 @@ class ChatRoomServiceTest {
         }
 
         @Test
-        @DisplayName("이 방에서 나갔다가 재입장하면 WAITING 상태로 복귀하고 인원수가 증가한다")
+        @DisplayName("이 방에서 나갔다가 재입장하면 WAITING 상태로 복귀하고 인원수가 증가하며 포지션이 변경된다")
         void joinChatRoom_rejoin_success() {
             // given
             ChattingRoom room = createWaitingRoom(1);
@@ -640,12 +640,12 @@ class ChatRoomServiceTest {
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
                     .willReturn(Optional.of(member));
             given(chattingRoomMemberRepository.countByChattingRoomIdAndPositionAndStatusIn(
-                    eq(ROOM_ID), eq(Position.AGREE), any())).willReturn(0);
+                    eq(ROOM_ID), eq(Position.DISAGREE), any())).willReturn(0);
 
             WaitingRoomResponse expectedResponse = new WaitingRoomResponse(ROOM_ID, 1, 1, 2, List.of());
             given(chatRoomQueryService.buildWaitingRoomResponse(room)).willReturn(expectedResponse);
 
-            ChatRoomJoinRequest request = new ChatRoomJoinRequest(Position.AGREE, 1);
+            ChatRoomJoinRequest request = new ChatRoomJoinRequest(Position.DISAGREE, 1);
 
             // when
             WaitingRoomResponse response = chatRoomService.joinChatRoom(ROOM_ID, USER_ID, request);
@@ -653,6 +653,7 @@ class ChatRoomServiceTest {
             // then
             assertThat(response.roomId()).isEqualTo(ROOM_ID);
             assertThat(member.getStatus()).isEqualTo(MemberStatus.WAITING);
+            assertThat(member.getPosition()).isEqualTo(Position.DISAGREE);
             assertThat(room.getCurrentMemberCount()).isEqualTo(2);
             then(chattingRoomMemberRepository).should(never()).save(any());
         }
