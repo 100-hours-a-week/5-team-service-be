@@ -31,7 +31,7 @@ public class Vote implements Persistable<Long> {
     @JoinColumn(name = "room_id")
     private ChattingRoom chattingRoom;
 
-    @Column(name = "opened_at", nullable = false)
+    @Column(name = "opened_at")
     private LocalDateTime openedAt;
 
     @Column(name = "closed_at")
@@ -58,6 +58,9 @@ public class Vote implements Persistable<Long> {
         this.roomId = chattingRoom.getId();
         this.chattingRoom = chattingRoom;
         this.totalMemberCount = totalMemberCount;
+    }
+
+    public void openVoting() {
         this.openedAt = LocalDateTime.now();
     }
 

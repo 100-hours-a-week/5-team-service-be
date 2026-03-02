@@ -8,14 +8,17 @@ import com.example.doktoribackend.room.repository.RoomRoundRepository;
 import com.example.doktoribackend.summary.client.AiSummaryClient;
 import com.example.doktoribackend.summary.client.AiSummaryRequest;
 import com.example.doktoribackend.summary.client.AiSummaryResponse;
+import com.example.doktoribackend.vote.service.VoteService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -31,12 +34,16 @@ public class RoundSummaryService {
     private static final int MAX_CHAR_LIMIT = 2400;
     private static final int MAX_RETRY = 3;
 
+    private static final int LAST_ROUND = 3;
+
     private final MessageRepository messageRepository;
     private final ChattingRoomMemberRepository chattingRoomMemberRepository;
     private final RoomRoundRepository roomRoundRepository;
     private final AiSummaryClient aiSummaryClient;
     private final ObjectMapper objectMapper;
     private final PlatformTransactionManager transactionManager;
+    private final VoteService voteService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Async("aiSummaryExecutor")
     public void generateSummaryAsync(Long roomId, Long roundId, String topic, int roundNumber) {
@@ -45,23 +52,38 @@ public class RoundSummaryService {
 
             if (messageItems.isEmpty()) {
                 log.info("No text messages found for round summary: roomId={}, roundId={}", roomId, roundId);
-                return;
+            } else {
+                AiSummaryRequest request = new AiSummaryRequest(topic, String.valueOf(roundNumber), messageItems);
+                AiSummaryResponse response = requestWithRetry(roomId, request);
+
+                String summaryJson = objectMapper.writeValueAsString(response.summary());
+
+                TransactionTemplate writeTx = new TransactionTemplate(transactionManager);
+                writeTx.executeWithoutResult(status ->
+                    roomRoundRepository.findById(roundId).ifPresent(round -> round.updateSummary(summaryJson))
+                );
+
+                log.info("AI summary generated successfully: roomId={}, roundNumber={}", roomId, roundNumber);
             }
-
-            AiSummaryRequest request = new AiSummaryRequest(topic, String.valueOf(roundNumber), messageItems);
-            AiSummaryResponse response = requestWithRetry(roomId, request);
-
-            String summaryJson = objectMapper.writeValueAsString(response.summary());
-
-            TransactionTemplate writeTx = new TransactionTemplate(transactionManager);
-            writeTx.executeWithoutResult(status ->
-                roomRoundRepository.findById(roundId).ifPresent(round -> round.updateSummary(summaryJson))
-            );
-
-            log.info("AI summary generated successfully: roomId={}, roundNumber={}", roomId, roundNumber);
-
         } catch (Exception e) {
             log.error("Failed to generate AI summary: roomId={}, roundId={}, error={}", roomId, roundId, e.getMessage());
+        } finally {
+            if (roundNumber == LAST_ROUND) {
+                openVoteAndNotify(roomId);
+            }
+        }
+    }
+
+    private void openVoteAndNotify(Long roomId) {
+        try {
+            LocalDateTime voteExpiresAt = voteService.openVoting(roomId);
+            messagingTemplate.convertAndSend(
+                    "/topic/chat-rooms/" + roomId,
+                    Map.of("type", "SUMMARY_READY", "voteExpiresAt", voteExpiresAt)
+            );
+            log.info("Vote opened and SUMMARY_READY broadcast: roomId={}, expiresAt={}", roomId, voteExpiresAt);
+        } catch (Exception e) {
+            log.error("Failed to open vote for roomId={}: {}", roomId, e.getMessage());
         }
     }
 
