@@ -171,35 +171,25 @@ public class Meeting extends BaseTimeEntity {
         return this.status == MeetingStatus.CANCELED;
     }
 
-    public void update(
+    public void changeLeader(User newLeader) {
+        this.leaderUser = newLeader;
+    }
+
+    public void patch(
             String meetingImagePath,
             String title,
             String description,
             Long readingGenreId,
             Integer capacity,
-            Integer roundCount,
-            LocalTime startTime,
-            Integer durationMinutes,
             LocalDate recruitmentDeadline,
-            String leaderIntro,
-            MeetingDayOfWeek dayOfWeek,
-            LocalDateTime firstRoundAt
+            String leaderIntro
     ) {
         this.meetingImagePath = meetingImagePath;
         this.title = title;
         this.description = description;
         this.readingGenreId = readingGenreId;
         this.capacity = capacity;
-        this.roundCount = roundCount;
-        this.startTime = startTime;
-        this.durationMinutes = durationMinutes;
         this.recruitmentDeadline = recruitmentDeadline;
         this.leaderIntro = leaderIntro;
-        this.dayOfWeek = dayOfWeek;
-        this.firstRoundAt = firstRoundAt;
-    }
-
-    public void changeLeader(User newLeader) {
-        this.leaderUser = newLeader;
     }
 }
