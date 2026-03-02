@@ -70,7 +70,6 @@ public enum ErrorCode {
     CAPACITY_FULL(HttpStatus.CONFLICT, "CAPACITY_FULL", "모집 정원이 가득 찼습니다."),
     MEETING_UPDATE_FORBIDDEN(HttpStatus.FORBIDDEN, "MEETING_UPDATE_FORBIDDEN", "모임을 수정할 권한이 없습니다."),
     MEETING_UPDATE_NOT_ALLOWED(HttpStatus.CONFLICT, "MEETING_UPDATE_NOT_ALLOWED", "취소된 모임은 수정할 수 없습니다."),
-    MEETING_ROUND_UPDATE_NOT_ALLOWED(HttpStatus.CONFLICT, "MEETING_ROUND_UPDATE_NOT_ALLOWED", "진행된 회차 또는 진행 중인 회차는 수정할 수 없습니다."),
     JOIN_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "JOIN_REQUEST_NOT_FOUND", "존재하지 않는 참여 요청입니다."),
     JOIN_REQUEST_ALREADY_PROCESSED(HttpStatus.CONFLICT, "JOIN_REQUEST_ALREADY_PROCESSED", "이미 처리된 참여 요청입니다."),
     PARTICIPATION_UPDATE_FORBIDDEN(HttpStatus.FORBIDDEN, "PARTICIPATION_UPDATE_FORBIDDEN", "참여 요청을 처리할 권한이 없습니다."),
@@ -79,6 +78,8 @@ public enum ErrorCode {
     LEAVE_NOT_ALLOWED(HttpStatus.CONFLICT, "LEAVE_NOT_ALLOWED", "탈퇴할 수 없는 상태입니다."),
     CANNOT_KICK_SELF(HttpStatus.CONFLICT, "CANNOT_KICK_SELF", "자기 자신을 강퇴할 수 없습니다."),
     KICK_NOT_ALLOWED(HttpStatus.CONFLICT, "KICK_NOT_ALLOWED", "강퇴할 수 없는 상태입니다."),
+    READING_GENRE_NOT_FOUND(HttpStatus.NOT_FOUND, "READING_GENRE_NOT_FOUND", "존재하지 않는 독서 장르입니다."),
+    CAPACITY_LESS_THAN_CURRENT(HttpStatus.CONFLICT, "CAPACITY_LESS_THAN_CURRENT", "정원은 현재 인원보다 작을 수 없습니다."),
 
     // LeaderDelegation
     LEADER_DELEGATION_FORBIDDEN(HttpStatus.FORBIDDEN, "LEADER_DELEGATION_FORBIDDEN", "모임장 위임 권한이 없습니다."),
