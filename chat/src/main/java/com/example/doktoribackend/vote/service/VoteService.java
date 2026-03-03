@@ -44,7 +44,7 @@ public class VoteService {
 
     @Transactional
     public void castVote(Long roomId, Long userId, Position choice) {
-        Vote vote = findVote(roomId);
+        Vote vote = findVoteWithLock(roomId);
         closeIfExpired(vote);
 
         if (vote.getOpenedAt() == null) {
@@ -88,6 +88,11 @@ public class VoteService {
 
     private Vote findVote(Long roomId) {
         return voteRepository.findById(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.VOTE_NOT_FOUND));
+    }
+
+    private Vote findVoteWithLock(Long roomId) {
+        return voteRepository.findByIdWithLock(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.VOTE_NOT_FOUND));
     }
 

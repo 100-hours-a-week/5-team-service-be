@@ -359,9 +359,9 @@ public class ChatRoomService {
     }
 
     private void validateNotAlreadyJoined(Long userId) {
-        chattingRoomMemberRepository.findFirstByUserIdAndStatusIn(userId, ACTIVE_STATUSES)
-                .ifPresent(member -> {
-                    throw new AlreadyJoinedRoomException(member.getChattingRoom().getId());
-                });
+        List<ChattingRoomMember> members = chattingRoomMemberRepository.findByUserIdAndStatusInWithLock(userId, ACTIVE_STATUSES);
+        if (!members.isEmpty()) {
+            throw new AlreadyJoinedRoomException(members.getFirst().getChattingRoom().getId());
+        }
     }
 }
