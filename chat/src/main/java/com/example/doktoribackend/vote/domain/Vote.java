@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.domain.Persistable;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -61,11 +62,11 @@ public class Vote implements Persistable<Long> {
     }
 
     public void openVoting() {
-        this.openedAt = LocalDateTime.now();
+        this.openedAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
     }
 
     public void close() {
-        this.closedAt = LocalDateTime.now();
+        this.closedAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
     }
 
     public boolean isClosed() {

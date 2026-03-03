@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Service
 @RequiredArgsConstructor
@@ -94,7 +95,7 @@ public class VoteService {
         if (vote.getOpenedAt() == null || vote.isClosed()) {
             return;
         }
-        if (vote.getOpenedAt().plus(VOTE_DURATION).isBefore(LocalDateTime.now())) {
+        if (vote.getOpenedAt().plus(VOTE_DURATION).isBefore(LocalDateTime.now(ZoneId.of("Asia/Seoul")))) {
             vote.close();
         }
     }

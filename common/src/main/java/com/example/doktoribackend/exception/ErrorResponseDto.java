@@ -22,20 +22,27 @@ public class ErrorResponseDto {
     @Schema(description = "필드 단위 오류", nullable = true)
     private final List<FieldErrorDetail> errors;
 
+    @Schema(description = "추가 데이터", nullable = true)
+    private final Object data;
+
     public static ErrorResponseDto from(CustomException e) {
-        return new ErrorResponseDto(e.getErrorCode().getCode(), e.getMessage(), null);
+        return new ErrorResponseDto(e.getErrorCode().getCode(), e.getMessage(), null, null);
     }
 
     public static ErrorResponseDto of(String code, String message) {
-        return new ErrorResponseDto(code, message, null);
+        return new ErrorResponseDto(code, message, null, null);
     }
 
     public static ErrorResponseDto of(ErrorCode errorCode) {
-        return new ErrorResponseDto(errorCode.getCode(), errorCode.getMessage(), null);
+        return new ErrorResponseDto(errorCode.getCode(), errorCode.getMessage(), null, null);
     }
 
     public static ErrorResponseDto of(ErrorCode errorCode, List<FieldErrorDetail> fieldErrors) {
-        return new ErrorResponseDto(errorCode.getCode(), errorCode.getMessage(), fieldErrors);
+        return new ErrorResponseDto(errorCode.getCode(), errorCode.getMessage(), fieldErrors, null);
+    }
+
+    public static ErrorResponseDto of(ErrorCode errorCode, Object data) {
+        return new ErrorResponseDto(errorCode.getCode(), errorCode.getMessage(), null, data);
     }
 
     @Getter
