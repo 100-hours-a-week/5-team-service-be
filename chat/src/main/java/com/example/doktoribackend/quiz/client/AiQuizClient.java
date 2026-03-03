@@ -40,7 +40,7 @@ public class AiQuizClient {
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
-            log.error("AI quiz generation failed: {}", ex.getMessage());
+            log.error("AI quiz generation failed: {}", ex.getMessage(), ex);
             throw new BusinessException(ErrorCode.AI_QUIZ_GENERATION_FAILED);
         }
     }
