@@ -5,6 +5,7 @@ import com.example.doktoribackend.book.service.BookService;
 import com.example.doktoribackend.book.repository.BookRepository;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.config.WebSocketSessionRegistry;
+import com.example.doktoribackend.exception.AlreadyJoinedRoomException;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.summary.service.RoundSummaryService;
 import com.example.doktoribackend.vote.service.VoteService;
@@ -358,11 +359,9 @@ public class ChatRoomService {
     }
 
     private void validateNotAlreadyJoined(Long userId) {
-        boolean alreadyJoined = chattingRoomMemberRepository.existsByUserIdAndStatusIn(
-                userId, ACTIVE_STATUSES);
-
-        if (alreadyJoined) {
-            throw new BusinessException(ErrorCode.CHAT_ROOM_ALREADY_JOINED);
-        }
+        chattingRoomMemberRepository.findFirstByUserIdAndStatusIn(userId, ACTIVE_STATUSES)
+                .ifPresent(member -> {
+                    throw new AlreadyJoinedRoomException(member.getChattingRoom().getId());
+                });
     }
 }
