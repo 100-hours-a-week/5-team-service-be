@@ -92,6 +92,19 @@ public interface ChatRoomApi {
                               }
                             }
                             """)))
+    @ApiResponse(responseCode = "409", description = "Conflict",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(name = "이미 참여 중",
+                            value = """
+                                    {
+                                      "code": "CHAT_ROOM_ALREADY_JOINED",
+                                      "message": "이미 참여 중인 채팅방이 있어 새 채팅방을 생성할 수 없습니다.",
+                                      "errors": null,
+                                      "data": {
+                                        "roomId": 42
+                                      }
+                                    }
+                                    """)))
     @ApiResponse(responseCode = "422", description = "Validation Failed",
             content = @Content(mediaType = "application/json",
                     examples = @ExampleObject(value = """
@@ -225,7 +238,11 @@ public interface ChatRoomApi {
                                     value = """
                                             {
                                               "code": "CHAT_ROOM_ALREADY_JOINED",
-                                              "message": "이미 참여 중인 채팅방이 있어 새 채팅방을 생성할 수 없습니다."
+                                              "message": "이미 참여 중인 채팅방이 있어 새 채팅방을 생성할 수 없습니다.",
+                                              "errors": null,
+                                              "data": {
+                                                "roomId": 42
+                                              }
                                             }
                                             """),
                             @ExampleObject(name = "정원 초과",
