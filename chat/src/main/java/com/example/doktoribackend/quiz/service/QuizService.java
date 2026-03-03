@@ -7,19 +7,28 @@ import com.example.doktoribackend.quiz.domain.QuizChoice;
 import com.example.doktoribackend.quiz.dto.QuizResponse;
 import com.example.doktoribackend.quiz.repository.QuizRepository;
 import com.example.doktoribackend.room.domain.ChattingRoom;
+import com.example.doktoribackend.room.domain.MemberStatus;
+import com.example.doktoribackend.room.domain.Position;
 import com.example.doktoribackend.room.domain.RoomStatus;
 import com.example.doktoribackend.room.dto.ChatRoomCreateRequest;
+import com.example.doktoribackend.room.repository.ChattingRoomMemberRepository;
 import com.example.doktoribackend.room.repository.ChattingRoomRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class QuizService {
 
+    private static final List<MemberStatus> ACTIVE_STATUSES =
+            List.of(MemberStatus.WAITING, MemberStatus.JOINED, MemberStatus.DISCONNECTED);
+
     private final QuizRepository quizRepository;
     private final ChattingRoomRepository chattingRoomRepository;
+    private final ChattingRoomMemberRepository chattingRoomMemberRepository;
 
     public void createQuiz(ChattingRoom room, ChatRoomCreateRequest.QuizRequest quizRequest) {
         Quiz quiz = Quiz.create(room, quizRequest);
@@ -51,6 +60,12 @@ public class QuizService {
         Quiz quiz = quizRepository.findById(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_QUIZ_NOT_FOUND));
 
-        return QuizResponse.from(quiz);
+        int agreeCount = chattingRoomMemberRepository
+                .countByChattingRoomIdAndPositionAndStatusIn(roomId, Position.AGREE, ACTIVE_STATUSES);
+        int disagreeCount = chattingRoomMemberRepository
+                .countByChattingRoomIdAndPositionAndStatusIn(roomId, Position.DISAGREE, ACTIVE_STATUSES);
+        int maxPerPosition = room.getCapacity() / 2;
+
+        return QuizResponse.from(quiz, agreeCount, disagreeCount, maxPerPosition);
     }
 }

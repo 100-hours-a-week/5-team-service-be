@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.domain.Persistable;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,7 +32,7 @@ public class Vote implements Persistable<Long> {
     @JoinColumn(name = "room_id")
     private ChattingRoom chattingRoom;
 
-    @Column(name = "opened_at", nullable = false)
+    @Column(name = "opened_at")
     private LocalDateTime openedAt;
 
     @Column(name = "closed_at")
@@ -58,11 +59,14 @@ public class Vote implements Persistable<Long> {
         this.roomId = chattingRoom.getId();
         this.chattingRoom = chattingRoom;
         this.totalMemberCount = totalMemberCount;
-        this.openedAt = LocalDateTime.now();
+    }
+
+    public void openVoting() {
+        this.openedAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
     }
 
     public void close() {
-        this.closedAt = LocalDateTime.now();
+        this.closedAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
     }
 
     public boolean isClosed() {

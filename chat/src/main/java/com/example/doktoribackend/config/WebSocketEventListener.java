@@ -31,7 +31,7 @@ public class WebSocketEventListener {
     public void handleWebSocketConnected(SessionConnectedEvent event) {
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
         boolean authenticated = accessor.getUser() != null;
-        log.info("[WebSocket] 연결 - sessionId: {}, authenticated: {}",
+        log.debug("[WebSocket] 연결 - sessionId: {}, authenticated: {}",
                 accessor.getSessionId(), authenticated);
     }
 
@@ -63,7 +63,7 @@ public class WebSocketEventListener {
         sessionRegistry.register(sessionId, userId, roomId);
         connectionService.handleReconnect(roomId, userId);
 
-        log.info("[WebSocket] SUBSCRIBE - sessionId: {}, roomId: {}", sessionId, roomId);
+        log.debug("[WebSocket] SUBSCRIBE - sessionId: {}, roomId: {}", sessionId, roomId);
     }
 
     @EventListener
@@ -71,11 +71,11 @@ public class WebSocketEventListener {
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
         String sessionId = accessor.getSessionId();
         CloseStatus closeStatus = event.getCloseStatus();
-        log.info("[WebSocket] 해제 - sessionId: {}, closeStatus: {}",
+        log.debug("[WebSocket] 해제 - sessionId: {}, closeStatus: {}",
                 sessionId, closeStatus.getCode());
 
         sessionRegistry.unregister(sessionId).ifPresent(info -> {
-            log.info("[WebSocket] 마지막 세션 해제 - roomId: {}", info.roomId());
+            log.debug("[WebSocket] 마지막 세션 해제 - roomId: {}", info.roomId());
             connectionService.handleDisconnect(info.roomId(), info.userId());
         });
     }

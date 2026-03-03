@@ -13,6 +13,8 @@ public interface ChattingRoomMemberRepository extends JpaRepository<ChattingRoom
 
     boolean existsByUserIdAndStatusIn(Long userId, List<MemberStatus> statuses);
 
+    Optional<ChattingRoomMember> findFirstByUserIdAndStatusIn(Long userId, List<MemberStatus> statuses);
+
     Optional<ChattingRoomMember> findByChattingRoomIdAndUserId(Long roomId, Long userId);
 
     List<ChattingRoomMember> findByChattingRoomIdAndStatusIn(Long roomId, List<MemberStatus> statuses);
