@@ -664,17 +664,8 @@ public interface ChatRoomApi {
 
     @CommonErrorResponses
     @AuthErrorResponses
-    @Operation(summary = "채팅방 종료", description = "방장이 채팅방을 종료합니다. 모든 멤버가 퇴장 처리되고 STOMP `/topic/chat-rooms/{roomId}`로 종료 알림이 브로드캐스트됩니다.")
+    @Operation(summary = "채팅방 종료", description = "채팅방 멤버가 채팅방을 종료합니다. 모든 멤버가 퇴장 처리되고 STOMP `/topic/chat-rooms/{roomId}`로 종료 알림이 브로드캐스트됩니다.")
     @ApiResponse(responseCode = "204", description = "No Content")
-    @ApiResponse(responseCode = "403", description = "Forbidden",
-            content = @Content(mediaType = "application/json",
-                    examples = @ExampleObject(name = "방장이 아님",
-                            value = """
-                                    {
-                                      "code": "CHAT_ROOM_NOT_HOST",
-                                      "message": "방장만 채팅을 시작할 수 있습니다."
-                                    }
-                                    """)))
     @ApiResponse(responseCode = "404", description = "Not Found",
             content = @Content(mediaType = "application/json",
                     examples = {
@@ -717,17 +708,8 @@ public interface ChatRoomApi {
 
     @CommonErrorResponses
     @AuthErrorResponses
-    @Operation(summary = "다음 라운드 전환", description = "방장이 현재 라운드를 종료하고 다음 라운드로 전환합니다. 최대 3라운드까지 가능합니다. 전환 결과는 STOMP `/topic/chat-rooms/{roomId}`로 브로드캐스트됩니다.")
+    @Operation(summary = "다음 라운드 전환", description = "채팅방 멤버가 현재 라운드를 종료하고 다음 라운드로 전환합니다. 최대 3라운드까지 가능합니다. 전환 결과는 STOMP `/topic/chat-rooms/{roomId}`로 브로드캐스트됩니다.")
     @ApiResponse(responseCode = "204", description = "No Content")
-    @ApiResponse(responseCode = "403", description = "Forbidden",
-            content = @Content(mediaType = "application/json",
-                    examples = @ExampleObject(name = "방장이 아님",
-                            value = """
-                                    {
-                                      "code": "CHAT_ROOM_NOT_HOST",
-                                      "message": "방장만 채팅을 시작할 수 있습니다."
-                                    }
-                                    """)))
     @ApiResponse(responseCode = "404", description = "Not Found",
             content = @Content(mediaType = "application/json",
                     examples = {

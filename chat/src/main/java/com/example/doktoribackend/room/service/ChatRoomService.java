@@ -179,13 +179,12 @@ public class ChatRoomService {
             throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_HOST);
         }
 
-        // TODO: 테스트 후 주석 해제
-        // Position oppositePosition = requester.getPosition() == Position.AGREE ? Position.DISAGREE : Position.AGREE;
-        // int oppositeCount = chattingRoomMemberRepository
-        //         .countByChattingRoomIdAndPositionAndStatusIn(roomId, oppositePosition, ACTIVE_STATUSES);
-        // if (oppositeCount < 1) {
-        //     throw new BusinessException(ErrorCode.CHAT_ROOM_INSUFFICIENT_MEMBERS);
-        // }
+         Position oppositePosition = requester.getPosition() == Position.AGREE ? Position.DISAGREE : Position.AGREE;
+         int oppositeCount = chattingRoomMemberRepository
+                 .countByChattingRoomIdAndPositionAndStatusIn(roomId, oppositePosition, ACTIVE_STATUSES);
+         if (oppositeCount < 1) {
+             throw new BusinessException(ErrorCode.CHAT_ROOM_INSUFFICIENT_MEMBERS);
+         }
 
         room.startChatting();
 
@@ -220,11 +219,6 @@ public class ChatRoomService {
     public void nextRound(Long roomId, Long userId) {
         ChatRoomQueryService.ChattingRoomAndMember context = chatRoomQueryService.findChattingRoomAndMember(roomId, userId);
         ChattingRoom room = context.room();
-        ChattingRoomMember requester = context.member();
-
-        if (!requester.isHost()) {
-            throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_HOST);
-        }
 
         RoomRound currentRound = roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_ROUND_NOT_FOUND));
@@ -255,11 +249,6 @@ public class ChatRoomService {
     @Transactional
     public void endChatRoom(Long roomId, Long userId) {
         ChatRoomQueryService.ChattingRoomAndMember context = chatRoomQueryService.findChattingRoomAndMember(roomId, userId);
-        ChattingRoomMember requester = context.member();
-
-        if (!requester.isHost()) {
-            throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_HOST);
-        }
 
         RoomRound currentRound = roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_ROUND_NOT_FOUND));

@@ -2,6 +2,8 @@ package com.example.doktoribackend.room.service;
 
 import com.example.doktoribackend.room.dto.ChatRoomStartResponse;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -30,13 +32,13 @@ public class WaitingRoomSseService {
                 return t;
             });
 
-    @jakarta.annotation.PostConstruct
+    @PostConstruct
     private void startHeartbeat() {
         heartbeatExecutor.scheduleAtFixedRate(this::sendHeartbeatToAll,
                 HEARTBEAT_INTERVAL_SECONDS, HEARTBEAT_INTERVAL_SECONDS, TimeUnit.SECONDS);
     }
 
-    @jakarta.annotation.PreDestroy
+    @PreDestroy
     private void stopHeartbeat() {
         heartbeatExecutor.shutdown();
     }

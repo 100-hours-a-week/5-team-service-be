@@ -10,6 +10,7 @@ spring:
 logging:
   level:
     org.hibernate.SQL: debug
+    com.example.doktoribackend.config.WebSocketEventListener: debug
 app:
   cookie:
     secure: true

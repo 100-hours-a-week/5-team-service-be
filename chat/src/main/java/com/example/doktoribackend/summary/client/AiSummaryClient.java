@@ -40,7 +40,7 @@ public class AiSummaryClient {
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
-            log.error("AI summary generation failed: {}", ex.getMessage());
+            log.error("AI summary generation failed: {}", ex.getMessage(), ex);
             throw new BusinessException(ErrorCode.AI_SUMMARY_GENERATION_FAILED);
         }
     }

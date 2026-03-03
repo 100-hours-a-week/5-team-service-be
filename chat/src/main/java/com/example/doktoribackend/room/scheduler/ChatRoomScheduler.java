@@ -13,9 +13,8 @@ public class ChatRoomScheduler {
 
     private final ChatRoomService chatRoomService;
 
-    // TODO: 테스트 끝나면 주석 해제할 것
-//    @Scheduled(fixedRate = 60_000)
-//    public void endExpiredChatRooms() {
-//        chatRoomService.endExpiredChatRooms();
-//    }
+    @Scheduled(fixedRate = 60_000)
+    public void endExpiredChatRooms() {
+        chatRoomService.endExpiredChatRooms();
+    }
 }
