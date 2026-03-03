@@ -219,11 +219,6 @@ public class ChatRoomService {
     public void nextRound(Long roomId, Long userId) {
         ChatRoomQueryService.ChattingRoomAndMember context = chatRoomQueryService.findChattingRoomAndMember(roomId, userId);
         ChattingRoom room = context.room();
-        ChattingRoomMember requester = context.member();
-
-        if (!requester.isHost()) {
-            throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_HOST);
-        }
 
         RoomRound currentRound = roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_ROUND_NOT_FOUND));
@@ -254,11 +249,6 @@ public class ChatRoomService {
     @Transactional
     public void endChatRoom(Long roomId, Long userId) {
         ChatRoomQueryService.ChattingRoomAndMember context = chatRoomQueryService.findChattingRoomAndMember(roomId, userId);
-        ChattingRoomMember requester = context.member();
-
-        if (!requester.isHost()) {
-            throw new BusinessException(ErrorCode.CHAT_ROOM_NOT_HOST);
-        }
 
         RoomRound currentRound = roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_ROUND_NOT_FOUND));

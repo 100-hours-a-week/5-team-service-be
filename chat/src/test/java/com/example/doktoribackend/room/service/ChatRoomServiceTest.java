@@ -1046,23 +1046,6 @@ class ChatRoomServiceTest {
         }
 
         @Test
-        @DisplayName("HOST가 아니면 CHAT_ROOM_NOT_HOST 예외가 발생한다")
-        void nextRound_notHost() {
-            // given
-            ChattingRoom room = createChattingRoom();
-            ChattingRoomMember participant = createMember(room, USER_ID, MemberRole.PARTICIPANT, Position.AGREE);
-
-            given(chatRoomQueryService.findChattingRoomAndMember(ROOM_ID, USER_ID))
-                    .willReturn(new ChatRoomQueryService.ChattingRoomAndMember(room, participant));
-
-            // when & then
-            assertThatThrownBy(() -> chatRoomService.nextRound(ROOM_ID, USER_ID))
-                    .isInstanceOf(BusinessException.class)
-                    .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.CHAT_ROOM_NOT_HOST);
-        }
-
-        @Test
         @DisplayName("3라운드에서 다음 라운드 시도 시 CHAT_ROOM_MAX_ROUND_REACHED 예외가 발생한다")
         void nextRound_maxRoundReached() {
             // given
@@ -1106,20 +1089,20 @@ class ChatRoomServiceTest {
         }
 
         @Test
-        @DisplayName("HOST가 종료하면 방 ENDED, 활성 멤버 LEFT, 활성 라운드 종료된다")
+        @DisplayName("멤버가 종료하면 방 ENDED, 활성 멤버 LEFT, 활성 라운드 종료된다")
         void endChatRoom_success() {
             // given
             ChattingRoom room = createChattingRoom();
-            ChattingRoomMember host = createMember(room, USER_ID, MemberRole.HOST, Position.AGREE);
-            ChattingRoomMember participant = createMember(room, 2L, MemberRole.PARTICIPANT, Position.DISAGREE);
+            ChattingRoomMember requester = createMember(room, USER_ID, MemberRole.PARTICIPANT, Position.AGREE);
+            ChattingRoomMember other = createMember(room, 2L, MemberRole.HOST, Position.DISAGREE);
             RoomRound activeRound = RoomRound.builder().chattingRoom(room).roundNumber(3).build();
 
             given(chatRoomQueryService.findChattingRoomAndMember(ROOM_ID, USER_ID))
-                    .willReturn(new ChatRoomQueryService.ChattingRoomAndMember(room, host));
+                    .willReturn(new ChatRoomQueryService.ChattingRoomAndMember(room, requester));
             given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(ROOM_ID))
                     .willReturn(Optional.of(activeRound));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(ROOM_ID), any()))
-                    .willReturn(List.of(host, participant));
+                    .willReturn(List.of(requester, other));
 
             // when
             chatRoomService.endChatRoom(ROOM_ID, USER_ID);
@@ -1127,8 +1110,8 @@ class ChatRoomServiceTest {
             // then
             assertThat(room.getStatus()).isEqualTo(RoomStatus.ENDED);
             assertThat(activeRound.getEndedAt()).isNotNull();
-            assertThat(host.getStatus()).isEqualTo(MemberStatus.LEFT);
-            assertThat(participant.getStatus()).isEqualTo(MemberStatus.LEFT);
+            assertThat(requester.getStatus()).isEqualTo(MemberStatus.LEFT);
+            assertThat(other.getStatus()).isEqualTo(MemberStatus.LEFT);
         }
 
         @Test
@@ -1178,11 +1161,11 @@ class ChatRoomServiceTest {
         void endChatRoom_notLastRound() {
             // given
             ChattingRoom room = createChattingRoom();
-            ChattingRoomMember host = createMember(room, USER_ID, MemberRole.HOST, Position.AGREE);
+            ChattingRoomMember participant = createMember(room, USER_ID, MemberRole.PARTICIPANT, Position.AGREE);
             RoomRound activeRound = RoomRound.builder().chattingRoom(room).roundNumber(2).build();
 
             given(chatRoomQueryService.findChattingRoomAndMember(ROOM_ID, USER_ID))
-                    .willReturn(new ChatRoomQueryService.ChattingRoomAndMember(room, host));
+                    .willReturn(new ChatRoomQueryService.ChattingRoomAndMember(room, participant));
             given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(ROOM_ID))
                     .willReturn(Optional.of(activeRound));
 
@@ -1193,22 +1176,6 @@ class ChatRoomServiceTest {
                     .isEqualTo(ErrorCode.CHAT_ROOM_NOT_LAST_ROUND);
         }
 
-        @Test
-        @DisplayName("HOST가 아니면 CHAT_ROOM_NOT_HOST 예외가 발생한다")
-        void endChatRoom_notHost() {
-            // given
-            ChattingRoom room = createChattingRoom();
-            ChattingRoomMember participant = createMember(room, USER_ID, MemberRole.PARTICIPANT, Position.AGREE);
-
-            given(chatRoomQueryService.findChattingRoomAndMember(ROOM_ID, USER_ID))
-                    .willReturn(new ChatRoomQueryService.ChattingRoomAndMember(room, participant));
-
-            // when & then
-            assertThatThrownBy(() -> chatRoomService.endChatRoom(ROOM_ID, USER_ID))
-                    .isInstanceOf(BusinessException.class)
-                    .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.CHAT_ROOM_NOT_HOST);
-        }
     }
 
     @Nested
