@@ -184,12 +184,26 @@ public class Meeting extends BaseTimeEntity {
             LocalDate recruitmentDeadline,
             String leaderIntro
     ) {
-        this.meetingImagePath = meetingImagePath;
-        this.title = title;
-        this.description = description;
-        this.readingGenreId = readingGenreId;
-        this.capacity = capacity;
-        this.recruitmentDeadline = recruitmentDeadline;
-        this.leaderIntro = leaderIntro;
+        if (meetingImagePath != null) {
+            this.meetingImagePath = meetingImagePath;
+        }
+        if (title != null) {
+            this.title = title;
+        }
+        if (description != null) {
+            this.description = description;
+        }
+        if (readingGenreId != null) {
+            this.readingGenreId = readingGenreId;
+        }
+        if (capacity != null) {
+            this.capacity = capacity;
+        }
+        if (recruitmentDeadline != null) {
+            this.recruitmentDeadline = recruitmentDeadline;
+        }
+        if (leaderIntro != null) {
+            this.leaderIntro = leaderIntro;
+        }
     }
 }
