@@ -14,7 +14,7 @@ import com.example.doktoribackend.meeting.dto.MeetingListResponse;
 import com.example.doktoribackend.meeting.dto.MeetingMembersResponse;
 import com.example.doktoribackend.meeting.dto.PendingMembersResponse;
 import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
-import com.example.doktoribackend.meeting.dto.MeetingUpdateRequest;
+import com.example.doktoribackend.meeting.dto.MeetingPatchRequest;
 import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateRequest;
 import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateResponse;
 import com.example.doktoribackend.meeting.dto.TopicRecommendationResponse;
@@ -408,8 +408,8 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
                     content = @Content(mediaType = "application/json",
                             examples = @ExampleObject(value = """
                                     {
-                                      "code": "MEETING_ROUND_UPDATE_NOT_ALLOWED",
-                                      "message": "진행된 회차 또는 진행 중인 회차는 수정할 수 없습니다."
+                                      "code": "CAPACITY_LESS_THAN_CURRENT",
+                                      "message": "정원은 현재 인원보다 작을 수 없습니다."
                                     }
                                     """))),
             @ApiResponse(responseCode = "422", description = "Validation failed",
@@ -419,16 +419,16 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
                                       "code": "VALIDATION_FAILED",
                                       "message": "요청 값이 유효하지 않습니다.",
                                       "errors": [
-                                        { "field": "durationMinutes", "reason": "ValidMeetingUpdateRequest", "message": "진행 시간은 30분이어야 합니다" }
+                                        { "field": "title", "reason": "NotBlank", "message": "공백일 수 없습니다" }
                                       ]
                                     }
                                     """)))
     })
-    @PutMapping("/{meetingId}")
-    public ResponseEntity<ApiResult<MeetingCreateResponse>> updateMeeting(
+    @PatchMapping("/{meetingId}")
+    public ResponseEntity<ApiResult<MeetingCreateResponse>> patchMeeting(
             @PathVariable Long meetingId,
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Valid @RequestBody MeetingUpdateRequest request
+            @Valid @RequestBody MeetingPatchRequest request
     ) {
         if (userDetails == null) {
             throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
@@ -438,7 +438,7 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        MeetingCreateResponse response = meetingService.updateMeeting(userDetails.getId(), meetingId, request);
+        MeetingCreateResponse response = meetingService.patchMeeting(userDetails.getId(), meetingId, request);
         return ResponseEntity.ok(ApiResult.ok("독서 모임이 성공적으로 수정되었습니다.", response));
     }
 

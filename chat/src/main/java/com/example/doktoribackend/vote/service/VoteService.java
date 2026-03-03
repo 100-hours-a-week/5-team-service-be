@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Service
 @RequiredArgsConstructor
@@ -35,9 +36,20 @@ public class VoteService {
     }
 
     @Transactional
+    public LocalDateTime openVoting(Long roomId) {
+        Vote vote = findVote(roomId);
+        vote.openVoting();
+        return vote.getOpenedAt().plus(VOTE_DURATION);
+    }
+
+    @Transactional
     public void castVote(Long roomId, Long userId, Position choice) {
         Vote vote = findVote(roomId);
         closeIfExpired(vote);
+
+        if (vote.getOpenedAt() == null) {
+            throw new BusinessException(ErrorCode.VOTE_NOT_OPEN);
+        }
 
         if (vote.isClosed()) {
             throw new BusinessException(ErrorCode.VOTE_ALREADY_CLOSED);
@@ -80,7 +92,10 @@ public class VoteService {
     }
 
     private void closeIfExpired(Vote vote) {
-        if (!vote.isClosed() && vote.getOpenedAt().plus(VOTE_DURATION).isBefore(LocalDateTime.now())) {
+        if (vote.getOpenedAt() == null || vote.isClosed()) {
+            return;
+        }
+        if (vote.getOpenedAt().plus(VOTE_DURATION).isBefore(LocalDateTime.now(ZoneId.of("Asia/Seoul")))) {
             vote.close();
         }
     }
