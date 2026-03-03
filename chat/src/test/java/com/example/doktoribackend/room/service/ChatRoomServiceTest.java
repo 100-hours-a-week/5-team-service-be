@@ -4,6 +4,7 @@ import com.example.doktoribackend.book.domain.Book;
 import com.example.doktoribackend.book.repository.BookRepository;
 import com.example.doktoribackend.book.service.BookService;
 import com.example.doktoribackend.common.error.ErrorCode;
+import com.example.doktoribackend.exception.AlreadyJoinedRoomException;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.quiz.service.QuizService;
 import com.example.doktoribackend.summary.service.RoundSummaryService;
@@ -157,8 +158,8 @@ class ChatRoomServiceTest {
             ChatRoomCreateRequest request = createValidRequest(4);
             given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
-            given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
-                    eq(USER_ID), any())).willReturn(false);
+            given(chattingRoomMemberRepository.findFirstByUserIdAndStatusIn(
+                    eq(USER_ID), any())).willReturn(Optional.empty());
             given(chattingRoomRepository.save(any(ChattingRoom.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
             stubUserInfo();
@@ -179,8 +180,8 @@ class ChatRoomServiceTest {
             ChatRoomCreateRequest request = createValidRequest(4);
             given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
-            given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
-                    eq(USER_ID), any())).willReturn(false);
+            given(chattingRoomMemberRepository.findFirstByUserIdAndStatusIn(
+                    eq(USER_ID), any())).willReturn(Optional.empty());
             given(chattingRoomRepository.save(any(ChattingRoom.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
             stubUserInfo();
@@ -199,8 +200,8 @@ class ChatRoomServiceTest {
             ChatRoomCreateRequest request = createValidRequest(4);
             given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
-            given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
-                    eq(USER_ID), any())).willReturn(false);
+            given(chattingRoomMemberRepository.findFirstByUserIdAndStatusIn(
+                    eq(USER_ID), any())).willReturn(Optional.empty());
             given(chattingRoomRepository.save(any(ChattingRoom.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
             stubUserInfo();
@@ -232,8 +233,8 @@ class ChatRoomServiceTest {
             ChatRoomCreateRequest request = createValidRequest(capacity);
             given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
-            given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
-                    eq(USER_ID), any())).willReturn(false);
+            given(chattingRoomMemberRepository.findFirstByUserIdAndStatusIn(
+                    eq(USER_ID), any())).willReturn(Optional.empty());
             given(chattingRoomRepository.save(any(ChattingRoom.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
             stubUserInfo();
@@ -267,20 +268,24 @@ class ChatRoomServiceTest {
     class DuplicateJoinValidation {
 
         @Test
-        @DisplayName("이미 WAITING, JOINED 또는 DISCONNECTED 상태로 참여 중이면 CHAT_ROOM_ALREADY_JOINED 예외가 발생한다")
+        @DisplayName("이미 WAITING, JOINED 또는 DISCONNECTED 상태로 참여 중이면 AlreadyJoinedRoomException이 발생하고 roomId를 포함한다")
         void alreadyJoined_throwsException() {
             // given
+            Long otherRoomId = 99L;
             ChatRoomCreateRequest request = createValidRequest(4);
             given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
-            given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
-                    USER_ID, List.of(MemberStatus.WAITING, MemberStatus.JOINED, MemberStatus.DISCONNECTED)))
-                    .willReturn(true);
+            ChattingRoom otherRoom = mock(ChattingRoom.class);
+            given(otherRoom.getId()).willReturn(otherRoomId);
+            ChattingRoomMember existingMember = mock(ChattingRoomMember.class);
+            given(existingMember.getChattingRoom()).willReturn(otherRoom);
+            given(chattingRoomMemberRepository.findFirstByUserIdAndStatusIn(eq(USER_ID), any()))
+                    .willReturn(Optional.of(existingMember));
 
             // when & then
             assertThatThrownBy(() -> chatRoomService.createChatRoom(USER_ID, request))
-                    .isInstanceOf(BusinessException.class)
-                    .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.CHAT_ROOM_ALREADY_JOINED);
+                    .isInstanceOf(AlreadyJoinedRoomException.class)
+                    .extracting(e -> ((AlreadyJoinedRoomException) e).getRoomId())
+                    .isEqualTo(otherRoomId);
 
             then(chattingRoomRepository).should(never()).save(any());
         }
@@ -292,8 +297,8 @@ class ChatRoomServiceTest {
             ChatRoomCreateRequest request = createValidRequest(4);
             given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
-            given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(
-                    eq(USER_ID), any())).willReturn(false);
+            given(chattingRoomMemberRepository.findFirstByUserIdAndStatusIn(
+                    eq(USER_ID), any())).willReturn(Optional.empty());
             given(chattingRoomRepository.save(any(ChattingRoom.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
             stubUserInfo();
@@ -586,22 +591,27 @@ class ChatRoomServiceTest {
         }
 
         @Test
-        @DisplayName("다른 방에 이미 참여 중이면 CHAT_ROOM_ALREADY_JOINED 예외가 발생한다")
+        @DisplayName("다른 방에 이미 참여 중이면 AlreadyJoinedRoomException이 발생하고 roomId를 포함한다")
         void joinChatRoom_alreadyJoinedOtherRoom() {
             // given
+            Long otherRoomId = 99L;
             ChattingRoom room = createWaitingRoom(1);
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
                     .willReturn(Optional.empty());
-            given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(eq(USER_ID), any()))
-                    .willReturn(true);
+            ChattingRoom otherRoom = mock(ChattingRoom.class);
+            given(otherRoom.getId()).willReturn(otherRoomId);
+            ChattingRoomMember existingMember = mock(ChattingRoomMember.class);
+            given(existingMember.getChattingRoom()).willReturn(otherRoom);
+            given(chattingRoomMemberRepository.findFirstByUserIdAndStatusIn(eq(USER_ID), any()))
+                    .willReturn(Optional.of(existingMember));
             ChatRoomJoinRequest request = new ChatRoomJoinRequest(Position.AGREE, 1);
 
             // when & then
             assertThatThrownBy(() -> chatRoomService.joinChatRoom(ROOM_ID, USER_ID, request))
-                    .isInstanceOf(BusinessException.class)
-                    .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.CHAT_ROOM_ALREADY_JOINED);
+                    .isInstanceOf(AlreadyJoinedRoomException.class)
+                    .extracting(e -> ((AlreadyJoinedRoomException) e).getRoomId())
+                    .isEqualTo(otherRoomId);
         }
 
         @Test
