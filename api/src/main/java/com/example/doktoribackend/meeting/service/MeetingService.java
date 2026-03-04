@@ -243,7 +243,9 @@ public class MeetingService {
 
     @Transactional
     public MyMeetingListResponse getMyMeetings(Long userId, MyMeetingListRequest request) {
-        int size = request.getSizeOrDefault();
+        // 오버플로우 방지를 위한 명시적 범위 제한
+        int size = Math.min(Math.max(request.getSizeOrDefault(), 1), 10);
+        int limit = size + 1;
 
         // PENDING / ACTIVE / INACTIVE 분기 처리
         List<MeetingListRow> results;
@@ -251,14 +253,14 @@ public class MeetingService {
             results = meetingRepository.findMyPendingMeetings(
                     userId,
                     request.getCursorId(),
-                    size + 1
+                    limit
             );
         } else {
             results = meetingRepository.findMyMeetings(
                     userId,
                     request.getCursorId(),
                     request.isActiveFilter(),
-                    size + 1
+                    limit
             );
         }
 
