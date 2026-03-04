@@ -92,4 +92,14 @@ public interface MeetingRoundRepository extends JpaRepository<MeetingRound, Long
             "WHERE mr.status = 'SCHEDULED' " +
             "AND mr.endAt < :now")
     int bulkUpdateExpiredToDone(@Param("now") LocalDateTime now);
+
+    // 현재 회차 계산: 아직 종료되지 않은 첫 번째 회차의 roundNo (일괄 조회)
+    @Query("SELECT mr.meeting.id as meetingId, MIN(mr.roundNo) as currentRoundNo " +
+           "FROM MeetingRound mr " +
+           "WHERE mr.meeting.id IN :meetingIds " +
+           "AND mr.endAt > :now " +
+           "GROUP BY mr.meeting.id")
+    List<CurrentRoundProjection> findCurrentRoundNoByMeetingIds(
+            @Param("meetingIds") List<Long> meetingIds,
+            @Param("now") LocalDateTime now);
 }

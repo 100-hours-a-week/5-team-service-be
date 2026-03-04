@@ -101,7 +101,7 @@ public class UserController implements UserWithdrawalApi, MyMeetingDetailApi {
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
-    @Operation(summary = "나의 모임 리스트 조회", description = "로그인 사용자가 참여 중인 모임 목록을 조회합니다. status는 필수이며 ACTIVE(진행 중) 또는 INACTIVE(종료)를 전달해야 합니다.")
+    @Operation(summary = "나의 모임 리스트 조회", description = "로그인 사용자가 참여 중인 모임 목록을 조회합니다. status는 필수이며 ACTIVE(진행 중) 또는 INACTIVE(종료) 또는 PENDING(승인 대기)을 전달해야 합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "OK",
                     content = @Content(mediaType = "application/json",

@@ -13,7 +13,7 @@ public class MyMeetingListRequest {
     private static final int DEFAULT_SIZE = 10;
 
     @NotBlank(message = "status는 필수입니다.")
-    private String status;  // "ACTIVE" or "INACTIVE" (required)
+    private String status;  // "ACTIVE" or "INACTIVE" or "PENDING" (required)
 
     @Min(1)
     private Long cursorId;
@@ -29,8 +29,12 @@ public class MyMeetingListRequest {
     public boolean isActiveFilter() {
         return "ACTIVE".equals(status);
     }
+
+    public boolean isPendingFilter() {
+        return "PENDING".equals(status);
+    }
     
     public boolean isValidStatus() {
-        return "ACTIVE".equals(status) || "INACTIVE".equals(status);
+        return "ACTIVE".equals(status) || "INACTIVE".equals(status) || "PENDING".equals(status);
     }
 }
