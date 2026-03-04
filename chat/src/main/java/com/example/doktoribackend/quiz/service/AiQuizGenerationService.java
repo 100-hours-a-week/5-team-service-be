@@ -17,6 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -30,35 +31,38 @@ public class AiQuizGenerationService {
     private final PlatformTransactionManager transactionManager;
 
     public AiQuizSuggestResponse suggest(Long userId, AiQuizSuggestRequest request) {
-        checkDailyLimit(userId);
+        Long logId = checkAndReserveSlot(userId);
 
-        AiQuizGenerateResponse aiResponse = aiQuizClient.generate(
-                new AiQuizGenerateRequest(request.author(), request.title()));
-
-        saveLog(userId);
-
-        return AiQuizSuggestResponse.from(aiResponse);
-    }
-
-    private void checkDailyLimit(Long userId) {
-        LocalDate today = LocalDate.now(KST);
-        LocalDateTime start = today.atStartOfDay();
-        LocalDateTime end = today.plusDays(1).atStartOfDay();
-
-        TransactionTemplate readTx = new TransactionTemplate(transactionManager);
-        readTx.setReadOnly(true);
-
-        Integer count = readTx.execute(status ->
-                quizGenerationLogRepository.countTodayByUserId(userId, start, end));
-
-        if (count != null && count >= DAILY_LIMIT) {
-            throw new BusinessException(ErrorCode.AI_QUIZ_GENERATION_LIMIT_EXCEEDED);
+        try {
+            AiQuizGenerateResponse aiResponse = aiQuizClient.generate(
+                    new AiQuizGenerateRequest(request.author(), request.title()));
+            return AiQuizSuggestResponse.from(aiResponse);
+        } catch (Exception e) {
+            releaseSlot(logId);
+            throw e;
         }
     }
 
-    private void saveLog(Long userId) {
+    private Long checkAndReserveSlot(Long userId) {
         TransactionTemplate writeTx = new TransactionTemplate(transactionManager);
-        writeTx.executeWithoutResult(status ->
-                quizGenerationLogRepository.save(QuizGenerationLog.of(userId)));
+        return writeTx.execute(status -> {
+            LocalDate today = LocalDate.now(KST);
+            LocalDateTime start = today.atStartOfDay();
+            LocalDateTime end = today.plusDays(1).atStartOfDay();
+
+            List<QuizGenerationLog> todayLogs =
+                    quizGenerationLogRepository.findTodayByUserIdWithLock(userId, start, end);
+
+            if (todayLogs.size() >= DAILY_LIMIT) {
+                throw new BusinessException(ErrorCode.AI_QUIZ_GENERATION_LIMIT_EXCEEDED);
+            }
+
+            return quizGenerationLogRepository.save(QuizGenerationLog.of(userId)).getId();
+        });
+    }
+
+    private void releaseSlot(Long logId) {
+        TransactionTemplate writeTx = new TransactionTemplate(transactionManager);
+        writeTx.executeWithoutResult(status -> quizGenerationLogRepository.deleteById(logId));
     }
 }

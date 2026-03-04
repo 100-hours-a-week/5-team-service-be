@@ -31,6 +31,9 @@ public class VoteService {
 
     @Transactional
     public void createVote(ChattingRoom room, int totalMemberCount) {
+        if (voteRepository.existsById(room.getId())) {
+            return;
+        }
         Vote vote = Vote.create(room, totalMemberCount);
         voteRepository.save(vote);
     }

@@ -29,6 +29,7 @@ import com.example.doktoribackend.room.repository.RoomRoundRepository;
 import com.example.doktoribackend.user.domain.UserInfo;
 import com.example.doktoribackend.user.repository.UserInfoRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ChatRoomService {
@@ -261,11 +263,24 @@ public class ChatRoomService {
         endRoom(context.room(), currentRound);
     }
 
-    @Transactional
     public void endExpiredChatRooms() {
         List<ChattingRoom> expiredRooms = chattingRoomRepository.findExpiredChattingRooms(LocalDateTime.now());
+        TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
+
         for (ChattingRoom room : expiredRooms) {
-            endRoom(room, null);
+            Long roomId = room.getId();
+            try {
+                txTemplate.executeWithoutResult(status -> {
+                    ChattingRoom lockedRoom = chattingRoomRepository.findByIdWithLock(roomId)
+                            .orElseThrow(() -> new BusinessException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+                    if (lockedRoom.getStatus() != RoomStatus.CHATTING) {
+                        return;
+                    }
+                    endRoom(lockedRoom, null);
+                });
+            } catch (Exception e) {
+                log.warn("만료된 채팅방 종료 실패 roomId={}: {}", roomId, e.getMessage());
+            }
         }
     }
 
