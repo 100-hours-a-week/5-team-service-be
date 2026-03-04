@@ -788,17 +788,23 @@ public class MeetingService {
             throw new BusinessException(ErrorCode.MEETING_UPDATE_NOT_ALLOWED);
         }
 
-        // 4. readingGenreId 유효성 검사
-        if (!readingGenreRepository.existsByIdAndDeletedAtIsNull(request.readingGenreId())) {
+        // 4. 최소 하나의 필드가 전달되었는지 확인
+        if (!request.hasAnyField()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        // 5. readingGenreId 유효성 검사 (전달된 경우만)
+        if (request.readingGenreId() != null &&
+                !readingGenreRepository.existsByIdAndDeletedAtIsNull(request.readingGenreId())) {
             throw new BusinessException(ErrorCode.READING_GENRE_NOT_FOUND);
         }
 
-        // 5. capacity 유효성 검사 (현재 인원보다 적으면 안 됨)
-        if (request.capacity() < meeting.getCurrentCount()) {
+        // 6. capacity 유효성 검사 (전달된 경우만, 현재 인원보다 적으면 안 됨)
+        if (request.capacity() != null && request.capacity() < meeting.getCurrentCount()) {
             throw new BusinessException(ErrorCode.CAPACITY_LESS_THAN_CURRENT);
         }
 
-        // 6. PATCH 적용
+        // 7. PATCH 적용 (null인 필드는 기존 값 유지)
         meeting.patch(
                 request.meetingImageKey(),
                 request.title(),
@@ -809,8 +815,8 @@ public class MeetingService {
                 request.leaderIntro()
         );
 
-        // 7. leaderIntroSavePolicy 처리
-        if (Boolean.TRUE.equals(request.leaderIntroSavePolicy())) {
+        // 8. leaderIntroSavePolicy 처리 (전달된 경우만)
+        if (Boolean.TRUE.equals(request.leaderIntroSavePolicy()) && request.leaderIntro() != null) {
             User leader = meeting.getLeaderUser();
             leader.updateLeaderIntro(request.leaderIntro());
         }
