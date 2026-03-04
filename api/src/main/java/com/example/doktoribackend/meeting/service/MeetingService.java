@@ -11,12 +11,7 @@ import com.example.doktoribackend.bookReport.domain.UserBookReportStatus;
 import com.example.doktoribackend.bookReport.repository.BookReportRepository;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
-import com.example.doktoribackend.meeting.domain.Meeting;
-import com.example.doktoribackend.meeting.domain.MeetingDayOfWeek;
-import com.example.doktoribackend.meeting.domain.MeetingMember;
-import com.example.doktoribackend.meeting.domain.MeetingMemberStatus;
-import com.example.doktoribackend.meeting.domain.MeetingRound;
-import com.example.doktoribackend.meeting.domain.MeetingStatus;
+import com.example.doktoribackend.meeting.domain.*;
 import com.example.doktoribackend.meeting.dto.BookRequest;
 import com.example.doktoribackend.meeting.dto.MeetingCreateRequest;
 import com.example.doktoribackend.meeting.dto.MeetingCreateResponse;
@@ -37,10 +32,7 @@ import com.example.doktoribackend.meeting.dto.MyMeetingDetailResponse;
 import com.example.doktoribackend.meeting.dto.PageInfo;
 import com.example.doktoribackend.meeting.dto.MeetingListItem;
 import com.example.doktoribackend.meeting.dto.MeetingListRow;
-import com.example.doktoribackend.meeting.repository.MeetingMemberRepository;
-import com.example.doktoribackend.meeting.repository.MeetingRepository;
-import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
-import com.example.doktoribackend.meeting.repository.NextRoundProjection;
+import com.example.doktoribackend.meeting.repository.*;
 import com.example.doktoribackend.reading.domain.ReadingGenre;
 import com.example.doktoribackend.reading.repository.ReadingGenreRepository;
 import com.example.doktoribackend.common.s3.ImageUrlResolver;
@@ -68,6 +60,7 @@ public class MeetingService {
     private final MeetingRepository meetingRepository;
     private final MeetingRoundRepository meetingRoundRepository;
     private final MeetingMemberRepository meetingMemberRepository;
+    private final MeetingRoundDiscussionTopicRepository meetingRoundDiscussionTopicRepository;
     private final BookRepository bookRepository;
     private final KakaoBookClient kakaoBookClient;
     private final UserRepository userRepository;
@@ -404,6 +397,15 @@ public class MeetingService {
                     .build();
         }
 
+        // 5. topics 조회 및 변환
+        List<MeetingRoundDiscussionTopic> topics = meetingRoundDiscussionTopicRepository.findByMeetingRoundId(round.getId());
+        List<MyMeetingDetailResponse.RoundDetail.TopicInfo> topicInfoList = topics.stream()
+                .map(t -> MyMeetingDetailResponse.RoundDetail.TopicInfo.builder()
+                        .topicNo(t.getTopicNo())
+                        .topic(t.getTopic())
+                        .build())
+                .toList();
+
         // 6. meetingLink 공개 여부 (10분 전부터)
         LocalDateTime tenMinutesBefore = round.getStartAt().minusMinutes(10);
         boolean isLinkAvailable = !now.isBefore(tenMinutesBefore) && now.isBefore(round.getEndAt());
@@ -435,6 +437,7 @@ public class MeetingService {
                 .canJoinMeeting(canJoinMeeting)
                 .book(bookInfo)
                 .bookReport(bookReportInfo)
+                .topics(topicInfoList)
                 .build();
     }
 
