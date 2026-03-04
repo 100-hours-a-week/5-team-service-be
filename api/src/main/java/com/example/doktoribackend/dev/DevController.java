@@ -61,6 +61,4 @@ public class DevController {
         );
         return ResponseEntity.ok().build();
     }
-
-    record DevTokenResponse(Long userId, String nickname, String accessToken) {}
 }
