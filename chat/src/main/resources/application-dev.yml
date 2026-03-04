@@ -15,3 +15,5 @@ app:
   cookie:
     secure: true
     same-site: None
+  jwt:
+    access-exp-minutes: 43200  # 30일 (부하테스트용)
