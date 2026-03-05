@@ -1,6 +1,7 @@
 package com.example.doktoribackend.notification.service;
 
 import com.example.doktoribackend.common.error.ErrorCode;
+import com.example.doktoribackend.config.NotificationRabbitConfig;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.exception.UserNotFoundException;
 import com.example.doktoribackend.notification.domain.Notification;
@@ -14,19 +15,23 @@ import com.example.doktoribackend.notification.repository.NotificationRepository
 import com.example.doktoribackend.notification.repository.NotificationTypeRepository;
 import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.repository.UserRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.BlockingQueue;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -54,13 +59,28 @@ class NotificationServiceTest {
     TemplateRenderer templateRenderer;
 
     @Mock
-    BlockingQueue<NotificationDeliveryTask> notificationDeliveryQueue;
+    RabbitTemplate rabbitTemplate;
 
     @InjectMocks
     NotificationService notificationService;
 
+    @BeforeEach
+    void setUp() {
+        TransactionSynchronizationManager.initSynchronization();
+    }
+
+    @AfterEach
+    void tearDown() {
+        TransactionSynchronizationManager.clearSynchronization();
+    }
+
+    private void triggerAfterCommit() {
+        TransactionSynchronizationManager.getSynchronizations()
+                .forEach(TransactionSynchronization::afterCommit);
+    }
+
     @Test
-    @DisplayName("createAndSend: 알림을 생성하고 FCM, SSE로 전송한다")
+    @DisplayName("createAndSend: 알림을 생성하고 RabbitMQ에 전송한다")
     void createAndSend_success() {
         // given
         Long userId = 1L;
@@ -98,13 +118,18 @@ class NotificationServiceTest {
                 NotificationTypeCode.ROUND_START_10M_BEFORE,
                 Map.of("meetingId", "123")
         );
+        triggerAfterCommit();
 
         // then
         assertThat(result.getId()).isEqualTo(100L);
         assertThat(result.getTitle()).isEqualTo("10분 후 토론이 시작돼요");
 
         then(notificationRepository).should().save(any(Notification.class));
-        then(notificationDeliveryQueue).should().offer(any(NotificationDeliveryTask.class));
+        then(rabbitTemplate).should().convertAndSend(
+                eq(NotificationRabbitConfig.EXCHANGE),
+                eq(NotificationRabbitConfig.ROUTING_KEY),
+                any(NotificationDeliveryTask.class)
+        );
     }
 
     @Test
@@ -122,6 +147,7 @@ class NotificationServiceTest {
                 .isInstanceOf(UserNotFoundException.class);
 
         then(notificationRepository).should(never()).save(any());
+        then(rabbitTemplate).should(never()).convertAndSend(anyString(), anyString(), (Object) any());
     }
 
     @Test
@@ -144,6 +170,7 @@ class NotificationServiceTest {
                 .isInstanceOf(NotificationTypeNotFoundException.class);
 
         then(notificationRepository).should(never()).save(any());
+        then(rabbitTemplate).should(never()).convertAndSend(anyString(), anyString(), (Object) any());
     }
 
     @Test
@@ -177,10 +204,15 @@ class NotificationServiceTest {
                 NotificationTypeCode.ROUND_START_10M_BEFORE,
                 Map.of("meetingId", "123")
         );
+        triggerAfterCommit();
 
         // then
         then(notificationRepository).should().saveAll(anyList());
-        then(notificationDeliveryQueue).should().offer(any(NotificationDeliveryTask.class));
+        then(rabbitTemplate).should().convertAndSend(
+                eq(NotificationRabbitConfig.EXCHANGE),
+                eq(NotificationRabbitConfig.ROUTING_KEY),
+                any(NotificationDeliveryTask.class)
+        );
     }
 
     @Test
@@ -192,10 +224,11 @@ class NotificationServiceTest {
                 NotificationTypeCode.ROUND_START_10M_BEFORE,
                 Map.of()
         );
+        triggerAfterCommit();
 
         // then
         then(notificationRepository).should(never()).saveAll(anyList());
-        then(notificationDeliveryQueue).should(never()).offer(any(NotificationDeliveryTask.class));
+        then(rabbitTemplate).should(never()).convertAndSend(anyString(), anyString(), (Object) any());
     }
 
     @Test
@@ -213,8 +246,7 @@ class NotificationServiceTest {
                 .build();
 
         Notification notification1 = Notification.builder()
-                .user(user)
-                .type(type)
+                .user(user).type(type)
                 .title("독후감 검사가 완료됐어요")
                 .message("검사 결과를 확인해 주세요.")
                 .linkPath("/users/me/meetings/1")
@@ -224,8 +256,7 @@ class NotificationServiceTest {
         ReflectionTestUtils.setField(notification1, "createdAt", LocalDateTime.now());
 
         Notification notification2 = Notification.builder()
-                .user(user)
-                .type(type)
+                .user(user).type(type)
                 .title("독후감 검사가 완료됐어요")
                 .message("검사 결과를 확인해 주세요.")
                 .linkPath("/users/me/meetings/2")
@@ -253,16 +284,10 @@ class NotificationServiceTest {
         User user = User.builder().nickname("testUser").build();
         NotificationType type = NotificationType.builder()
                 .code(NotificationTypeCode.BOOK_REPORT_CHECKED)
-                .title("Title")
-                .messageTemplate("Message")
-                .build();
+                .title("Title").messageTemplate("Message").build();
 
         Notification notification = Notification.builder()
-                .user(user)
-                .type(type)
-                .title("Title")
-                .message("Message")
-                .build();
+                .user(user).type(type).title("Title").message("Message").build();
         ReflectionTestUtils.setField(notification, "id", 1L);
         ReflectionTestUtils.setField(notification, "isRead", true);
         ReflectionTestUtils.setField(notification, "createdAt", LocalDateTime.now());
@@ -304,16 +329,10 @@ class NotificationServiceTest {
 
         NotificationType type = NotificationType.builder()
                 .code(NotificationTypeCode.BOOK_REPORT_CHECKED)
-                .title("Title")
-                .messageTemplate("Message")
-                .build();
+                .title("Title").messageTemplate("Message").build();
 
         Notification notification = Notification.builder()
-                .user(user)
-                .type(type)
-                .title("Title")
-                .message("Message")
-                .build();
+                .user(user).type(type).title("Title").message("Message").build();
         ReflectionTestUtils.setField(notification, "id", notificationId);
 
         given(notificationRepository.findById(notificationId)).willReturn(Optional.of(notification));
@@ -338,16 +357,10 @@ class NotificationServiceTest {
 
         NotificationType type = NotificationType.builder()
                 .code(NotificationTypeCode.BOOK_REPORT_CHECKED)
-                .title("Title")
-                .messageTemplate("Message")
-                .build();
+                .title("Title").messageTemplate("Message").build();
 
         Notification notification = Notification.builder()
-                .user(owner)
-                .type(type)
-                .title("Title")
-                .message("Message")
-                .build();
+                .user(owner).type(type).title("Title").message("Message").build();
         ReflectionTestUtils.setField(notification, "id", notificationId);
 
         given(notificationRepository.findById(notificationId)).willReturn(Optional.of(notification));
@@ -382,9 +395,7 @@ class NotificationServiceTest {
 
         NotificationType type = NotificationType.builder()
                 .code(NotificationTypeCode.BOOK_REPORT_CHECKED)
-                .title("Title")
-                .messageTemplate("Message")
-                .build();
+                .title("Title").messageTemplate("Message").build();
 
         Notification notification1 = Notification.builder()
                 .user(user).type(type).title("Title").message("Message").build();

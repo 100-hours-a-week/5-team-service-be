@@ -1,6 +1,7 @@
 package com.example.doktoribackend.notification.service;
 
 import com.example.doktoribackend.common.error.ErrorCode;
+import com.example.doktoribackend.config.NotificationRabbitConfig;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.exception.UserNotFoundException;
 import com.example.doktoribackend.notification.domain.Notification;
@@ -19,13 +20,15 @@ import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
 
 @Slf4j
 @Service
@@ -36,7 +39,7 @@ public class NotificationService {
     private final NotificationTypeRepository notificationTypeRepository;
     private final UserRepository userRepository;
     private final TemplateRenderer templateRenderer;
-    private final BlockingQueue<NotificationDeliveryTask> notificationDeliveryQueue;
+    private final RabbitTemplate rabbitTemplate;
 
     private static final int RECENT_DAYS = 3;
 
@@ -122,9 +125,16 @@ public class NotificationService {
     }
 
     private void enqueue(NotificationDeliveryTask task) {
-        if (!notificationDeliveryQueue.offer(task)) {
-            log.warn("Notification delivery queue is full, task dropped for userIds: {}", task.userIds());
-        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                rabbitTemplate.convertAndSend(
+                        NotificationRabbitConfig.EXCHANGE,
+                        NotificationRabbitConfig.ROUTING_KEY,
+                        task
+                );
+            }
+        });
     }
 
     @Transactional(readOnly = true)
