@@ -51,6 +51,7 @@ public class RabbitMQConfig {
         factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
         factory.setConcurrentConsumers(3);
         factory.setMaxConcurrentConsumers(10);
+        factory.setPrefetchCount(250);
         return factory;
     }
 }

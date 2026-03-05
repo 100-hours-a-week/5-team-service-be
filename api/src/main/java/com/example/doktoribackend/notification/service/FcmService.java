@@ -116,6 +116,7 @@ public class FcmService {
                 }
             } catch (FirebaseMessagingException e) {
                 log.error("Batch FCM send failed", e);
+                throw new RuntimeException("FCM batch send failed", e);
             }
         }
 
