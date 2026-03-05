@@ -197,26 +197,31 @@ public class MeetingService {
             throw new BusinessException(ErrorCode.CAPACITY_FULL);
         }
 
-        // 6. 중복 신청 방지
-        meetingMemberRepository.findByMeetingIdAndUserId(meetingId, userId)
-                .ifPresent(existingMember -> {
-                    MeetingMemberStatus status = existingMember.getStatus();
-                    // APPROVED: 이미 승인됨
-                    if (status == MeetingMemberStatus.APPROVED) {
-                        throw new BusinessException(ErrorCode.JOIN_REQUEST_ALREADY_EXISTS);
-                    }
-                    // KICKED: 강퇴된 사용자는 재신청 불가
-                    if (status == MeetingMemberStatus.KICKED) {
-                        throw new BusinessException(ErrorCode.JOIN_REQUEST_BLOCKED);
-                    }
-                    // PENDING은 추후 사용 예정 (현재 정책에서는 발생하지 않음)
-                    if (status == MeetingMemberStatus.PENDING) {
-                        throw new BusinessException(ErrorCode.JOIN_REQUEST_ALREADY_EXISTS);
-                    }
-                    // REJECTED, LEFT: 재신청 가능 (if문 통과)
-                });
+        // 6. 기존 멤버십 확인
+        Optional<MeetingMember> existingOpt = meetingMemberRepository.findByMeetingIdAndUserId(meetingId, userId);
 
-        // 7. 참여 요청 생성 (PENDING 상태)
+        if (existingOpt.isPresent()) {
+            MeetingMember existing = existingOpt.get();
+            MeetingMemberStatus status = existing.getStatus();
+
+            // APPROVED: 이미 승인됨
+            if (status == MeetingMemberStatus.APPROVED) {
+                throw new BusinessException(ErrorCode.JOIN_REQUEST_ALREADY_EXISTS);
+            }
+            // KICKED: 강퇴된 사용자는 재신청 불가
+            if (status == MeetingMemberStatus.KICKED) {
+                throw new BusinessException(ErrorCode.JOIN_REQUEST_BLOCKED);
+            }
+            // PENDING: 이미 신청 대기 중
+            if (status == MeetingMemberStatus.PENDING) {
+                throw new BusinessException(ErrorCode.JOIN_REQUEST_ALREADY_EXISTS);
+            }
+            // REJECTED, LEFT: 재신청 (기존 레코드 상태 변경)
+            existing.reapply(user.getMemberIntro());
+            return JoinMeetingResponse.from(existing);
+        }
+
+        // 7. 신규 참여 요청 생성 (PENDING 상태)
         MeetingMember member = MeetingMember.createParticipant(meeting, user);
         meetingMemberRepository.save(member);
 
