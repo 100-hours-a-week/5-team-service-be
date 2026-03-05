@@ -379,5 +379,54 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
         return entityManager.createQuery(query).getResultList();
     }
 
+    @Override
+    public List<MeetingListRow> findMyPendingMeetings(Long userId, Long cursorId, int limit) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<MeetingListRow> query = cb.createQuery(MeetingListRow.class);
+        Root<Meeting> meeting = query.from(Meeting.class);
+        Join<Meeting, User> leader = meeting.join("leaderUser", JoinType.INNER);
+
+        // MeetingMember 서브쿼리: PENDING 상태인 멤버십만 필터링
+        Subquery<Long> memberSubquery = query.subquery(Long.class);
+        Root<MeetingMember> memberRoot = memberSubquery.from(MeetingMember.class);
+
+        memberSubquery.select(memberRoot.get("meeting").get("id"))
+                .where(
+                        cb.equal(memberRoot.get("user").get("id"), userId),
+                        cb.equal(memberRoot.get("status"), MeetingMemberStatus.PENDING)
+                );
+
+        List<Predicate> predicates = new ArrayList<>();
+        predicates.add(cb.isNull(meeting.get("deletedAt")));
+        predicates.add(meeting.get("id").in(memberSubquery));
+
+        // 모임 상태: RECRUITING, FINISHED (CANCELED 제외)
+        predicates.add(cb.or(
+                cb.equal(meeting.get("status"), MeetingStatus.RECRUITING),
+                cb.equal(meeting.get("status"), MeetingStatus.FINISHED)
+        ));
+
+        if (cursorId != null) {
+            predicates.add(cb.lt(meeting.get("id"), cursorId));
+        }
+
+        query.select(cb.construct(MeetingListRow.class,
+                        meeting.get("id"),
+                        meeting.get("meetingImagePath"),
+                        meeting.get("title"),
+                        meeting.get("readingGenreId"),
+                        leader.get("nickname"),
+                        meeting.get("capacity"),
+                        meeting.get("currentCount"),
+                        meeting.get("recruitmentDeadline")
+                ))
+                .where(predicates.toArray(new Predicate[0]))
+                .orderBy(cb.desc(meeting.get("id")));
+
+        TypedQuery<MeetingListRow> typedQuery = entityManager.createQuery(query);
+        typedQuery.setMaxResults(limit);
+        return typedQuery.getResultList();
+    }
+
     
 }

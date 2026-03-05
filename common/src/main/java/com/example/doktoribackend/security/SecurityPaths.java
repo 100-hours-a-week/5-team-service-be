@@ -11,7 +11,6 @@ public final class SecurityPaths {
             "/actuator/**",
             "/policies/reading-genres",
             "/ws/**",
-            "/chat-rooms",
             "/dev/**"
     };
 

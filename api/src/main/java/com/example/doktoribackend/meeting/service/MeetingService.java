@@ -197,26 +197,31 @@ public class MeetingService {
             throw new BusinessException(ErrorCode.CAPACITY_FULL);
         }
 
-        // 6. 중복 신청 방지
-        meetingMemberRepository.findByMeetingIdAndUserId(meetingId, userId)
-                .ifPresent(existingMember -> {
-                    MeetingMemberStatus status = existingMember.getStatus();
-                    // APPROVED: 이미 승인됨
-                    if (status == MeetingMemberStatus.APPROVED) {
-                        throw new BusinessException(ErrorCode.JOIN_REQUEST_ALREADY_EXISTS);
-                    }
-                    // KICKED: 강퇴된 사용자는 재신청 불가
-                    if (status == MeetingMemberStatus.KICKED) {
-                        throw new BusinessException(ErrorCode.JOIN_REQUEST_BLOCKED);
-                    }
-                    // PENDING은 추후 사용 예정 (현재 정책에서는 발생하지 않음)
-                    if (status == MeetingMemberStatus.PENDING) {
-                        throw new BusinessException(ErrorCode.JOIN_REQUEST_ALREADY_EXISTS);
-                    }
-                    // REJECTED, LEFT: 재신청 가능 (if문 통과)
-                });
+        // 6. 기존 멤버십 확인
+        Optional<MeetingMember> existingOpt = meetingMemberRepository.findByMeetingIdAndUserId(meetingId, userId);
 
-        // 7. 참여 요청 생성 (PENDING 상태)
+        if (existingOpt.isPresent()) {
+            MeetingMember existing = existingOpt.get();
+            MeetingMemberStatus status = existing.getStatus();
+
+            // APPROVED: 이미 승인됨
+            if (status == MeetingMemberStatus.APPROVED) {
+                throw new BusinessException(ErrorCode.JOIN_REQUEST_ALREADY_EXISTS);
+            }
+            // KICKED: 강퇴된 사용자는 재신청 불가
+            if (status == MeetingMemberStatus.KICKED) {
+                throw new BusinessException(ErrorCode.JOIN_REQUEST_BLOCKED);
+            }
+            // PENDING: 이미 신청 대기 중
+            if (status == MeetingMemberStatus.PENDING) {
+                throw new BusinessException(ErrorCode.JOIN_REQUEST_ALREADY_EXISTS);
+            }
+            // REJECTED, LEFT: 재신청 (기존 레코드 상태 변경)
+            existing.reapply(user.getMemberIntro());
+            return JoinMeetingResponse.from(existing);
+        }
+
+        // 7. 신규 참여 요청 생성 (PENDING 상태)
         MeetingMember member = MeetingMember.createParticipant(meeting, user);
         meetingMemberRepository.save(member);
 
@@ -243,15 +248,26 @@ public class MeetingService {
 
     @Transactional
     public MyMeetingListResponse getMyMeetings(Long userId, MyMeetingListRequest request) {
-        int size = request.getSizeOrDefault();
-        boolean activeOnly = request.isActiveFilter();
+        // 오버플로우 방지를 위한 명시적 범위 제한
+        int size = Math.min(Math.max(request.getSizeOrDefault(), 1), 10);
+        int limit = size + 1;
 
-        List<MeetingListRow> results = meetingRepository.findMyMeetings(
-                userId,
-                request.getCursorId(),
-                activeOnly,
-                size + 1
-        );
+        // PENDING / ACTIVE / INACTIVE 분기 처리
+        List<MeetingListRow> results;
+        if (request.isPendingFilter()) {
+            results = meetingRepository.findMyPendingMeetings(
+                    userId,
+                    request.getCursorId(),
+                    limit
+            );
+        } else {
+            results = meetingRepository.findMyMeetings(
+                    userId,
+                    request.getCursorId(),
+                    request.isActiveFilter(),
+                    limit
+            );
+        }
 
         boolean hasNext = results.size() > size;
         List<MeetingListRow> sliced = hasNext ? results.subList(0, size) : results;
@@ -273,8 +289,17 @@ public class MeetingService {
                         NextRoundProjection::getNextRoundDate
                 ));
 
+        // N+1 해결: 현재 회차 일괄 조회 (현재 시간 기준 계산)
+        Map<Long, Integer> currentRoundMap = meetingRoundRepository
+                .findCurrentRoundNoByMeetingIds(meetingIds, now)
+                .stream()
+                .collect(Collectors.toMap(
+                        CurrentRoundProjection::getMeetingId,
+                        CurrentRoundProjection::getCurrentRoundNo
+                ));
+
         List<MyMeetingItem> mapped = sliced.stream()
-                .map(row -> toMyMeetingItem(row, now, nextRoundMap))
+                .map(row -> toMyMeetingItem(row, now, nextRoundMap, currentRoundMap))
                 .toList();
 
         Long nextCursorId = hasNext ? mapped.getLast().getMeetingId() : null;
@@ -442,7 +467,7 @@ public class MeetingService {
     }
 
     private MyMeetingItem toMyMeetingItem(MeetingListRow row, LocalDateTime now) {
-        // Meeting 조회 (currentRound 필요)
+        // Meeting 조회 (roundCount 필요)
         Meeting meeting = meetingRepository.findById(row.getMeetingId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
 
@@ -450,13 +475,20 @@ public class MeetingService {
         List<LocalDateTime> nextRounds = meetingRoundRepository.findNextRoundDate(row.getMeetingId(), now);
         LocalDate meetingDate = nextRounds.isEmpty() ? null : nextRounds.getFirst().toLocalDate();
 
+        // 현재 회차 계산: 아직 종료되지 않은 첫 번째 회차, 없으면 마지막 회차
+        List<CurrentRoundProjection> currentRoundList = meetingRoundRepository
+                .findCurrentRoundNoByMeetingIds(List.of(row.getMeetingId()), now);
+        int currentRound = currentRoundList.isEmpty() 
+                ? meeting.getRoundCount() 
+                : currentRoundList.getFirst().getCurrentRoundNo();
+
         return MyMeetingItem.builder()
                 .meetingId(row.getMeetingId())
                 .meetingImagePath(imageUrlResolver.toUrl(row.getMeetingImagePath()))
                 .title(row.getTitle())
                 .readingGenreId(row.getReadingGenreId())
                 .leaderNickname(row.getLeaderNickname())
-                .currentRound(meeting.getCurrentRound())
+                .currentRound(currentRound)
                 .meetingDate(meetingDate)
                 .build();
     }
@@ -465,9 +497,10 @@ public class MeetingService {
     private MyMeetingItem toMyMeetingItem(
             MeetingListRow row, 
             LocalDateTime now, 
-            Map<Long, LocalDateTime> nextRoundMap
+            Map<Long, LocalDateTime> nextRoundMap,
+            Map<Long, Integer> currentRoundMap
     ) {
-        // Meeting 조회 (currentRound 필요)
+        // Meeting 조회 (roundCount 필요 - 모든 회차 종료 시 fallback용)
         Meeting meeting = meetingRepository.findById(row.getMeetingId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
 
@@ -475,13 +508,16 @@ public class MeetingService {
         LocalDateTime nextRound = nextRoundMap.get(row.getMeetingId());
         LocalDate meetingDate = nextRound != null ? nextRound.toLocalDate() : null;
 
+        // Map에서 현재 회차 조회 (O(1)), 없으면 마지막 회차 (모든 회차 종료)
+        Integer currentRound = currentRoundMap.getOrDefault(row.getMeetingId(), meeting.getRoundCount());
+
         return MyMeetingItem.builder()
                 .meetingId(row.getMeetingId())
                 .meetingImagePath(imageUrlResolver.toUrl(row.getMeetingImagePath()))
                 .title(row.getTitle())
                 .readingGenreId(row.getReadingGenreId())
                 .leaderNickname(row.getLeaderNickname())
-                .currentRound(meeting.getCurrentRound())
+                .currentRound(currentRound)
                 .meetingDate(meetingDate)
                 .build();
     }
