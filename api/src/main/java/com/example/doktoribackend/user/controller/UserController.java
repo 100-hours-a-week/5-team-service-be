@@ -36,7 +36,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/users")
-public class UserController implements UserWithdrawalApi {
+public class UserController implements UserWithdrawalApi, MyMeetingDetailApi {
 
     private final OnboardingService onboardingService;
     private final UserService userService;
@@ -101,7 +101,7 @@ public class UserController implements UserWithdrawalApi {
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
-    @Operation(summary = "나의 모임 리스트 조회", description = "로그인 사용자가 참여 중인 모임 목록을 조회합니다. status는 필수이며 ACTIVE(진행 중) 또는 INACTIVE(종료)를 전달해야 합니다.")
+    @Operation(summary = "나의 모임 리스트 조회", description = "로그인 사용자가 참여 중인 모임 목록을 조회합니다. status는 필수이며 ACTIVE(진행 중) 또는 INACTIVE(종료) 또는 PENDING(승인 대기)을 전달해야 합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "OK",
                     content = @Content(mediaType = "application/json",
@@ -236,26 +236,7 @@ public class UserController implements UserWithdrawalApi {
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
-    @Operation(summary = "나의 모임 상세 조회", description = "로그인 사용자가 참여 중인 모임의 상세 정보를 조회합니다.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(mediaType = "application/json",
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "code": "AUTH_UNAUTHORIZED",
-                                      "message": "인증이 필요합니다."
-                                    }
-                                    """))),
-            @ApiResponse(responseCode = "404", description = "Not Found",
-                    content = @Content(mediaType = "application/json",
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "code": "MEETING_NOT_FOUND",
-                                      "message": "존재하지 않는 모임입니다."
-                                    }
-                                    """)))
-    })
+    @Override
     @GetMapping("/me/meetings/{meetingId}")
     public ResponseEntity<ApiResult<MyMeetingDetailResponse>> getMyMeetingDetail(
             @AuthenticationPrincipal CustomUserDetails userDetails,

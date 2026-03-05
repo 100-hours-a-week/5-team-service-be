@@ -10,7 +10,8 @@ public final class SecurityPaths {
             "/health",
             "/actuator/**",
             "/policies/reading-genres",
-            "/ws/**"
+            "/ws/**",
+            "/dev/**"
     };
 
     public static final String[] PUBLIC_DOCS = {

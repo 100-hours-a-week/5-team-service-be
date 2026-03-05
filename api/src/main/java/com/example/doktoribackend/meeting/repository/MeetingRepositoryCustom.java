@@ -11,5 +11,6 @@ public interface MeetingRepositoryCustom {
     List<MeetingListRow> findMeetingList(MeetingListRequest request, int limit);
     List<MeetingListRow> searchMeetings(MeetingSearchRequest request, int limit);
     List<MeetingListRow> findMyMeetings(Long userId, Long cursorId, boolean activeOnly, int limit);
+    List<MeetingListRow> findMyPendingMeetings(Long userId, Long cursorId, int limit);
     List<MeetingListRow> findMyTodayMeetings(Long userId, LocalDate today);
 }
