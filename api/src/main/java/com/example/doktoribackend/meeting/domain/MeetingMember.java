@@ -116,4 +116,15 @@ public class MeetingMember extends BaseTimeEntity {
     public void demoteToMember() {
         this.role = MeetingMemberRole.MEMBER;
     }
+
+    /**
+     * 재신청: REJECTED/LEFT 상태에서 다시 PENDING으로 변경
+     */
+    public void reapply(String memberIntro) {
+        this.status = MeetingMemberStatus.PENDING;
+        this.memberIntro = memberIntro;
+        this.rejectedAt = null;
+        this.leftAt = null;
+        this.approvedAt = null;
+    }
 }
