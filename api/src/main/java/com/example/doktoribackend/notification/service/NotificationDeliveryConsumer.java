@@ -1,49 +1,48 @@
 package com.example.doktoribackend.notification.service;
 
-import com.example.doktoribackend.config.NotificationRabbitConfig;
 import com.example.doktoribackend.notification.dto.NotificationDeliveryTask;
-import com.rabbitmq.client.Channel;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.amqp.support.AmqpHeaders;
-import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class NotificationDeliveryConsumer {
 
+    private final BlockingQueue<NotificationDeliveryTask> notificationDeliveryQueue;
     private final SseEmitterService sseEmitterService;
     private final FcmService fcmService;
 
-    @RabbitListener(queues = NotificationRabbitConfig.QUEUE)
-    public void consume(
-            NotificationDeliveryTask task,
-            Channel channel,
-            @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag
-    ) throws IOException {
-        try {
-            deliver(task);
-            channel.basicAck(deliveryTag, false);
-        } catch (Exception e) {
-            log.error("Notification delivery failed for userIds: {}, routing to DLQ", task.userIds(), e);
-            channel.basicNack(deliveryTag, false, false);
-        }
+    private volatile boolean running = true;
+    private Thread consumerThread;
+
+    @PostConstruct
+    void start() {
+        consumerThread = Thread.ofVirtual()
+                .name("notification-delivery-consumer")
+                .start(this::consumeLoop);
     }
 
-    @RabbitListener(queues = NotificationRabbitConfig.DLQ)
-    public void handleDeadLetter(
-            NotificationDeliveryTask task,
-            Channel channel,
-            @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag
-    ) throws IOException {
-        log.error("Notification permanently failed. userIds={}, title={}", task.userIds(), task.title());
-        channel.basicAck(deliveryTag, false);
+    private void consumeLoop() {
+        while (running) {
+            try {
+                NotificationDeliveryTask task = notificationDeliveryQueue.take();
+                deliver(task);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                log.error("Failed to deliver notification", e);
+            }
+        }
     }
 
     private void deliver(NotificationDeliveryTask task) {
@@ -54,6 +53,36 @@ public class NotificationDeliveryConsumer {
         } catch (Exception e) {
             log.error("SSE delivery failed for userIds: {}", userIds, e);
         }
-        fcmService.sendToUsers(userIds, task.title(), task.message(), task.linkPath());
+
+        try {
+            fcmService.sendToUsers(userIds, task.title(), task.message(), task.linkPath());
+        } catch (Exception e) {
+            log.error("FCM delivery failed for userIds: {}", userIds, e);
+        }
+    }
+
+    @PreDestroy
+    void shutdown() {
+        running = false;
+        consumerThread.interrupt();
+
+        List<NotificationDeliveryTask> remaining = new ArrayList<>();
+        notificationDeliveryQueue.drainTo(remaining);
+
+        log.info("Draining {} remaining notification tasks", remaining.size());
+
+        long deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(30);
+        for (NotificationDeliveryTask task : remaining) {
+            if (System.currentTimeMillis() > deadline) {
+                log.warn("Shutdown timeout reached, {} tasks not delivered",
+                        remaining.size() - remaining.indexOf(task));
+                break;
+            }
+            try {
+                deliver(task);
+            } catch (Exception e) {
+                log.error("Failed to deliver task during shutdown", e);
+            }
+        }
     }
 }

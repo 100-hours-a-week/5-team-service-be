@@ -1,7 +1,6 @@
 package com.example.doktoribackend.notification.service;
 
 import com.example.doktoribackend.common.error.ErrorCode;
-import com.example.doktoribackend.config.NotificationRabbitConfig;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.exception.UserNotFoundException;
 import com.example.doktoribackend.notification.domain.Notification;
@@ -15,23 +14,19 @@ import com.example.doktoribackend.notification.repository.NotificationRepository
 import com.example.doktoribackend.notification.repository.NotificationTypeRepository;
 import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.repository.UserRepository;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.BlockingQueue;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -59,28 +54,13 @@ class NotificationServiceTest {
     TemplateRenderer templateRenderer;
 
     @Mock
-    RabbitTemplate rabbitTemplate;
+    BlockingQueue<NotificationDeliveryTask> notificationDeliveryQueue;
 
     @InjectMocks
     NotificationService notificationService;
 
-    @BeforeEach
-    void setUp() {
-        TransactionSynchronizationManager.initSynchronization();
-    }
-
-    @AfterEach
-    void tearDown() {
-        TransactionSynchronizationManager.clearSynchronization();
-    }
-
-    private void triggerAfterCommit() {
-        TransactionSynchronizationManager.getSynchronizations()
-                .forEach(TransactionSynchronization::afterCommit);
-    }
-
     @Test
-    @DisplayName("createAndSend: 알림을 생성하고 RabbitMQ에 전송한다")
+    @DisplayName("createAndSend: 알림을 생성하고 큐에 전송한다")
     void createAndSend_success() {
         // given
         Long userId = 1L;
@@ -111,6 +91,7 @@ class NotificationServiceTest {
         given(templateRenderer.render(eq("곧 화상 토론이 열려요."), any())).willReturn("곧 화상 토론이 열려요.");
         given(templateRenderer.render(eq("/users/me/meetings/{meetingId}"), any())).willReturn("/users/me/meetings/123");
         given(notificationRepository.save(any(Notification.class))).willReturn(savedNotification);
+        given(notificationDeliveryQueue.offer(any())).willReturn(true);
 
         // when
         Notification result = notificationService.createAndSend(
@@ -118,18 +99,13 @@ class NotificationServiceTest {
                 NotificationTypeCode.ROUND_START_10M_BEFORE,
                 Map.of("meetingId", "123")
         );
-        triggerAfterCommit();
 
         // then
         assertThat(result.getId()).isEqualTo(100L);
         assertThat(result.getTitle()).isEqualTo("10분 후 토론이 시작돼요");
 
         then(notificationRepository).should().save(any(Notification.class));
-        then(rabbitTemplate).should().convertAndSend(
-                eq(NotificationRabbitConfig.EXCHANGE),
-                eq(NotificationRabbitConfig.ROUTING_KEY),
-                any(NotificationDeliveryTask.class)
-        );
+        then(notificationDeliveryQueue).should().offer(any(NotificationDeliveryTask.class));
     }
 
     @Test
@@ -147,7 +123,7 @@ class NotificationServiceTest {
                 .isInstanceOf(UserNotFoundException.class);
 
         then(notificationRepository).should(never()).save(any());
-        then(rabbitTemplate).should(never()).convertAndSend(anyString(), anyString(), (Object) any());
+        then(notificationDeliveryQueue).should(never()).offer(any());
     }
 
     @Test
@@ -170,7 +146,7 @@ class NotificationServiceTest {
                 .isInstanceOf(NotificationTypeNotFoundException.class);
 
         then(notificationRepository).should(never()).save(any());
-        then(rabbitTemplate).should(never()).convertAndSend(anyString(), anyString(), (Object) any());
+        then(notificationDeliveryQueue).should(never()).offer(any());
     }
 
     @Test
@@ -197,6 +173,7 @@ class NotificationServiceTest {
                 .willReturn(Optional.of(type));
         given(userRepository.findAllById(userIds)).willReturn(List.of(user1, user2, user3));
         given(templateRenderer.render(anyString(), any())).willAnswer(inv -> inv.getArgument(0));
+        given(notificationDeliveryQueue.offer(any())).willReturn(true);
 
         // when
         notificationService.createAndSendBatch(
@@ -204,15 +181,10 @@ class NotificationServiceTest {
                 NotificationTypeCode.ROUND_START_10M_BEFORE,
                 Map.of("meetingId", "123")
         );
-        triggerAfterCommit();
 
         // then
         then(notificationRepository).should().saveAll(anyList());
-        then(rabbitTemplate).should().convertAndSend(
-                eq(NotificationRabbitConfig.EXCHANGE),
-                eq(NotificationRabbitConfig.ROUTING_KEY),
-                any(NotificationDeliveryTask.class)
-        );
+        then(notificationDeliveryQueue).should().offer(any(NotificationDeliveryTask.class));
     }
 
     @Test
@@ -224,11 +196,10 @@ class NotificationServiceTest {
                 NotificationTypeCode.ROUND_START_10M_BEFORE,
                 Map.of()
         );
-        triggerAfterCommit();
 
         // then
         then(notificationRepository).should(never()).saveAll(anyList());
-        then(rabbitTemplate).should(never()).convertAndSend(anyString(), anyString(), (Object) any());
+        then(notificationDeliveryQueue).should(never()).offer(any());
     }
 
     @Test
