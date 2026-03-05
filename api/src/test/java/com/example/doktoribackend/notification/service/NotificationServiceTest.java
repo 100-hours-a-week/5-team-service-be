@@ -1,7 +1,6 @@
 package com.example.doktoribackend.notification.service;
 
 import com.example.doktoribackend.common.error.ErrorCode;
-import com.example.doktoribackend.config.NotificationRabbitConfig;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.exception.UserNotFoundException;
 import com.example.doktoribackend.notification.domain.Notification;
@@ -23,10 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -59,25 +55,10 @@ class NotificationServiceTest {
     TemplateRenderer templateRenderer;
 
     @Mock
-    RabbitTemplate rabbitTemplate;
+    NotificationEnqueuePort notificationEnqueuePort;
 
     @InjectMocks
     NotificationService notificationService;
-
-    @BeforeEach
-    void setUp() {
-        TransactionSynchronizationManager.initSynchronization();
-    }
-
-    @AfterEach
-    void tearDown() {
-        TransactionSynchronizationManager.clearSynchronization();
-    }
-
-    private void triggerAfterCommit() {
-        TransactionSynchronizationManager.getSynchronizations()
-                .forEach(TransactionSynchronization::afterCommit);
-    }
 
     @Test
     @DisplayName("createAndSend: 알림을 생성하고 RabbitMQ에 전송한다")
@@ -118,18 +99,13 @@ class NotificationServiceTest {
                 NotificationTypeCode.ROUND_START_10M_BEFORE,
                 Map.of("meetingId", "123")
         );
-        triggerAfterCommit();
 
         // then
         assertThat(result.getId()).isEqualTo(100L);
         assertThat(result.getTitle()).isEqualTo("10분 후 토론이 시작돼요");
 
         then(notificationRepository).should().save(any(Notification.class));
-        then(rabbitTemplate).should().convertAndSend(
-                eq(NotificationRabbitConfig.EXCHANGE),
-                eq(NotificationRabbitConfig.ROUTING_KEY),
-                any(NotificationDeliveryTask.class)
-        );
+        then(notificationEnqueuePort).should().enqueue(any(NotificationDeliveryTask.class));
     }
 
     @Test
@@ -147,7 +123,7 @@ class NotificationServiceTest {
                 .isInstanceOf(UserNotFoundException.class);
 
         then(notificationRepository).should(never()).save(any());
-        then(rabbitTemplate).should(never()).convertAndSend(anyString(), anyString(), (Object) any());
+        then(notificationEnqueuePort).should(never()).enqueue(any());
     }
 
     @Test
@@ -170,7 +146,7 @@ class NotificationServiceTest {
                 .isInstanceOf(NotificationTypeNotFoundException.class);
 
         then(notificationRepository).should(never()).save(any());
-        then(rabbitTemplate).should(never()).convertAndSend(anyString(), anyString(), (Object) any());
+        then(notificationEnqueuePort).should(never()).enqueue(any());
     }
 
     @Test
@@ -204,15 +180,10 @@ class NotificationServiceTest {
                 NotificationTypeCode.ROUND_START_10M_BEFORE,
                 Map.of("meetingId", "123")
         );
-        triggerAfterCommit();
 
         // then
         then(notificationRepository).should().saveAll(anyList());
-        then(rabbitTemplate).should().convertAndSend(
-                eq(NotificationRabbitConfig.EXCHANGE),
-                eq(NotificationRabbitConfig.ROUTING_KEY),
-                any(NotificationDeliveryTask.class)
-        );
+        then(notificationEnqueuePort).should().enqueue(any(NotificationDeliveryTask.class));
     }
 
     @Test
@@ -224,11 +195,10 @@ class NotificationServiceTest {
                 NotificationTypeCode.ROUND_START_10M_BEFORE,
                 Map.of()
         );
-        triggerAfterCommit();
 
         // then
         then(notificationRepository).should(never()).saveAll(anyList());
-        then(rabbitTemplate).should(never()).convertAndSend(anyString(), anyString(), (Object) any());
+        then(notificationEnqueuePort).should(never()).enqueue(any());
     }
 
     @Test
