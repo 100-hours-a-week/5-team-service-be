@@ -158,8 +158,8 @@ class ChatRoomServiceTest {
             ChatRoomCreateRequest request = createValidRequest(4);
             given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
-            given(chattingRoomMemberRepository.findFirstByUserIdAndStatusIn(
-                    eq(USER_ID), any())).willReturn(Optional.empty());
+            given(chattingRoomMemberRepository.findByUserIdAndStatusInWithLock(
+                    eq(USER_ID), any())).willReturn(List.of());
             given(chattingRoomRepository.save(any(ChattingRoom.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
             stubUserInfo();
@@ -180,8 +180,8 @@ class ChatRoomServiceTest {
             ChatRoomCreateRequest request = createValidRequest(4);
             given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
-            given(chattingRoomMemberRepository.findFirstByUserIdAndStatusIn(
-                    eq(USER_ID), any())).willReturn(Optional.empty());
+            given(chattingRoomMemberRepository.findByUserIdAndStatusInWithLock(
+                    eq(USER_ID), any())).willReturn(List.of());
             given(chattingRoomRepository.save(any(ChattingRoom.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
             stubUserInfo();
@@ -200,8 +200,8 @@ class ChatRoomServiceTest {
             ChatRoomCreateRequest request = createValidRequest(4);
             given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
-            given(chattingRoomMemberRepository.findFirstByUserIdAndStatusIn(
-                    eq(USER_ID), any())).willReturn(Optional.empty());
+            given(chattingRoomMemberRepository.findByUserIdAndStatusInWithLock(
+                    eq(USER_ID), any())).willReturn(List.of());
             given(chattingRoomRepository.save(any(ChattingRoom.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
             stubUserInfo();
@@ -233,8 +233,8 @@ class ChatRoomServiceTest {
             ChatRoomCreateRequest request = createValidRequest(capacity);
             given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
-            given(chattingRoomMemberRepository.findFirstByUserIdAndStatusIn(
-                    eq(USER_ID), any())).willReturn(Optional.empty());
+            given(chattingRoomMemberRepository.findByUserIdAndStatusInWithLock(
+                    eq(USER_ID), any())).willReturn(List.of());
             given(chattingRoomRepository.save(any(ChattingRoom.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
             stubUserInfo();
@@ -278,8 +278,8 @@ class ChatRoomServiceTest {
             given(otherRoom.getId()).willReturn(otherRoomId);
             ChattingRoomMember existingMember = mock(ChattingRoomMember.class);
             given(existingMember.getChattingRoom()).willReturn(otherRoom);
-            given(chattingRoomMemberRepository.findFirstByUserIdAndStatusIn(eq(USER_ID), any()))
-                    .willReturn(Optional.of(existingMember));
+            given(chattingRoomMemberRepository.findByUserIdAndStatusInWithLock(eq(USER_ID), any()))
+                    .willReturn(List.of(existingMember));
 
             // when & then
             assertThatThrownBy(() -> chatRoomService.createChatRoom(USER_ID, request))
@@ -297,8 +297,8 @@ class ChatRoomServiceTest {
             ChatRoomCreateRequest request = createValidRequest(4);
             given(bookService.resolveBook(TEST_ISBN)).willReturn(createTestBook());
             given(bookRepository.getReferenceById(any())).willReturn(createTestBook());
-            given(chattingRoomMemberRepository.findFirstByUserIdAndStatusIn(
-                    eq(USER_ID), any())).willReturn(Optional.empty());
+            given(chattingRoomMemberRepository.findByUserIdAndStatusInWithLock(
+                    eq(USER_ID), any())).willReturn(List.of());
             given(chattingRoomRepository.save(any(ChattingRoom.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
             stubUserInfo();
@@ -539,8 +539,8 @@ class ChatRoomServiceTest {
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
                     .willReturn(Optional.empty());
-            given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(eq(USER_ID), any()))
-                    .willReturn(false);
+            given(chattingRoomMemberRepository.findByUserIdAndStatusInWithLock(eq(USER_ID), any()))
+                    .willReturn(List.of());
             given(chattingRoomMemberRepository.countByChattingRoomIdAndPositionAndStatusIn(
                     eq(ROOM_ID), eq(Position.AGREE), any())).willReturn(0);
             stubUserInfo();
@@ -603,8 +603,8 @@ class ChatRoomServiceTest {
             given(otherRoom.getId()).willReturn(otherRoomId);
             ChattingRoomMember existingMember = mock(ChattingRoomMember.class);
             given(existingMember.getChattingRoom()).willReturn(otherRoom);
-            given(chattingRoomMemberRepository.findFirstByUserIdAndStatusIn(eq(USER_ID), any()))
-                    .willReturn(Optional.of(existingMember));
+            given(chattingRoomMemberRepository.findByUserIdAndStatusInWithLock(eq(USER_ID), any()))
+                    .willReturn(List.of(existingMember));
             ChatRoomJoinRequest request = new ChatRoomJoinRequest(Position.AGREE, 1);
 
             // when & then
@@ -740,8 +740,8 @@ class ChatRoomServiceTest {
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
                     .willReturn(Optional.empty());
-            given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(eq(USER_ID), any()))
-                    .willReturn(false);
+            given(chattingRoomMemberRepository.findByUserIdAndStatusInWithLock(eq(USER_ID), any()))
+                    .willReturn(List.of());
             org.mockito.BDDMockito.willThrow(new BusinessException(ErrorCode.CHAT_ROOM_QUIZ_WRONG_ANSWER))
                     .given(quizService).validateQuizAnswer(ROOM_ID, 2);
             ChatRoomJoinRequest request = new ChatRoomJoinRequest(Position.AGREE, 2);
@@ -761,8 +761,8 @@ class ChatRoomServiceTest {
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
                     .willReturn(Optional.empty());
-            given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(eq(USER_ID), any()))
-                    .willReturn(false);
+            given(chattingRoomMemberRepository.findByUserIdAndStatusInWithLock(eq(USER_ID), any()))
+                    .willReturn(List.of());
             ChatRoomJoinRequest request = new ChatRoomJoinRequest(Position.AGREE, 1);
 
             // when & then
@@ -780,8 +780,8 @@ class ChatRoomServiceTest {
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
                     .willReturn(Optional.empty());
-            given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(eq(USER_ID), any()))
-                    .willReturn(false);
+            given(chattingRoomMemberRepository.findByUserIdAndStatusInWithLock(eq(USER_ID), any()))
+                    .willReturn(List.of());
             given(chattingRoomMemberRepository.countByChattingRoomIdAndPositionAndStatusIn(
                     eq(ROOM_ID), eq(Position.AGREE), any())).willReturn(2);
             ChatRoomJoinRequest request = new ChatRoomJoinRequest(Position.AGREE, 1);
@@ -801,8 +801,8 @@ class ChatRoomServiceTest {
             given(chattingRoomRepository.findById(ROOM_ID)).willReturn(Optional.of(room));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
                     .willReturn(Optional.empty());
-            given(chattingRoomMemberRepository.existsByUserIdAndStatusIn(eq(USER_ID), any()))
-                    .willReturn(false);
+            given(chattingRoomMemberRepository.findByUserIdAndStatusInWithLock(eq(USER_ID), any()))
+                    .willReturn(List.of());
             given(chattingRoomMemberRepository.countByChattingRoomIdAndPositionAndStatusIn(
                     eq(ROOM_ID), eq(Position.AGREE), any())).willReturn(0);
             given(userInfoRepository.findById(USER_ID)).willReturn(Optional.empty());
@@ -1208,6 +1208,8 @@ class ChatRoomServiceTest {
 
             given(chattingRoomRepository.findExpiredChattingRooms(any(java.time.LocalDateTime.class)))
                     .willReturn(List.of(expiredRoom));
+            given(chattingRoomRepository.findByIdWithLock(1L))
+                    .willReturn(Optional.of(expiredRoom));
             given(roomRoundRepository.findByChattingRoomIdAndEndedAtIsNull(1L))
                     .willReturn(Optional.empty());
             given(chattingRoomMemberRepository.findByChattingRoomIdAndStatusIn(eq(1L), any()))

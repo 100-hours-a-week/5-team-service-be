@@ -106,7 +106,7 @@ class VoteServiceTest {
         void castVote_success() {
             // given
             Vote vote = createOpenVote();
-            given(voteRepository.findById(ROOM_ID)).willReturn(Optional.of(vote));
+            given(voteRepository.findByIdWithLock(ROOM_ID)).willReturn(Optional.of(vote));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
                     .willReturn(Optional.of(createMember()));
             given(voteCastRepository.existsById(new VoteCastId(ROOM_ID, USER_ID))).willReturn(false);
@@ -125,7 +125,7 @@ class VoteServiceTest {
         void castVote_disagree() {
             // given
             Vote vote = createOpenVote();
-            given(voteRepository.findById(ROOM_ID)).willReturn(Optional.of(vote));
+            given(voteRepository.findByIdWithLock(ROOM_ID)).willReturn(Optional.of(vote));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
                     .willReturn(Optional.of(createMember()));
             given(voteCastRepository.existsById(new VoteCastId(ROOM_ID, USER_ID))).willReturn(false);
@@ -142,7 +142,7 @@ class VoteServiceTest {
         @DisplayName("투표가 없으면 VOTE_NOT_FOUND 예외가 발생한다")
         void castVote_voteNotFound() {
             // given
-            given(voteRepository.findById(ROOM_ID)).willReturn(Optional.empty());
+            given(voteRepository.findByIdWithLock(ROOM_ID)).willReturn(Optional.empty());
 
             // when & then
             assertThatThrownBy(() -> voteService.castVote(ROOM_ID, USER_ID, Position.AGREE))
@@ -156,7 +156,7 @@ class VoteServiceTest {
         void castVote_expired() {
             // given
             Vote vote = createExpiredVote();
-            given(voteRepository.findById(ROOM_ID)).willReturn(Optional.of(vote));
+            given(voteRepository.findByIdWithLock(ROOM_ID)).willReturn(Optional.of(vote));
 
             // when & then
             assertThatThrownBy(() -> voteService.castVote(ROOM_ID, USER_ID, Position.AGREE))
@@ -172,7 +172,7 @@ class VoteServiceTest {
         void castVote_notMember() {
             // given
             Vote vote = createOpenVote();
-            given(voteRepository.findById(ROOM_ID)).willReturn(Optional.of(vote));
+            given(voteRepository.findByIdWithLock(ROOM_ID)).willReturn(Optional.of(vote));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
                     .willReturn(Optional.empty());
 
@@ -188,7 +188,7 @@ class VoteServiceTest {
         void castVote_duplicate() {
             // given
             Vote vote = createOpenVote();
-            given(voteRepository.findById(ROOM_ID)).willReturn(Optional.of(vote));
+            given(voteRepository.findByIdWithLock(ROOM_ID)).willReturn(Optional.of(vote));
             given(chattingRoomMemberRepository.findByChattingRoomIdAndUserId(ROOM_ID, USER_ID))
                     .willReturn(Optional.of(createMember()));
             given(voteCastRepository.existsById(new VoteCastId(ROOM_ID, USER_ID))).willReturn(true);
