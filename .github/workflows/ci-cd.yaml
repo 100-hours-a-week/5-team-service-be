@@ -34,6 +34,7 @@ jobs:
           echo "✅ Source branch validation passed: ${{ github.head_ref }}"
 
   ci:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -50,7 +51,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build (includes compile check)
-        run: ./gradlew build -x test --no-daemon
+        run: ./gradlew build -x test --no-daemon --build-cache --parallel
 
       - name: Notify Discord on failure
         if: failure()
@@ -83,7 +84,6 @@ jobs:
                ${{ secrets.DISCORD_WEBHOOK_URL }} || true
 
   build-and-push:
-    needs: ci
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04-arm
     permissions:
@@ -91,9 +91,84 @@ jobs:
       contents: read
     outputs:
       image-tag: ${{ steps.meta.outputs.image-tag }}
+      api-changed: ${{ steps.changes.outputs.api }}
+      chat-changed: ${{ steps.changes.outputs.chat }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" == "push" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+            echo "Changed files:"
+            echo "$CHANGED"
+
+            API=false; CHAT=false
+            while IFS= read -r file; do
+              case "$file" in
+                api/*) API=true ;;
+                chat/*) CHAT=true ;;
+                common/*|build.gradle*|settings.gradle*|gradle.properties|Dockerfile|docker-bake.hcl|.dockerignore)
+                  API=true; CHAT=true ;;
+              esac
+            done <<< "$CHANGED"
+
+            if [ "$API" == "false" ] && [ "$CHAT" == "false" ]; then
+              API=true; CHAT=true
+              echo "No module-specific changes, building all"
+            fi
+          else
+            API=true; CHAT=true
+            echo "workflow_dispatch or first push: building all"
+          fi
+
+          echo "api=$API" >> $GITHUB_OUTPUT
+          echo "chat=$CHAT" >> $GITHUB_OUTPUT
+          echo "API: $API, Chat: $CHAT"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: Build (compile check + JARs)
+        run: chmod +x ./gradlew && ./gradlew build -x test --no-daemon --build-cache --parallel
+
+      - name: Notify Discord on CI failure
+        if: failure()
+        run: |
+          COMMIT_SHA="${{ github.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          COMMIT_MSG=$(echo '${{ github.event.head_commit.message }}' | head -1)
+          COMMIT_AUTHOR="${{ github.event.head_commit.author.name }}"
+          COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+          ACTIONS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "{
+                 \"content\": \"❌ **Backend CI 빌드 실패**\",
+                 \"embeds\": [{
+                   \"title\": \"🔴 빌드 실패 알림\",
+                   \"color\": 15158528,
+                   \"fields\": [
+                     {\"name\": \"📦 저장소\", \"value\": \"\`${{ github.repository }}\`\", \"inline\": true},
+                     {\"name\": \"🌿 브랜치\", \"value\": \"\`${{ github.ref_name }}\`\", \"inline\": true},
+                     {\"name\": \"🔖 커밋\", \"value\": \"[\`$SHORT_SHA\`]($COMMIT_URL)\", \"inline\": true},
+                     {\"name\": \"💬 커밋 메시지\", \"value\": \"$COMMIT_MSG\", \"inline\": false},
+                     {\"name\": \"👤 작성자\", \"value\": \"$COMMIT_AUTHOR\", \"inline\": true},
+                     {\"name\": \"📋 상세 로그\", \"value\": \"[Actions에서 확인]($ACTIONS_URL)\", \"inline\": true}
+                   ],
+                   \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+                 }]
+               }" \
+               ${{ secrets.DISCORD_WEBHOOK_URL }} || true
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -107,57 +182,26 @@ jobs:
       - name: Set image metadata
         id: meta
         run: |
-          REGISTRY="${{ secrets.ECR_REGISTRY }}"
           if [ "${{ github.ref }}" == "refs/heads/develop" ]; then
-            TAG="develop"
-            echo "api-tags=${REGISTRY}/doktori/backend-api:develop" >> $GITHUB_OUTPUT
-            echo "chat-tags=${REGISTRY}/doktori/backend-chat:develop" >> $GITHUB_OUTPUT
+            echo "image-tag=develop" >> $GITHUB_OUTPUT
           else
             SHORT_SHA="${GITHUB_SHA:0:7}"
-            TAG="sha-${SHORT_SHA}"
-
-            {
-              echo "api-tags<<EOF"
-              echo "${REGISTRY}/doktori/backend-api:sha-${SHORT_SHA}"
-              echo "${REGISTRY}/doktori/backend-api:latest"
-              echo "EOF"
-            } >> $GITHUB_OUTPUT
-
-            {
-              echo "chat-tags<<EOF"
-              echo "${REGISTRY}/doktori/backend-chat:sha-${SHORT_SHA}"
-              echo "${REGISTRY}/doktori/backend-chat:latest"
-              echo "EOF"
-            } >> $GITHUB_OUTPUT
+            echo "image-tag=sha-${SHORT_SHA}" >> $GITHUB_OUTPUT
           fi
-          echo "image-tag=${TAG}" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push API image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          target: api
-          platforms: linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.api-tags }}
-          cache-from: type=gha,scope=api
-          cache-to: type=gha,mode=max,scope=api
-
-      - name: Build and push Chat image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          target: chat
-          platforms: linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.chat-tags }}
-          cache-from: |
-            type=gha,scope=chat
-            type=gha,scope=api
-          cache-to: type=gha,mode=max,scope=chat
+      - name: Build and push images
+        run: |
+          TARGETS=""
+          [ "${{ steps.changes.outputs.api }}" == "true" ] && TARGETS="$TARGETS api"
+          [ "${{ steps.changes.outputs.chat }}" == "true" ] && TARGETS="$TARGETS chat"
+          echo "Bake targets: $TARGETS"
+          docker buildx bake -f docker-bake.hcl --push $TARGETS
+        env:
+          REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          TAG: ${{ steps.meta.outputs.image-tag }}
 
   deploy-dev:
     needs: build-and-push
