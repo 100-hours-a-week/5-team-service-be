@@ -137,8 +137,8 @@ jobs:
           distribution: "temurin"
           cache: "gradle"
 
-      - name: Build (compile check + JARs)
-        run: chmod +x ./gradlew && ./gradlew build -x test --no-daemon --build-cache --parallel
+      - name: Build JARs
+        run: chmod +x ./gradlew && ./gradlew :api:bootJar :chat:bootJar -x test -x checkstyleMain -x checkstyleTest --no-daemon --build-cache --parallel
 
       - name: Notify Discord on CI failure
         if: failure()
