@@ -20,6 +20,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  # ─── main PR 보호: develop 또는 hotfix/* 브랜치만 허용 ────────────
   check-source-branch:
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     runs-on: ubuntu-latest
@@ -33,6 +34,8 @@ jobs:
           fi
           echo "✅ Source branch validation passed: ${{ github.head_ref }}"
 
+  # ─── CI: PR에서만 실행 — 컴파일 + checkstyle 검사 ─────────────────
+  # TODO: 테스트 추가 시 -x test 제거하여 PR에서 테스트 실행
   ci:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -50,6 +53,7 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
+      # compile + checkstyle (test는 아직 없으므로 제외)
       - name: Build (includes compile check)
         run: ./gradlew build -x test --no-daemon --build-cache --parallel
 
@@ -83,6 +87,8 @@ jobs:
                }" \
                ${{ secrets.DISCORD_WEBHOOK_URL }} || true
 
+  # ─── Build & Push: push/dispatch에서만 실행 — JAR 빌드 + Docker 이미지 ECR push ──
+  # ci job을 거치지 않음 (PR에서 이미 검증된 코드만 push됨)
   build-and-push:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04-arm
@@ -97,8 +103,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # git diff 변경감지에 전체 히스토리 필요
 
+      # git diff로 변경된 모듈만 감지 → 안 바뀐 모듈은 이미지 생성 스킵
       - name: Detect changes
         id: changes
         run: |
@@ -112,16 +119,19 @@ jobs:
               case "$file" in
                 api/*) API=true ;;
                 chat/*) CHAT=true ;;
+                # 공유 파일 변경 시 전체 빌드
                 common/*|build.gradle*|settings.gradle*|gradle.properties|Dockerfile|docker-bake.hcl|.dockerignore)
                   API=true; CHAT=true ;;
               esac
             done <<< "$CHANGED"
 
+            # 모듈 외 변경(docs, .github 등)은 안전하게 전체 빌드
             if [ "$API" == "false" ] && [ "$CHAT" == "false" ]; then
               API=true; CHAT=true
               echo "No module-specific changes, building all"
             fi
           else
+            # workflow_dispatch 또는 브랜치 첫 push는 전체 빌드
             API=true; CHAT=true
             echo "workflow_dispatch or first push: building all"
           fi
@@ -135,8 +145,10 @@ jobs:
         with:
           java-version: "21"
           distribution: "temurin"
-          cache: "gradle"
+          cache: "gradle"  # Gradle 의존성 캐시 (GHA Cache API 경유)
 
+      # bootJar만 실행 — checkstyle은 PR ci job에서 이미 통과
+      # TODO: 테스트 추가 시 bootJar 전에 ./gradlew test 스텝 추가
       - name: Build JARs
         run: chmod +x ./gradlew && ./gradlew :api:bootJar :chat:bootJar -x test -x checkstyleMain -x checkstyleTest --no-daemon --build-cache --parallel
 
@@ -170,6 +182,7 @@ jobs:
                }" \
                ${{ secrets.DISCORD_WEBHOOK_URL }} || true
 
+      # ── ECR 인증 + 이미지 빌드/푸시 ──
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -179,6 +192,7 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
+      # develop → :develop 태그, main → :sha-xxxxxxx + :latest (docker-bake.hcl에서 처리)
       - name: Set image metadata
         id: meta
         run: |
@@ -192,6 +206,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Docker Bake: 변경된 모듈만 병렬 빌드+푸시 (Docker 캐시 미사용 — 오버헤드 > 이점)
       - name: Build and push images
         run: |
           TARGETS=""
@@ -203,6 +218,7 @@ jobs:
           REGISTRY: ${{ secrets.ECR_REGISTRY }}
           TAG: ${{ steps.meta.outputs.image-tag }}
 
+  # ─── Deploy: Dev (develop push) ──────────────────────────────────
   deploy-dev:
     needs: build-and-push
     if: github.ref == 'refs/heads/develop'
