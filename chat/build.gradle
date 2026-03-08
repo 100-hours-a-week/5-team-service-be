@@ -33,6 +33,9 @@ dependencies {
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-mysql'
 
+    // Redis
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
     // Spring Cloud AWS Parameter Store
     implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:3.2.1')
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-parameter-store'
