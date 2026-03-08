@@ -56,7 +56,7 @@ public class SseEmitterService {
                     .data("connected"));
         } catch (IOException e) {
             log.error("Failed to send SSE connect event", e);
-            emitters.remove(userId);
+            removeConnected.run();
         }
         return emitter;
     }
