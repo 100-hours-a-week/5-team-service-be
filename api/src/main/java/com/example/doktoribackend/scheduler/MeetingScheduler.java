@@ -4,6 +4,7 @@ import com.example.doktoribackend.meeting.repository.MeetingRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ public class MeetingScheduler {
      * "0 0 0 * * *" = 매일 00:00:00
      */
     @Scheduled(cron = "0 0 0 * * *")
+    @SchedulerLock(name = "updateExpiredRecruitmentStatus", lockAtMostFor = "23h")
     @Transactional
     public void updateExpiredRecruitmentStatus() {
         LocalDate today = LocalDate.now();
@@ -39,6 +41,7 @@ public class MeetingScheduler {
      * "0 0 * * * *" = 매 시간 00분 00초
      */
     @Scheduled(cron = "0 0 * * * *")
+    @SchedulerLock(name = "completeExpiredRounds", lockAtMostFor = "55m")
     @Transactional
     public void completeExpiredRounds() {
         LocalDateTime now = LocalDateTime.now();

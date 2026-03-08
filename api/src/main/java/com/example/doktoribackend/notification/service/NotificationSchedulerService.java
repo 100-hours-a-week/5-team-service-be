@@ -6,6 +6,7 @@ import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
 import com.example.doktoribackend.notification.domain.NotificationTypeCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -26,6 +27,7 @@ public class NotificationSchedulerService {
     private static final String PARAM_MEETING_ID = "meetingId";
 
     @Scheduled(cron = "0 0 * * * *")
+    @SchedulerLock(name = "sendReviewDeadline24hNotifications", lockAtMostFor = "55m")
     public void sendReviewDeadline24hNotifications() {
         LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.HOURS);
         LocalDateTime from = now.plusHours(47);
@@ -59,6 +61,7 @@ public class NotificationSchedulerService {
     }
 
     @Scheduled(cron = "0 0,30 * * * *")
+    @SchedulerLock(name = "sendReviewDeadline30mNotifications", lockAtMostFor = "25m")
     public void sendReviewDeadline30mNotifications() {
         LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
         LocalDateTime from = now.plusHours(24);

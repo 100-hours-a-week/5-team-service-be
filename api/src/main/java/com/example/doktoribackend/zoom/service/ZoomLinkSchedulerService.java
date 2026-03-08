@@ -9,6 +9,7 @@ import com.example.doktoribackend.notification.service.NotificationService;
 import com.example.doktoribackend.zoom.exception.ZoomAuthenticationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import java.time.Duration;
@@ -41,6 +42,7 @@ public class ZoomLinkSchedulerService {
     );
 
     @Scheduled(cron = "0 * * * * *")
+    @SchedulerLock(name = "createZoomLinksForUpcomingMeetings", lockAtMostFor = "55s")
     public void createZoomLinksForUpcomingMeetings() {
         LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
         LocalDateTime targetTime = now.plusMinutes(LOOK_AHEAD_MINUTES);

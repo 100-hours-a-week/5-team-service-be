@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -19,7 +21,7 @@ public class RedisSseSubscriber implements MessageListener {
     private final ObjectMapper objectMapper;
 
     @Override
-    public void onMessage(Message message, byte[] pattern) {
+    public void onMessage(@NonNull Message message, @Nullable byte[] pattern) {
         try {
             String channel = new String(message.getChannel());
             Long userId = Long.parseLong(channel.substring(CHANNEL_PREFIX.length()));
