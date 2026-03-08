@@ -14,6 +14,8 @@ import com.example.doktoribackend.notification.repository.NotificationRepository
 import com.example.doktoribackend.notification.repository.NotificationTypeRepository;
 import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.repository.UserRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,7 +28,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.BlockingQueue;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -54,13 +55,13 @@ class NotificationServiceTest {
     TemplateRenderer templateRenderer;
 
     @Mock
-    BlockingQueue<NotificationDeliveryTask> notificationDeliveryQueue;
+    NotificationEnqueuePort notificationEnqueuePort;
 
     @InjectMocks
     NotificationService notificationService;
 
     @Test
-    @DisplayName("createAndSend: 알림을 생성하고 FCM, SSE로 전송한다")
+    @DisplayName("createAndSend: 알림을 생성하고 RabbitMQ에 전송한다")
     void createAndSend_success() {
         // given
         Long userId = 1L;
@@ -104,7 +105,7 @@ class NotificationServiceTest {
         assertThat(result.getTitle()).isEqualTo("10분 후 토론이 시작돼요");
 
         then(notificationRepository).should().save(any(Notification.class));
-        then(notificationDeliveryQueue).should().offer(any(NotificationDeliveryTask.class));
+        then(notificationEnqueuePort).should().enqueue(any(NotificationDeliveryTask.class));
     }
 
     @Test
@@ -122,6 +123,7 @@ class NotificationServiceTest {
                 .isInstanceOf(UserNotFoundException.class);
 
         then(notificationRepository).should(never()).save(any());
+        then(notificationEnqueuePort).should(never()).enqueue(any());
     }
 
     @Test
@@ -144,6 +146,7 @@ class NotificationServiceTest {
                 .isInstanceOf(NotificationTypeNotFoundException.class);
 
         then(notificationRepository).should(never()).save(any());
+        then(notificationEnqueuePort).should(never()).enqueue(any());
     }
 
     @Test
@@ -180,7 +183,7 @@ class NotificationServiceTest {
 
         // then
         then(notificationRepository).should().saveAll(anyList());
-        then(notificationDeliveryQueue).should().offer(any(NotificationDeliveryTask.class));
+        then(notificationEnqueuePort).should().enqueue(any(NotificationDeliveryTask.class));
     }
 
     @Test
@@ -195,7 +198,7 @@ class NotificationServiceTest {
 
         // then
         then(notificationRepository).should(never()).saveAll(anyList());
-        then(notificationDeliveryQueue).should(never()).offer(any(NotificationDeliveryTask.class));
+        then(notificationEnqueuePort).should(never()).enqueue(any());
     }
 
     @Test
@@ -213,8 +216,7 @@ class NotificationServiceTest {
                 .build();
 
         Notification notification1 = Notification.builder()
-                .user(user)
-                .type(type)
+                .user(user).type(type)
                 .title("독후감 검사가 완료됐어요")
                 .message("검사 결과를 확인해 주세요.")
                 .linkPath("/users/me/meetings/1")
@@ -224,8 +226,7 @@ class NotificationServiceTest {
         ReflectionTestUtils.setField(notification1, "createdAt", LocalDateTime.now());
 
         Notification notification2 = Notification.builder()
-                .user(user)
-                .type(type)
+                .user(user).type(type)
                 .title("독후감 검사가 완료됐어요")
                 .message("검사 결과를 확인해 주세요.")
                 .linkPath("/users/me/meetings/2")
@@ -253,16 +254,10 @@ class NotificationServiceTest {
         User user = User.builder().nickname("testUser").build();
         NotificationType type = NotificationType.builder()
                 .code(NotificationTypeCode.BOOK_REPORT_CHECKED)
-                .title("Title")
-                .messageTemplate("Message")
-                .build();
+                .title("Title").messageTemplate("Message").build();
 
         Notification notification = Notification.builder()
-                .user(user)
-                .type(type)
-                .title("Title")
-                .message("Message")
-                .build();
+                .user(user).type(type).title("Title").message("Message").build();
         ReflectionTestUtils.setField(notification, "id", 1L);
         ReflectionTestUtils.setField(notification, "isRead", true);
         ReflectionTestUtils.setField(notification, "createdAt", LocalDateTime.now());
@@ -304,16 +299,10 @@ class NotificationServiceTest {
 
         NotificationType type = NotificationType.builder()
                 .code(NotificationTypeCode.BOOK_REPORT_CHECKED)
-                .title("Title")
-                .messageTemplate("Message")
-                .build();
+                .title("Title").messageTemplate("Message").build();
 
         Notification notification = Notification.builder()
-                .user(user)
-                .type(type)
-                .title("Title")
-                .message("Message")
-                .build();
+                .user(user).type(type).title("Title").message("Message").build();
         ReflectionTestUtils.setField(notification, "id", notificationId);
 
         given(notificationRepository.findById(notificationId)).willReturn(Optional.of(notification));
@@ -338,16 +327,10 @@ class NotificationServiceTest {
 
         NotificationType type = NotificationType.builder()
                 .code(NotificationTypeCode.BOOK_REPORT_CHECKED)
-                .title("Title")
-                .messageTemplate("Message")
-                .build();
+                .title("Title").messageTemplate("Message").build();
 
         Notification notification = Notification.builder()
-                .user(owner)
-                .type(type)
-                .title("Title")
-                .message("Message")
-                .build();
+                .user(owner).type(type).title("Title").message("Message").build();
         ReflectionTestUtils.setField(notification, "id", notificationId);
 
         given(notificationRepository.findById(notificationId)).willReturn(Optional.of(notification));
@@ -382,9 +365,7 @@ class NotificationServiceTest {
 
         NotificationType type = NotificationType.builder()
                 .code(NotificationTypeCode.BOOK_REPORT_CHECKED)
-                .title("Title")
-                .messageTemplate("Message")
-                .build();
+                .title("Title").messageTemplate("Message").build();
 
         Notification notification1 = Notification.builder()
                 .user(user).type(type).title("Title").message("Message").build();

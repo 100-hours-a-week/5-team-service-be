@@ -2,14 +2,12 @@ package com.example.doktoribackend.dev;
 
 import com.example.doktoribackend.auth.dto.OAuthProvider;
 import com.example.doktoribackend.notification.domain.NotificationTypeCode;
-import com.example.doktoribackend.notification.dto.NotificationDeliveryTask;
 import com.example.doktoribackend.notification.service.NotificationService;
 import com.example.doktoribackend.security.jwt.JwtTokenProvider;
 import com.example.doktoribackend.user.domain.UserAccount;
 import com.example.doktoribackend.user.repository.UserAccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Profile;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,7 +17,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
 
 @Profile("dev")
 @RestController
@@ -30,7 +27,6 @@ public class DevController {
     private final UserAccountRepository userAccountRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final NotificationService notificationService;
-    private final BlockingQueue<NotificationDeliveryTask> notificationDeliveryQueue;
 
     @GetMapping("/tokens")
     public ResponseEntity<List<DevTokenResponse>> getTokens() {
@@ -51,9 +47,6 @@ public class DevController {
 
     @PostMapping("/trigger-notification/{userId}")
     public ResponseEntity<Void> triggerNotification(@PathVariable Long userId) {
-        if (notificationDeliveryQueue.remainingCapacity() == 0) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
-        }
         notificationService.createAndSend(
                 userId,
                 NotificationTypeCode.BOOK_REPORT_CHECKED,

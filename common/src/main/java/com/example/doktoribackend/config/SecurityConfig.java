@@ -48,6 +48,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_AUTH).permitAll()
                         .requestMatchers(PUBLIC_DOCS).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/chat-rooms").permitAll()
                         .requestMatchers(HttpMethod.GET, "/meetings").permitAll()
                         .requestMatchers(HttpMethod.GET, "/meetings/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/meetings/search").permitAll()

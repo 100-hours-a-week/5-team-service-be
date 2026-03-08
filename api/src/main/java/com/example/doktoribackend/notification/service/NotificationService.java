@@ -25,7 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
 
 @Slf4j
 @Service
@@ -36,7 +35,7 @@ public class NotificationService {
     private final NotificationTypeRepository notificationTypeRepository;
     private final UserRepository userRepository;
     private final TemplateRenderer templateRenderer;
-    private final BlockingQueue<NotificationDeliveryTask> notificationDeliveryQueue;
+    private final NotificationEnqueuePort notificationEnqueuePort;
 
     private static final int RECENT_DAYS = 3;
 
@@ -74,7 +73,7 @@ public class NotificationService {
                 notification.getLinkPath(),
                 notification.getCreatedAt()
         );
-        enqueue(new NotificationDeliveryTask(List.of(userId), title, message, linkPath, sseEvent));
+        notificationEnqueuePort.enqueue(new NotificationDeliveryTask(List.of(userId), title, message, linkPath, sseEvent));
 
         return notification;
     }
@@ -118,13 +117,7 @@ public class NotificationService {
                 linkPath,
                 LocalDateTime.now()
         );
-        enqueue(new NotificationDeliveryTask(userIds, title, message, linkPath, sseEvent));
-    }
-
-    private void enqueue(NotificationDeliveryTask task) {
-        if (!notificationDeliveryQueue.offer(task)) {
-            log.warn("Notification delivery queue is full, task dropped for userIds: {}", task.userIds());
-        }
+        notificationEnqueuePort.enqueue(new NotificationDeliveryTask(userIds, title, message, linkPath, sseEvent));
     }
 
     @Transactional(readOnly = true)
