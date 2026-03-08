@@ -16,9 +16,9 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     hikari:
-      maximum-pool-size: 40
-      minimum-idle: 10
-      connection-timeout: 3000
+      maximum-pool-size: 60
+      minimum-idle: 15
+      connection-timeout: 5000
       idle-timeout: 600000
       max-lifetime: 1800000
       pool-name: DoktoriHikariPool
@@ -28,6 +28,12 @@ spring:
       hibernate:
         format_sql: false
 
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+      password: ${SPRING_REDIS_PASSWORD:}
+
   rabbitmq:
     host: ${SPRING_RABBITMQ_HOST:localhost}
     port: ${SPRING_RABBITMQ_PORT:5672}
@@ -35,6 +41,10 @@ spring:
     password: ${SPRING_RABBITMQ_PASSWORD:guest}
     publisher-confirm-type: correlated
     publisher-returns: true
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
 
 server:
   servlet:

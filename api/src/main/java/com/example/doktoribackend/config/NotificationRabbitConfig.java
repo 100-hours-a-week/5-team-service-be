@@ -24,6 +24,7 @@ public class NotificationRabbitConfig {
     @Bean
     public Queue notificationQueue() {
         return QueueBuilder.durable(QUEUE)
+                .ttl(600_000)
                 .deadLetterExchange("")
                 .deadLetterRoutingKey(DLQ)
                 .build();

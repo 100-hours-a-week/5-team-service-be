@@ -6,6 +6,7 @@ import com.example.doktoribackend.notification.domain.NotificationTypeCode;
 import com.example.doktoribackend.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ public class BookReportSchedulerService {
     private final NotificationService notificationService;
 
     @Scheduled(cron = "0 */5 * * * *")
+    @SchedulerLock(name = "failStalePendingReports", lockAtMostFor = "4m")
     @Transactional
     public void failStalePendingReports() {
         LocalDateTime threshold = LocalDateTime.now().minusMinutes(PENDING_TIMEOUT_MINUTES);
