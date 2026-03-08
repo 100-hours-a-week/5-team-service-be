@@ -2,35 +2,41 @@ package com.example.doktoribackend.notification.service;
 
 import com.example.doktoribackend.notification.domain.NotificationTypeCode;
 import com.example.doktoribackend.notification.dto.SseNotificationEvent;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.then;
 
+@ExtendWith(MockitoExtension.class)
 class SseEmitterServiceTest {
+
+    @Mock
+    StringRedisTemplate stringRedisTemplate;
 
     SseEmitterService sseEmitterService;
 
     @BeforeEach
     void setUp() {
-        sseEmitterService = new SseEmitterService();
+        sseEmitterService = new SseEmitterService(stringRedisTemplate, new ObjectMapper());
     }
 
     @Test
     @DisplayName("subscribe: SSE 연결을 생성하고 반환한다")
     void subscribe_createsEmitter() {
-        // given
-        Long userId = 1L;
+        SseEmitter emitter = sseEmitterService.subscribe(1L);
 
-        // when
-        SseEmitter emitter = sseEmitterService.subscribe(userId);
-
-        // then
         assertThat(emitter).isNotNull();
         assertThat(emitter.getTimeout()).isEqualTo(30 * 60 * 1000L);
     }
@@ -38,77 +44,45 @@ class SseEmitterServiceTest {
     @Test
     @DisplayName("subscribe: 기존 연결이 있으면 완료하고 새 연결을 생성한다")
     void subscribe_existingConnection_replacesIt() {
-        // given
-        Long userId = 1L;
-        SseEmitter firstEmitter = sseEmitterService.subscribe(userId);
+        SseEmitter firstEmitter = sseEmitterService.subscribe(1L);
+        SseEmitter secondEmitter = sseEmitterService.subscribe(1L);
 
-        // when
-        SseEmitter secondEmitter = sseEmitterService.subscribe(userId);
-
-        // then
         assertThat(secondEmitter).isNotNull();
         assertThat(secondEmitter).isNotSameAs(firstEmitter);
     }
 
     @Test
-    @DisplayName("sendToUser: 연결된 사용자에게 이벤트를 전송한다")
-    void sendToUser_connectedUser_sendsEvent() {
-        // given
-        Long userId = 1L;
-        sseEmitterService.subscribe(userId);
-
-        SseNotificationEvent event = new SseNotificationEvent(
-                100L,
-                NotificationTypeCode.BOOK_REPORT_CHECKED,
-                "제목",
-                "메시지",
-                "/link",
-                LocalDateTime.now()
-        );
-
-        // when - 예외 없이 실행되어야 함
-        sseEmitterService.sendToUser(userId, event);
-
-        // then - 예외가 발생하지 않으면 성공
-    }
-
-    @Test
-    @DisplayName("sendToUser: 연결되지 않은 사용자에게는 아무것도 하지 않는다")
-    void sendToUser_notConnected_doesNothing() {
-        // given
-        Long userId = 999L;
-        SseNotificationEvent event = new SseNotificationEvent(
-                100L,
-                NotificationTypeCode.BOOK_REPORT_CHECKED,
-                "제목",
-                "메시지",
-                "/link",
-                LocalDateTime.now()
-        );
-
-        // when - 예외 없이 실행되어야 함
-        sseEmitterService.sendToUser(userId, event);
-
-        // then - 예외가 발생하지 않으면 성공
-    }
-
-    @Test
-    @DisplayName("sendToUsers: 여러 사용자에게 이벤트를 전송한다")
-    void sendToUsers_multipleUsers_sendsToAll() {
-        // given
+    @DisplayName("deliverToLocal: 연결된 사용자에게 이벤트를 전송한다")
+    void deliverToLocal_connectedUser_sendsEvent() {
         sseEmitterService.subscribe(1L);
-        sseEmitterService.subscribe(2L);
 
-        SseNotificationEvent event = new SseNotificationEvent(
+        // when - 예외 없이 실행되어야 함
+        sseEmitterService.deliverToLocal(1L, createEvent());
+    }
+
+    @Test
+    @DisplayName("deliverToLocal: 연결되지 않은 사용자에게는 아무것도 하지 않는다")
+    void deliverToLocal_notConnected_doesNothing() {
+        // when - 예외 없이 실행되어야 함
+        sseEmitterService.deliverToLocal(999L, createEvent());
+    }
+
+    @Test
+    @DisplayName("sendToUsers: Redis 채널로 이벤트를 발행한다")
+    void sendToUsers_publishesToRedis() {
+        sseEmitterService.sendToUsers(List.of(1L, 2L), createEvent());
+
+        then(stringRedisTemplate).should().convertAndSend(anyString(), anyString());
+    }
+
+    private SseNotificationEvent createEvent() {
+        return new SseNotificationEvent(
                 100L,
-                NotificationTypeCode.ROUND_START_10M_BEFORE,
+                NotificationTypeCode.BOOK_REPORT_CHECKED,
                 "제목",
                 "메시지",
                 "/link",
                 LocalDateTime.now()
         );
-
-        // when - 예외 없이 실행되어야 함
-        sseEmitterService.sendToUsers(List.of(1L, 2L, 3L), event);
     }
 }
