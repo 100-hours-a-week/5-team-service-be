@@ -125,7 +125,6 @@ public class TokenService {
                 .build();
 
         refreshTokenRedisRepository.save(token);
-        log.debug("RefreshToken 저장 완료: tokenId={}, userId={}, ttl={}초", 
-                tokenId, userId, jwtTokenProvider.getRefreshExpSeconds());
+        log.debug("RefreshToken 저장 완료: userId={}, ttl={}초", userId, jwtTokenProvider.getRefreshExpSeconds());
     }
 }
