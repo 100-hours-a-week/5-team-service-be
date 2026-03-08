@@ -48,12 +48,16 @@ public class NotificationDeliveryConsumer {
 
     private void deliver(NotificationDeliveryTask task) {
         List<Long> userIds = task.userIds();
+        List<Long> fcmTargetIds = sseEmitterService.filterSseDisconnectedUsers(userIds);
 
         try {
             sseEmitterService.sendToUsers(userIds, task.sseEvent());
         } catch (Exception e) {
             log.error("SSE delivery failed for userIds: {}", userIds, e);
         }
-        fcmService.sendToUsers(userIds, task.title(), task.message(), task.linkPath());
+
+        if (!fcmTargetIds.isEmpty()) {
+            fcmService.sendToUsers(fcmTargetIds, task.title(), task.message(), task.linkPath());
+        }
     }
 }
