@@ -55,6 +55,9 @@ dependencies {
     // RabbitMQ
     implementation 'org.springframework.boot:spring-boot-starter-amqp'
 
+    // Redis
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
     // TSID
     implementation 'com.github.f4b6a3:tsid-creator:5.2.6'
 
