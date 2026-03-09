@@ -35,7 +35,7 @@ public class Review extends BaseTimeEntity {
     @Column(name = "round_no", nullable = false)
     private Integer roundNo;
 
-    @Column(name = "book_title", nullable = false, length = 255)
+    @Column(name = "book_title", nullable = false)
     private String bookTitle;
 
     @Column(name = "meeting_rating", nullable = false, precision = 2, scale = 1)
