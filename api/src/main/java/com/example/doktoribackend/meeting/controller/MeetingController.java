@@ -20,6 +20,7 @@ import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateRequest;
 import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateResponse;
 import com.example.doktoribackend.meeting.dto.TopicRecommendationResponse;
 import com.example.doktoribackend.meeting.service.LeaderDelegationService;
+import com.example.doktoribackend.meeting.service.MeetingBookmarkService;
 import com.example.doktoribackend.meeting.service.MeetingService;
 import com.example.doktoribackend.meeting.service.TopicRecommendationService;
 import com.example.doktoribackend.security.CustomUserDetails;
@@ -49,6 +50,7 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
     private final MeetingService meetingService;
     private final TopicRecommendationService topicRecommendationService;
     private final LeaderDelegationService leaderDelegationService;
+    private final MeetingBookmarkService meetingBookmarkService;
 
     @Operation(summary = "모임 생성", description = "로그인 사용자가 모임을 생성합니다.")
     @ApiResponses({
@@ -652,7 +654,7 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        // TODO: Service 로직 구현 예정
+        meetingBookmarkService.addBookmark(userDetails.getId(), meetingId);
         return ResponseEntity.noContent().build();
     }
 
@@ -670,7 +672,7 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        // TODO: Service 로직 구현 예정
+        meetingBookmarkService.removeBookmark(userDetails.getId(), meetingId);
         return ResponseEntity.noContent().build();
     }
 }
