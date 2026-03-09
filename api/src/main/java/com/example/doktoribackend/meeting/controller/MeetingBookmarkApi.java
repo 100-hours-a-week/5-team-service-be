@@ -11,7 +11,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 
-@Tag(name = "Meeting Bookmark", description = "관심 모임 API")
 public interface MeetingBookmarkApi {
 
     @CommonErrorResponses
