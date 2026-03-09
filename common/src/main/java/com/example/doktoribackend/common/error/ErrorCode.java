@@ -80,6 +80,7 @@ public enum ErrorCode {
     KICK_NOT_ALLOWED(HttpStatus.CONFLICT, "KICK_NOT_ALLOWED", "강퇴할 수 없는 상태입니다."),
     READING_GENRE_NOT_FOUND(HttpStatus.NOT_FOUND, "READING_GENRE_NOT_FOUND", "존재하지 않는 독서 장르입니다."),
     CAPACITY_LESS_THAN_CURRENT(HttpStatus.CONFLICT, "CAPACITY_LESS_THAN_CURRENT", "정원은 현재 인원보다 작을 수 없습니다."),
+    BOOKMARK_ALREADY_EXISTS(HttpStatus.CONFLICT, "BOOKMARK_ALREADY_EXISTS", "이미 관심 모임으로 등록되어 있습니다."),
 
     // LeaderDelegation
     LEADER_DELEGATION_FORBIDDEN(HttpStatus.FORBIDDEN, "LEADER_DELEGATION_FORBIDDEN", "모임장 위임 권한이 없습니다."),
