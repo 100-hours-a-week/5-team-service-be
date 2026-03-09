@@ -5,7 +5,6 @@ import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.meeting.domain.Meeting;
 import com.example.doktoribackend.meeting.domain.MeetingBookmark;
 import com.example.doktoribackend.meeting.domain.MeetingStatus;
-import com.example.doktoribackend.meeting.domain.id.MeetingBookmarkId;
 import com.example.doktoribackend.meeting.repository.MeetingBookmarkRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRepository;
 import com.example.doktoribackend.user.domain.User;
@@ -32,8 +31,7 @@ public class MeetingBookmarkService {
         Meeting meeting = findBookmarkableMeeting(meetingId);
 
         // 3. 중복 북마크 확인
-        MeetingBookmarkId bookmarkId = new MeetingBookmarkId(userId, meetingId);
-        if (meetingBookmarkRepository.existsById(bookmarkId)) {
+        if (meetingBookmarkRepository.existsByUserIdAndMeetingId(userId, meetingId)) {
             throw new BusinessException(ErrorCode.BOOKMARK_ALREADY_EXISTS);
         }
 
@@ -48,8 +46,7 @@ public class MeetingBookmarkService {
         findBookmarkableMeeting(meetingId);
 
         // 2. 북마크 삭제 (멱등: 없어도 정상 처리)
-        MeetingBookmarkId bookmarkId = new MeetingBookmarkId(userId, meetingId);
-        meetingBookmarkRepository.deleteById(bookmarkId);
+        meetingBookmarkRepository.deleteByUserIdAndMeetingId(userId, meetingId);
     }
 
     /**
