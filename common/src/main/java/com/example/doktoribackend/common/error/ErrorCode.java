@@ -143,7 +143,16 @@ public enum ErrorCode {
     VOTE_NOT_FOUND(HttpStatus.NOT_FOUND, "VOTE_NOT_FOUND", "투표를 찾을 수 없습니다."),
     VOTE_NOT_OPEN(HttpStatus.CONFLICT, "VOTE_NOT_OPEN", "아직 투표가 시작되지 않았습니다."),
     VOTE_ALREADY_CLOSED(HttpStatus.CONFLICT, "VOTE_ALREADY_CLOSED", "이미 종료된 투표입니다."),
-    VOTE_ALREADY_CAST(HttpStatus.CONFLICT, "VOTE_ALREADY_CAST", "이미 투표하였습니다.");
+    VOTE_ALREADY_CAST(HttpStatus.CONFLICT, "VOTE_ALREADY_CAST", "이미 투표하였습니다."),
+
+    // Review
+    REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_NOT_FOUND", "리뷰를 찾을 수 없습니다."),
+    REVIEW_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "REVIEW_ALREADY_SUBMITTED", "이미 리뷰를 작성했습니다."),
+    REVIEW_PERIOD_EXPIRED(HttpStatus.CONFLICT, "REVIEW_PERIOD_EXPIRED", "리뷰 작성 기간이 만료되었습니다."),
+    REVIEW_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "REVIEW_DELETE_FORBIDDEN", "리뷰 삭제 권한이 없습니다."),
+    INVALID_RATING_STEP(HttpStatus.BAD_REQUEST, "INVALID_RATING_STEP", "별점은 0.5 단위여야 합니다."),
+    INVALID_BEST_MEMBER(HttpStatus.BAD_REQUEST, "INVALID_BEST_MEMBER", "유효하지 않은 베스트 모임원입니다."),
+    REVIEW_IMAGE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "REVIEW_IMAGE_LIMIT_EXCEEDED", "리뷰 이미지는 최대 5장까지 가능합니다.");
 
 
     private final HttpStatus status;
