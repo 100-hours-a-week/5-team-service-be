@@ -8,7 +8,8 @@ import lombok.RequiredArgsConstructor;
 public enum UploadDirectory {
     PROFILE("images/profiles"),
     MEETING("images/meetings"),
-    CHAT("images/chats");
+    CHAT("images/chats"),
+    REVIEW("images/reviews");
 
     private final String path;
 }
