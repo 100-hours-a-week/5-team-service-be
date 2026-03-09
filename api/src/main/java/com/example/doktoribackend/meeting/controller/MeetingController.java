@@ -44,7 +44,7 @@ import java.net.URI;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/meetings")
-public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi, LeaderDelegationApi, CancelParticipationApi, LeaveMeetingApi, MeetingMembersApi, KickMemberApi, PendingMembersApi {
+public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi, LeaderDelegationApi, CancelParticipationApi, LeaveMeetingApi, MeetingMembersApi, KickMemberApi, PendingMembersApi, MeetingBookmarkApi {
 
     private final MeetingService meetingService;
     private final TopicRecommendationService topicRecommendationService;
@@ -636,5 +636,41 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
         PendingMembersResponse response = meetingService.getPendingMembers(
                 userDetails.getId(), meetingId, cursorId, size);
         return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Override
+    @PostMapping("/{meetingId}/bookmarks")
+    public ResponseEntity<Void> addBookmark(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        // TODO: Service 로직 구현 예정
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    @DeleteMapping("/{meetingId}/bookmarks")
+    public ResponseEntity<Void> removeBookmark(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        // TODO: Service 로직 구현 예정
+        return ResponseEntity.noContent().build();
     }
 }
