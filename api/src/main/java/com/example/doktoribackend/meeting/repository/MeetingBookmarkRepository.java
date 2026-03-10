@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface MeetingBookmarkRepository extends JpaRepository<MeetingBookmark, Long> {
 
@@ -29,4 +30,7 @@ public interface MeetingBookmarkRepository extends JpaRepository<MeetingBookmark
             @Param("cursorId") Long cursorId,
             Pageable pageable
     );
+
+    @Query("SELECT b.meeting.id FROM MeetingBookmark b WHERE b.user.id = :userId AND b.meeting.id IN :meetingIds")
+    Set<Long> findBookmarkedMeetingIds(@Param("userId") Long userId, @Param("meetingIds") List<Long> meetingIds);
 }

@@ -37,6 +37,7 @@ import com.example.doktoribackend.meeting.repository.*;
 import com.example.doktoribackend.reading.domain.ReadingGenre;
 import com.example.doktoribackend.reading.repository.ReadingGenreRepository;
 import com.example.doktoribackend.common.s3.ImageUrlResolver;
+import com.example.doktoribackend.meeting.repository.MeetingBookmarkRepository;
 import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -67,6 +69,7 @@ public class MeetingService {
     private final UserRepository userRepository;
     private final ReadingGenreRepository readingGenreRepository;
     private final BookReportRepository bookReportRepository;
+    private final MeetingBookmarkRepository meetingBookmarkRepository;
     private final ImageUrlResolver imageUrlResolver;
 
     @Transactional
@@ -128,14 +131,18 @@ public class MeetingService {
     }
 
     @Transactional(readOnly = true)
-    public MeetingListResponse getMeetings(MeetingListRequest request) {
+    public MeetingListResponse getMeetings(MeetingListRequest request, Long userId) {
         int size = request.getSizeOrDefault();
         List<MeetingListRow> results = meetingRepository.findMeetingList(request, size + 1);
 
         boolean hasNext = results.size() > size;
         List<MeetingListRow> sliced = hasNext ? results.subList(0, size) : results;
+
+        // 북마크 정보 조회
+        Set<Long> bookmarkedIds = getBookmarkedMeetingIds(userId, sliced);
+
         List<MeetingListItem> mapped = sliced.stream()
-                .map(this::toListItem)
+                .map(row -> toListItem(row, userId == null ? null : bookmarkedIds.contains(row.getMeetingId())))
                 .toList();
 
         Long nextCursorId = hasNext ? mapped.getLast().getMeetingId() : null;
@@ -231,14 +238,18 @@ public class MeetingService {
     }
 
     @Transactional(readOnly = true)
-    public MeetingListResponse searchMeetings(MeetingSearchRequest request) {
+    public MeetingListResponse searchMeetings(MeetingSearchRequest request, Long userId) {
         int size = request.getSizeOrDefault();
         List<MeetingListRow> results = meetingRepository.searchMeetings(request, size + 1);
 
         boolean hasNext = results.size() > size;
         List<MeetingListRow> sliced = hasNext ? results.subList(0, size) : results;
+
+        // 북마크 정보 조회
+        Set<Long> bookmarkedIds = getBookmarkedMeetingIds(userId, sliced);
+
         List<MeetingListItem> mapped = sliced.stream()
-                .map(this::toListItem)
+                .map(row -> toListItem(row, userId == null ? null : bookmarkedIds.contains(row.getMeetingId())))
                 .toList();
 
         Long nextCursorId = hasNext ? mapped.getLast().getMeetingId() : null;
@@ -299,8 +310,11 @@ public class MeetingService {
                         CurrentRoundProjection::getCurrentRoundNo
                 ));
 
+        // 북마크 정보 조회
+        Set<Long> bookmarkedIds = getBookmarkedMeetingIds(userId, sliced);
+
         List<MyMeetingItem> mapped = sliced.stream()
-                .map(row -> toMyMeetingItem(row, now, nextRoundMap, currentRoundMap))
+                .map(row -> toMyMeetingItem(row, now, nextRoundMap, currentRoundMap, bookmarkedIds.contains(row.getMeetingId())))
                 .toList();
 
         Long nextCursorId = hasNext ? mapped.getLast().getMeetingId() : null;
@@ -318,8 +332,11 @@ public class MeetingService {
         LocalDateTime now = LocalDateTime.now();
         updateCompletedMeetingsStatus(results, now);
 
+        // 북마크 정보 조회
+        Set<Long> bookmarkedIds = getBookmarkedMeetingIds(userId, results);
+
         List<MyMeetingItem> mapped = results.stream()
-                .map(row -> toMyMeetingItem(row, now))
+                .map(row -> toMyMeetingItem(row, now, bookmarkedIds.contains(row.getMeetingId())))
                 .toList();
 
         // 페이징 없음
@@ -467,7 +484,7 @@ public class MeetingService {
                 .build();
     }
 
-    private MyMeetingItem toMyMeetingItem(MeetingListRow row, LocalDateTime now) {
+    private MyMeetingItem toMyMeetingItem(MeetingListRow row, LocalDateTime now, Boolean isBookmarked) {
         // Meeting 조회 (roundCount 필요)
         Meeting meeting = meetingRepository.findById(row.getMeetingId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
@@ -491,6 +508,7 @@ public class MeetingService {
                 .leaderNickname(row.getLeaderNickname())
                 .currentRound(currentRound)
                 .meetingDate(meetingDate)
+                .isBookmarked(isBookmarked)
                 .build();
     }
 
@@ -499,7 +517,8 @@ public class MeetingService {
             MeetingListRow row, 
             LocalDateTime now, 
             Map<Long, LocalDateTime> nextRoundMap,
-            Map<Long, Integer> currentRoundMap
+            Map<Long, Integer> currentRoundMap,
+            Boolean isBookmarked
     ) {
         // Meeting 조회 (roundCount 필요 - 모든 회차 종료 시 fallback용)
         Meeting meeting = meetingRepository.findById(row.getMeetingId())
@@ -520,10 +539,11 @@ public class MeetingService {
                 .leaderNickname(row.getLeaderNickname())
                 .currentRound(currentRound)
                 .meetingDate(meetingDate)
+                .isBookmarked(isBookmarked)
                 .build();
     }
 
-    private MeetingListItem toListItem(MeetingListRow row) {
+    private MeetingListItem toListItem(MeetingListRow row, Boolean isBookmarked) {
         Long remainingDays = null;
         if (row.getRecruitmentDeadline() != null) {
             remainingDays = java.time.temporal.ChronoUnit.DAYS.between(
@@ -539,7 +559,8 @@ public class MeetingService {
                 row.getLeaderNickname(),
                 row.getCapacity(),
                 row.getCurrentMemberCount(),
-                remainingDays
+                remainingDays,
+                isBookmarked
         );
     }
 
@@ -936,5 +957,19 @@ public class MeetingService {
             return null;
         }
         return time.atZone(java.time.ZoneId.of("Asia/Seoul")).toOffsetDateTime();
+    }
+
+    /**
+     * 주어진 모임 목록에서 사용자가 북마크한 모임 ID 조회
+     * 비로그인(userId == null)이면 빈 Set 반환
+     */
+    private Set<Long> getBookmarkedMeetingIds(Long userId, List<MeetingListRow> rows) {
+        if (userId == null || rows.isEmpty()) {
+            return Set.of();
+        }
+        List<Long> meetingIds = rows.stream()
+                .map(MeetingListRow::getMeetingId)
+                .toList();
+        return meetingBookmarkRepository.findBookmarkedMeetingIds(userId, meetingIds);
     }
 }

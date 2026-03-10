@@ -18,4 +18,6 @@ public class MyMeetingItem {
 
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate meetingDate;  // 다음 회차 날짜
+    
+    private Boolean isBookmarked;
 }

@@ -153,9 +153,11 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
     })
     @GetMapping
     public ResponseEntity<ApiResult<MeetingListResponse>> getMeetings(
-            @Valid @ModelAttribute MeetingListRequest request
+            @Valid @ModelAttribute MeetingListRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        MeetingListResponse response = meetingService.getMeetings(request);
+        Long userId = (userDetails != null) ? userDetails.getId() : null;
+        MeetingListResponse response = meetingService.getMeetings(request, userId);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
@@ -364,9 +366,11 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
     })
     @GetMapping("/search")
     public ResponseEntity<ApiResult<MeetingListResponse>> searchMeetings(
-            @Valid @ParameterObject MeetingSearchRequest request
+            @Valid @ParameterObject MeetingSearchRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        MeetingListResponse response = meetingService.searchMeetings(request);
+        Long userId = (userDetails != null) ? userDetails.getId() : null;
+        MeetingListResponse response = meetingService.searchMeetings(request, userId);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
