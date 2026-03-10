@@ -22,13 +22,6 @@ import com.example.doktoribackend.user.service.OnboardingService;
 import com.example.doktoribackend.user.service.UserService;
 import com.example.doktoribackend.meeting.dto.BookmarkedMeetingListResponse;
 import com.example.doktoribackend.meeting.service.MeetingBookmarkService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -37,11 +30,10 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 
-@Tag(name = "User", description = "사용자 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/users")
-public class UserController implements UserWithdrawalApi, MyMeetingDetailApi, BookmarkedMeetingsApi {
+public class UserController implements UserApi, UserWithdrawalApi, MyMeetingDetailApi, BookmarkedMeetingsApi {
 
     private final OnboardingService onboardingService;
     private final UserService userService;
@@ -50,7 +42,7 @@ public class UserController implements UserWithdrawalApi, MyMeetingDetailApi, Bo
     private final CookieUtil cookieUtil;
     private final MeetingBookmarkService meetingBookmarkService;
 
-    @Operation(summary = "내 정보 조회", description = "로그인 사용자의 프로필 정보를 조회합니다.")
+    @Override
     @GetMapping("/me")
     public ResponseEntity<ApiResult<UserProfileResponse>> getMyProfile(
             @AuthenticationPrincipal CustomUserDetails userDetails
@@ -59,7 +51,7 @@ public class UserController implements UserWithdrawalApi, MyMeetingDetailApi, Bo
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
-    @Operation(summary = "내 정보 수정", description = "로그인 사용자의 프로필 정보를 수정합니다.")
+    @Override
     @PutMapping("/me")
     public ResponseEntity<ApiResult<UserProfileResponse>> updateMyProfile(
             @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -69,7 +61,7 @@ public class UserController implements UserWithdrawalApi, MyMeetingDetailApi, Bo
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
-    @Operation(summary = "프로필 필수 정보 등록", description = "성별과 출생연도 정보를 등록합니다.")
+    @Override
     @PutMapping("/me/profile")
     public ResponseEntity<ApiResult<UserProfileResponse>> updateProfileRequiredInfo(
             @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -79,7 +71,7 @@ public class UserController implements UserWithdrawalApi, MyMeetingDetailApi, Bo
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
-    @Operation(summary = "알림 수신 여부 변경", description = "알림 수신 동의를 설정합니다.")
+    @Override
     @PutMapping("/me/notifications")
     public ResponseEntity<ApiResult<Void>> updateNotificationAgreement(
             @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -89,7 +81,7 @@ public class UserController implements UserWithdrawalApi, MyMeetingDetailApi, Bo
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "알림 수신 여부 조회", description = "알림 수신 동의 상태를 조회합니다.")
+    @Override
     @GetMapping("/me/notifications")
     public ResponseEntity<ApiResult<NotificationAgreementResponse>> getNotificationAgreement(
             @AuthenticationPrincipal CustomUserDetails userDetails
@@ -98,7 +90,7 @@ public class UserController implements UserWithdrawalApi, MyMeetingDetailApi, Bo
         return ResponseEntity.ok(ApiResult.ok(new NotificationAgreementResponse(agreed)));
     }
 
-    @Operation(summary = "온보딩", description = "소셜 로그인 이후 사용자의 온보딩 정보를 저장합니다.")
+    @Override
     @PutMapping("/me/onboarding")
     public ResponseEntity<ApiResult<UserProfileResponse>> onboard(
             @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -108,7 +100,7 @@ public class UserController implements UserWithdrawalApi, MyMeetingDetailApi, Bo
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
-    @Operation(summary = "나의 리뷰 목록 조회", description = "내가 작성한 리뷰 목록을 조회합니다.")
+    @Override
     @GetMapping("/me/reviews")
     public ResponseEntity<ApiResult<MyReviewListResponse>> getMyReviews(
             @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -123,7 +115,7 @@ public class UserController implements UserWithdrawalApi, MyMeetingDetailApi, Bo
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
-    @Operation(summary = "나의 리뷰 상세 조회", description = "내가 작성한 리뷰의 상세 정보를 조회합니다.")
+    @Override
     @GetMapping("/me/reviews/{reviewId}")
     public ResponseEntity<ApiResult<MyReviewDetailResponse>> getMyReviewDetail(
             @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -133,61 +125,7 @@ public class UserController implements UserWithdrawalApi, MyMeetingDetailApi, Bo
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
-    @Operation(summary = "나의 모임 리스트 조회", description = "로그인 사용자가 참여 중인 모임 목록을 조회합니다. status는 필수이며 ACTIVE(진행 중) 또는 INACTIVE(종료) 또는 PENDING(승인 대기)을 전달해야 합니다.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK",
-                    content = @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = ApiResult.class),
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "code": "OK",
-                                      "message": "요청이 성공적으로 처리되었습니다.",
-                                      "data": {
-                                        "items": [
-                                          {
-                                            "meetingId": 1,
-                                            "meetingImagePath": "https://image.kr/meeting/1.jpg",
-                                            "title": "함께 읽는 에세이 모임",
-                                            "readingGenreId": 1,
-                                            "leaderNickname": "startup",
-                                            "currentRound": 2,
-                                            "meetingDate": "2026-01-12"
-                                          },
-                                          {
-                                            "meetingId": 2,
-                                            "meetingImagePath": "https://image.kr/meeting/2.jpg",
-                                            "title": "경제/경영 스터디",
-                                            "readingGenreId": 2,
-                                            "leaderNickname": "ella",
-                                            "currentRound": 5,
-                                            "meetingDate": "2026-01-15"
-                                          }
-                                        ],
-                                        "pageInfo": {
-                                          "nextCursorId": 2,
-                                          "hasNext": true,
-                                          "size": 10
-                                        }
-                                      }
-                                    }
-                                    """))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(mediaType = "application/json",
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "code": "AUTH_UNAUTHORIZED",
-                                      "message": "인증이 필요합니다."
-                                    }
-                                    """))),
-            @ApiResponse(responseCode = "400", description = "Bad Request",
-                    content = @Content(mediaType = "application/json",
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "code": "INVALID_STATUS_PARAMETER",
-                                      "message": "status는 ACTIVE 또는 INACTIVE여야 합니다."
-                                    }
-                                    """)))
-    })
+    @Override
     @GetMapping("/me/meetings")
     public ResponseEntity<ApiResult<MyMeetingListResponse>> getMyMeetings(
             @AuthenticationPrincipal CustomUserDetails userDetails,
@@ -217,44 +155,7 @@ public class UserController implements UserWithdrawalApi, MyMeetingDetailApi, Bo
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
-    @Operation(summary = "나의 오늘 모임 조회", description = "로그인 사용자의 오늘 진행되는 모임 목록을 조회합니다.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK",
-                    content = @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = ApiResult.class),
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "code": "OK",
-                                      "message": "요청이 성공적으로 처리되었습니다.",
-                                      "data": {
-                                        "items": [
-                                          {
-                                            "meetingId": 1,
-                                            "meetingImagePath": "https://image.kr/meeting/1.jpg",
-                                            "title": "함께 읽는 에세이 모임",
-                                            "readingGenreId": 1,
-                                            "leaderNickname": "startup",
-                                            "currentRound": 2,
-                                            "meetingDate": "2026-01-27"
-                                          }
-                                        ],
-                                        "pageInfo": {
-                                          "nextCursorId": null,
-                                          "hasNext": false,
-                                          "size": 10
-                                        }
-                                      }
-                                    }
-                                    """))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(mediaType = "application/json",
-                            examples = @ExampleObject(value = """
-                                    {
-                                      "code": "AUTH_UNAUTHORIZED",
-                                      "message": "인증이 필요합니다."
-                                    }
-                                    """)))
-    })
+    @Override
     @GetMapping("/me/meetings/today")
     public ResponseEntity<ApiResult<MyMeetingListResponse>> getMyTodayMeetings(
             @AuthenticationPrincipal CustomUserDetails userDetails
