@@ -111,4 +111,24 @@ public class MeetingBookmarkService {
 
         return meeting;
     }
+
+    @Transactional(readOnly = true)
+    public Boolean getBookmarkStatus(Long userId, Long meetingId) {
+        // 1. 모임 존재 여부 확인 (soft delete 체크)
+        boolean meetingExists = meetingRepository.findById(meetingId)
+                .filter(m -> m.getDeletedAt() == null)
+                .isPresent();
+
+        if (!meetingExists) {
+            throw new BusinessException(ErrorCode.MEETING_NOT_FOUND);
+        }
+
+        // 2. 비로그인이면 null 반환
+        if (userId == null) {
+            return null;
+        }
+
+        // 3. 북마크 여부 확인
+        return meetingBookmarkRepository.existsByUserIdAndMeetingId(userId, meetingId);
+    }
 }

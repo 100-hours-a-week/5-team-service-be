@@ -3,22 +3,7 @@ package com.example.doktoribackend.meeting.controller;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.response.ApiResult;
 import com.example.doktoribackend.exception.BusinessException;
-import com.example.doktoribackend.meeting.dto.LeaderDelegationRequest;
-import com.example.doktoribackend.meeting.dto.LeaderDelegationResponse;
-import com.example.doktoribackend.meeting.dto.MeetingCreateRequest;
-import com.example.doktoribackend.meeting.dto.MeetingCreateResponse;
-import com.example.doktoribackend.meeting.dto.MeetingDetailResponse;
-import com.example.doktoribackend.meeting.dto.JoinMeetingResponse;
-import com.example.doktoribackend.meeting.dto.MeetingListRequest;
-import com.example.doktoribackend.meeting.dto.MeetingListResponse;
-import com.example.doktoribackend.meeting.dto.MeetingMembersResponse;
-import com.example.doktoribackend.meeting.dto.OtherMembersResponse;
-import com.example.doktoribackend.meeting.dto.PendingMembersResponse;
-import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
-import com.example.doktoribackend.meeting.dto.MeetingPatchRequest;
-import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateRequest;
-import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateResponse;
-import com.example.doktoribackend.meeting.dto.TopicRecommendationResponse;
+import com.example.doktoribackend.meeting.dto.*;
 import com.example.doktoribackend.meeting.service.LeaderDelegationService;
 import com.example.doktoribackend.meeting.service.MeetingBookmarkService;
 import com.example.doktoribackend.meeting.service.MeetingService;
@@ -679,5 +664,21 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
 
         meetingBookmarkService.removeBookmark(userDetails.getId(), meetingId);
         return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    @GetMapping("/{meetingId}/bookmarks")
+    public ResponseEntity<ApiResult<MeetingBookmarkStatusResponse>> getBookmarkStatus(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId
+    ) {
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        Long userId = (userDetails != null) ? userDetails.getId() : null;
+        Boolean isBookmarked = meetingBookmarkService.getBookmarkStatus(userId, meetingId);
+
+        return ResponseEntity.ok(ApiResult.ok(new MeetingBookmarkStatusResponse(isBookmarked)));
     }
 }
