@@ -89,7 +89,7 @@ class ReviewServiceTest {
             });
 
             // when
-            ReviewCreateResponse response = reviewService.createReview(USER_ID, request);
+            ReviewCreateResponse response = reviewService.createReview(USER_ID, ROUND_ID, request);
 
             // then
             assertThat(response.reviewId()).isEqualTo(1L);
@@ -109,7 +109,7 @@ class ReviewServiceTest {
             });
 
             // when
-            ReviewCreateResponse response = reviewService.createReview(USER_ID, request);
+            ReviewCreateResponse response = reviewService.createReview(USER_ID, ROUND_ID, request);
 
             // then
             assertThat(response.reviewId()).isEqualTo(1L);
@@ -133,7 +133,7 @@ class ReviewServiceTest {
             });
 
             // when
-            ReviewCreateResponse response = reviewService.createReview(USER_ID, request);
+            ReviewCreateResponse response = reviewService.createReview(USER_ID, ROUND_ID, request);
 
             // then
             assertThat(response.reviewId()).isEqualTo(1L);
@@ -148,7 +148,7 @@ class ReviewServiceTest {
                     .willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> reviewService.createReview(USER_ID, request))
+            assertThatThrownBy(() -> reviewService.createReview(USER_ID, ROUND_ID, request))
                     .isInstanceOf(UserNotFoundException.class);
         }
 
@@ -163,14 +163,14 @@ class ReviewServiceTest {
                     .willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> reviewService.createReview(USER_ID, request))
+            assertThatThrownBy(() -> reviewService.createReview(USER_ID, ROUND_ID, request))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.ROUND_NOT_FOUND);
         }
 
         @Test
-        @DisplayName("회차 상태가 DONE이 아니면 REVIEW_PERIOD_EXPIRED 에러를 던진다")
+        @DisplayName("회차 상태가 DONE이 아니면 ROUND_NOT_COMPLETED 에러를 던진다")
         void roundNotDone() {
             // given
             ReviewCreateRequest request = createRequest(null, null);
@@ -182,10 +182,10 @@ class ReviewServiceTest {
                     .willReturn(Optional.of(meetingRound));
 
             // when & then
-            assertThatThrownBy(() -> reviewService.createReview(USER_ID, request))
+            assertThatThrownBy(() -> reviewService.createReview(USER_ID, ROUND_ID, request))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.REVIEW_PERIOD_EXPIRED);
+                    .isEqualTo(ErrorCode.ROUND_NOT_COMPLETED);
         }
 
         @Test
@@ -202,27 +202,7 @@ class ReviewServiceTest {
                     .willReturn(Optional.of(meetingRound));
 
             // when & then
-            assertThatThrownBy(() -> reviewService.createReview(USER_ID, request))
-                    .isInstanceOf(BusinessException.class)
-                    .extracting(e -> ((BusinessException) e).getErrorCode())
-                    .isEqualTo(ErrorCode.REVIEW_PERIOD_EXPIRED);
-        }
-
-        @Test
-        @DisplayName("회차가 아직 끝나지 않았으면 REVIEW_PERIOD_EXPIRED 에러를 던진다")
-        void roundNotEndedYet() {
-            // given
-            ReviewCreateRequest request = createRequest(null, null);
-            given(userRepository.findByIdAndDeletedAtIsNull(USER_ID))
-                    .willReturn(Optional.of(mock(User.class)));
-            MeetingRound meetingRound = mock(MeetingRound.class);
-            given(meetingRound.getStatus()).willReturn(MeetingRoundStatus.DONE);
-            given(meetingRound.getEndAt()).willReturn(LocalDateTime.now().plusHours(1));
-            given(meetingRoundRepository.findById(ROUND_ID))
-                    .willReturn(Optional.of(meetingRound));
-
-            // when & then
-            assertThatThrownBy(() -> reviewService.createReview(USER_ID, request))
+            assertThatThrownBy(() -> reviewService.createReview(USER_ID, ROUND_ID, request))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.REVIEW_PERIOD_EXPIRED);
@@ -239,7 +219,7 @@ class ReviewServiceTest {
                     .willReturn(false);
 
             // when & then
-            assertThatThrownBy(() -> reviewService.createReview(USER_ID, request))
+            assertThatThrownBy(() -> reviewService.createReview(USER_ID, ROUND_ID, request))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.AUTH_FORBIDDEN);
@@ -258,7 +238,7 @@ class ReviewServiceTest {
                     .willReturn(true);
 
             // when & then
-            assertThatThrownBy(() -> reviewService.createReview(USER_ID, request))
+            assertThatThrownBy(() -> reviewService.createReview(USER_ID, ROUND_ID, request))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.REVIEW_ALREADY_SUBMITTED);
@@ -272,7 +252,7 @@ class ReviewServiceTest {
             mockValidContext();
 
             // when & then
-            assertThatThrownBy(() -> reviewService.createReview(USER_ID, request))
+            assertThatThrownBy(() -> reviewService.createReview(USER_ID, ROUND_ID, request))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.INVALID_BEST_MEMBER);
@@ -290,7 +270,7 @@ class ReviewServiceTest {
                     .willReturn(false);
 
             // when & then
-            assertThatThrownBy(() -> reviewService.createReview(USER_ID, request))
+            assertThatThrownBy(() -> reviewService.createReview(USER_ID, ROUND_ID, request))
                     .isInstanceOf(BusinessException.class)
                     .extracting(e -> ((BusinessException) e).getErrorCode())
                     .isEqualTo(ErrorCode.INVALID_BEST_MEMBER);
@@ -407,7 +387,7 @@ class ReviewServiceTest {
             });
 
             // when
-            ReviewCreateResponse response = reviewService.createReview(USER_ID, request);
+            ReviewCreateResponse response = reviewService.createReview(USER_ID, ROUND_ID, request);
 
             // then
             assertThat(response.reviewId()).isEqualTo(2L);
@@ -531,7 +511,6 @@ class ReviewServiceTest {
 
     private ReviewCreateRequest createRequest(Long bestMemberId, List<String> imageKeys) {
         return new ReviewCreateRequest(
-                ROUND_ID,
                 new BigDecimal("4.5"),
                 new BigDecimal("4.0"),
                 "좋은 모임이었습니다",

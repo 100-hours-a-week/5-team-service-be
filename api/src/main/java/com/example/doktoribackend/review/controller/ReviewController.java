@@ -23,12 +23,13 @@ public class ReviewController implements ReviewApi {
     private final ReviewService reviewService;
 
     @Override
-    @PostMapping
+    @PostMapping("/meeting-rounds/{meetingRoundId}")
     public ResponseEntity<ApiResult<ReviewCreateResponse>> createReview(
             @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingRoundId,
             @Valid @RequestBody ReviewCreateRequest request
     ) {
-        ReviewCreateResponse response = reviewService.createReview(userDetails.getId(), request);
+        ReviewCreateResponse response = reviewService.createReview(userDetails.getId(), meetingRoundId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResult.ok(response));
     }
