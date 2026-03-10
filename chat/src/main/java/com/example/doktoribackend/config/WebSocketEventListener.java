@@ -2,7 +2,8 @@ package com.example.doktoribackend.config;
 
 import com.example.doktoribackend.room.service.ChatRoomConnectionService;
 import com.example.doktoribackend.security.CustomUserDetails;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
@@ -18,7 +19,6 @@ import java.util.regex.Pattern;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class WebSocketEventListener {
 
     private static final Pattern CHAT_ROOM_TOPIC_PATTERN =
@@ -26,6 +26,16 @@ public class WebSocketEventListener {
 
     private final WebSocketSessionRegistry sessionRegistry;
     private final ChatRoomConnectionService connectionService;
+
+    public WebSocketEventListener(WebSocketSessionRegistry sessionRegistry,
+                                  ChatRoomConnectionService connectionService,
+                                  MeterRegistry meterRegistry) {
+        this.sessionRegistry = sessionRegistry;
+        this.connectionService = connectionService;
+        Gauge.builder("chat.ws.sessions.active", sessionRegistry, WebSocketSessionRegistry::getActiveSessionCount)
+                .description("Current number of active WebSocket sessions")
+                .register(meterRegistry);
+    }
 
     @EventListener
     public void handleWebSocketConnected(SessionConnectedEvent event) {

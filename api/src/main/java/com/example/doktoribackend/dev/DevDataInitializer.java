@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
-@Profile("dev")
+@Profile({"dev", "staging"})
 @Component
 @RequiredArgsConstructor
 public class DevDataInitializer implements ApplicationRunner {
