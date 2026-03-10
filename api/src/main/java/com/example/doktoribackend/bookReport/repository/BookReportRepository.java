@@ -88,4 +88,11 @@ public interface BookReportRepository extends JpaRepository<BookReport, Long> {
         Long getUserId();
         Long getApprovedCount();
     }
+
+    @Query("SELECT br FROM BookReport br " +
+            "JOIN FETCH br.user " +
+            "WHERE br.meetingRound.id = :meetingRoundId " +
+            "AND br.status = 'APPROVED' " +
+            "AND br.deletedAt IS NULL")
+    List<BookReport> findApprovedByMeetingRoundIdWithUser(@Param("meetingRoundId") Long meetingRoundId);
 }

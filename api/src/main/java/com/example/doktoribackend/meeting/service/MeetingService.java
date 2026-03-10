@@ -778,7 +778,7 @@ public class MeetingService {
     }
 
     @Transactional(readOnly = true)
-    public OtherMembersResponse getOtherMembers(Long userId, Long meetingId) {
+    public OtherMembersResponse getOtherMembers(Long userId, Long meetingId, Long meetingRoundId) {
         meetingRepository.findById(meetingId)
                 .filter(m -> m.getDeletedAt() == null)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
@@ -789,15 +789,15 @@ public class MeetingService {
             throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
         }
 
-        List<MeetingMember> approvedMembers =
-                meetingMemberRepository.findApprovedMembersByMeetingIdOrderByCreatedAt(meetingId);
+        List<BookReport> approvedReports =
+                bookReportRepository.findApprovedByMeetingRoundIdWithUser(meetingRoundId);
 
-        List<OtherMembersResponse.MemberInfo> members = approvedMembers.stream()
-                .filter(mm -> !mm.getUser().getId().equals(userId))
-                .map(mm -> new OtherMembersResponse.MemberInfo(
-                        mm.getUser().getId(),
-                        mm.getUser().getNickname(),
-                        imageUrlResolver.toUrl(mm.getUser().getProfileImagePath())
+        List<OtherMembersResponse.MemberInfo> members = approvedReports.stream()
+                .filter(br -> !br.getUser().getId().equals(userId))
+                .map(br -> new OtherMembersResponse.MemberInfo(
+                        br.getUser().getId(),
+                        br.getUser().getNickname(),
+                        imageUrlResolver.toUrl(br.getUser().getProfileImagePath())
                 ))
                 .toList();
 

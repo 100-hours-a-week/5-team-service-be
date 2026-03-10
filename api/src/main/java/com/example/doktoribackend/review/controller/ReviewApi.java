@@ -82,11 +82,29 @@ public interface ReviewApi {
                                             """
                             ),
                             @ExampleObject(
+                                    name = "회차 미종료",
+                                    value = """
+                                            {
+                                              "code": "ROUND_NOT_COMPLETED",
+                                              "message": "아직 종료되지 않은 회차입니다."
+                                            }
+                                            """
+                            ),
+                            @ExampleObject(
                                     name = "기간 만료",
                                     value = """
                                             {
                                               "code": "REVIEW_PERIOD_EXPIRED",
                                               "message": "리뷰 작성 기간이 만료되었습니다."
+                                            }
+                                            """
+                            ),
+                            @ExampleObject(
+                                    name = "독후감 미작성",
+                                    value = """
+                                            {
+                                              "code": "BOOK_REPORT_NOT_SUBMITTED",
+                                              "message": "독후감을 작성하지 않아 리뷰를 작성할 수 없습니다."
                                             }
                                             """
                             )
@@ -95,6 +113,7 @@ public interface ReviewApi {
     )
     ResponseEntity<ApiResult<ReviewCreateResponse>> createReview(
             @Parameter(hidden = true) CustomUserDetails userDetails,
+            @Parameter(description = "모임 회차 ID", example = "1") Long meetingRoundId,
             ReviewCreateRequest request
     );
 

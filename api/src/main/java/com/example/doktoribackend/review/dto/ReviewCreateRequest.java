@@ -12,10 +12,6 @@ import java.util.List;
 
 @Schema(description = "리뷰 생성 요청")
 public record ReviewCreateRequest(
-        @Schema(description = "모임 회차 ID", example = "1")
-        @NotNull(message = "모임 회차 ID는 필수입니다")
-        Long meetingRoundId,
-
         @Schema(description = "모임 별점 (0.5~5.0, 0.5 단위)", example = "4.5")
         @NotNull(message = "모임 별점은 필수입니다")
         @DecimalMin(value = "0.5", message = "별점은 0.5 이상이어야 합니다")
