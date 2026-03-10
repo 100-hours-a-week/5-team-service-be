@@ -132,7 +132,8 @@ public class MeetingService {
 
     @Transactional(readOnly = true)
     public MeetingListResponse getMeetings(MeetingListRequest request, Long userId) {
-        int size = request.getSizeOrDefault();
+        // 오버플로우 방지를 위한 명시적 범위 제한
+        int size = Math.min(Math.max(request.getSizeOrDefault(), 1), 10);
         List<MeetingListRow> results = meetingRepository.findMeetingList(request, size + 1);
 
         boolean hasNext = results.size() > size;
@@ -239,7 +240,8 @@ public class MeetingService {
 
     @Transactional(readOnly = true)
     public MeetingListResponse searchMeetings(MeetingSearchRequest request, Long userId) {
-        int size = request.getSizeOrDefault();
+        // 오버플로우 방지를 위한 명시적 범위 제한
+        int size = Math.min(Math.max(request.getSizeOrDefault(), 1), 10);
         List<MeetingListRow> results = meetingRepository.searchMeetings(request, size + 1);
 
         boolean hasNext = results.size() > size;
