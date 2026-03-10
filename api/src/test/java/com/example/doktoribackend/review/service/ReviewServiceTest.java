@@ -287,6 +287,123 @@ class ReviewServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("deleteReview")
+    class DeleteReviewTests {
+
+        @Test
+        @DisplayName("정상적으로 리뷰를 삭제한다")
+        void success() {
+            // given
+            Long reviewId = 1L;
+            User reviewer = mock(User.class);
+            given(reviewer.getId()).willReturn(USER_ID);
+
+            Review review = mock(Review.class);
+            given(review.getDeletedAt()).willReturn(null);
+            given(review.getReviewer()).willReturn(reviewer);
+
+            given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+
+            // when
+            reviewService.deleteReview(USER_ID, reviewId);
+
+            // then
+            verify(review).softDelete();
+        }
+
+        @Test
+        @DisplayName("리뷰가 존재하지 않으면 REVIEW_NOT_FOUND 에러를 던진다")
+        void reviewNotFound() {
+            // given
+            Long reviewId = 1L;
+            given(reviewRepository.findById(reviewId)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> reviewService.deleteReview(USER_ID, reviewId))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.REVIEW_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("이미 삭제된 리뷰면 REVIEW_NOT_FOUND 에러를 던진다")
+        void alreadyDeleted() {
+            // given
+            Long reviewId = 1L;
+            Review review = mock(Review.class);
+            given(review.getDeletedAt()).willReturn(LocalDateTime.now());
+
+            given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+
+            // when & then
+            assertThatThrownBy(() -> reviewService.deleteReview(USER_ID, reviewId))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.REVIEW_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("작성자가 아니면 REVIEW_DELETE_FORBIDDEN 에러를 던진다")
+        void notOwner() {
+            // given
+            Long reviewId = 1L;
+            Long otherUserId = 999L;
+            User reviewer = mock(User.class);
+            given(reviewer.getId()).willReturn(otherUserId);
+
+            Review review = mock(Review.class);
+            given(review.getDeletedAt()).willReturn(null);
+            given(review.getReviewer()).willReturn(reviewer);
+
+            given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+
+            // when & then
+            assertThatThrownBy(() -> reviewService.deleteReview(USER_ID, reviewId))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.REVIEW_DELETE_FORBIDDEN);
+        }
+    }
+
+    @Nested
+    @DisplayName("deleteAndRecreateReview")
+    class DeleteAndRecreateReviewTests {
+
+        @Test
+        @DisplayName("삭제 후 동일 회차에 다시 리뷰를 작성할 수 있다")
+        void canRecreateAfterDelete() {
+            // given – 삭제
+            Long reviewId = 1L;
+            User reviewer = mock(User.class);
+            given(reviewer.getId()).willReturn(USER_ID);
+
+            Review review = mock(Review.class);
+            given(review.getDeletedAt()).willReturn(null);
+            given(review.getReviewer()).willReturn(reviewer);
+
+            given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+
+            reviewService.deleteReview(USER_ID, reviewId);
+            verify(review).softDelete();
+
+            // given – 재작성: soft-deleted 리뷰는 중복 검사에 걸리지 않음
+            ReviewCreateRequest request = createRequest(null, null);
+            mockValidContext();
+            given(reviewRepository.save(any(Review.class))).willAnswer(invocation -> {
+                Review saved = invocation.getArgument(0);
+                org.springframework.test.util.ReflectionTestUtils.setField(saved, "id", 2L);
+                return saved;
+            });
+
+            // when
+            ReviewCreateResponse response = reviewService.createReview(USER_ID, request);
+
+            // then
+            assertThat(response.reviewId()).isEqualTo(2L);
+        }
+    }
+
     private ReviewCreateRequest createRequest(Long bestMemberId, List<String> imageKeys) {
         return new ReviewCreateRequest(
                 ROUND_ID,

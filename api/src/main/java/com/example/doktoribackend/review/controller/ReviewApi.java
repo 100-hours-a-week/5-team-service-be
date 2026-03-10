@@ -5,6 +5,7 @@ import com.example.doktoribackend.common.swagger.AuthErrorResponses;
 import com.example.doktoribackend.common.swagger.CommonErrorResponses;
 import com.example.doktoribackend.review.dto.ReviewCreateRequest;
 import com.example.doktoribackend.review.dto.ReviewCreateResponse;
+import com.example.doktoribackend.review.dto.ReviewListResponse;
 import com.example.doktoribackend.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -95,5 +96,102 @@ public interface ReviewApi {
     ResponseEntity<ApiResult<ReviewCreateResponse>> createReview(
             @Parameter(hidden = true) CustomUserDetails userDetails,
             ReviewCreateRequest request
+    );
+
+    @CommonErrorResponses
+    @AuthErrorResponses
+    @Operation(
+            summary = "리뷰 삭제",
+            description = "자신이 작성한 리뷰를 삭제합니다."
+    )
+    @ApiResponse(
+            responseCode = "204",
+            description = "No Content"
+    )
+    @ApiResponse(
+            responseCode = "403",
+            description = "Forbidden",
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {
+                              "code": "REVIEW_DELETE_FORBIDDEN",
+                              "message": "리뷰 삭제 권한이 없습니다."
+                            }
+                            """)
+            )
+    )
+    @ApiResponse(
+            responseCode = "404",
+            description = "Not Found",
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {
+                              "code": "REVIEW_NOT_FOUND",
+                              "message": "리뷰를 찾을 수 없습니다."
+                            }
+                            """)
+            )
+    )
+    ResponseEntity<Void> deleteReview(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
+            Long reviewId
+    );
+
+    @CommonErrorResponses
+    @Operation(
+            summary = "모임장 리뷰 목록 조회",
+            description = "모임 상세 페이지에서 해당 모임장이 만든 모든 모임들의 리뷰를 조회합니다. 비인증 API입니다."
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "OK",
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {
+                              "code": "OK",
+                              "message": "요청이 성공적으로 처리되었습니다.",
+                              "data": {
+                                "items": [
+                                  {
+                                    "reviewId": 10,
+                                    "reviewerProfileImageUrl": "https://image.kr/profiles/1.jpg",
+                                    "meetingTitle": "함께 읽는 에세이 모임",
+                                    "roundNo": 2,
+                                    "bookTitle": "데미안",
+                                    "meetingRating": 4.5,
+                                    "content": "좋은 모임이었습니다.",
+                                    "imageUrls": ["https://image.kr/reviews/1.jpg"]
+                                  }
+                                ],
+                                "pageInfo": {
+                                  "nextCursorId": 9,
+                                  "hasNext": true,
+                                  "size": 10
+                                }
+                              }
+                            }
+                            """)
+            )
+    )
+    @ApiResponse(
+            responseCode = "404",
+            description = "Not Found",
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {
+                              "code": "MEETING_NOT_FOUND",
+                              "message": "존재하지 않는 모임입니다."
+                            }
+                            """)
+            )
+    )
+    ResponseEntity<ApiResult<ReviewListResponse>> getLeaderReviews(
+            Long meetingId,
+            Long cursorId,
+            Integer size
     );
 }
