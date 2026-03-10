@@ -39,20 +39,20 @@ public class ReviewService {
     private final ImageUrlResolver imageUrlResolver;
 
     @Transactional
-    public ReviewCreateResponse createReview(Long userId, ReviewCreateRequest request) {
+    public ReviewCreateResponse createReview(Long userId, Long meetingRoundId, ReviewCreateRequest request) {
         User user = userRepository.findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(UserNotFoundException::new);
 
-        MeetingRound meetingRound = meetingRoundRepository.findById(request.meetingRoundId())
+        MeetingRound meetingRound = meetingRoundRepository.findById(meetingRoundId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ROUND_NOT_FOUND));
 
         if (meetingRound.getStatus() != MeetingRoundStatus.DONE) {
-            throw new BusinessException(ErrorCode.REVIEW_PERIOD_EXPIRED);
+            throw new BusinessException(ErrorCode.ROUND_NOT_COMPLETED);
         }
 
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime endAt = meetingRound.getEndAt();
-        if (!now.isAfter(endAt) || now.isAfter(endAt.plusHours(24))) {
+        if (now.isAfter(endAt.plusHours(24))) {
             throw new BusinessException(ErrorCode.REVIEW_PERIOD_EXPIRED);
         }
 
@@ -65,7 +65,7 @@ public class ReviewService {
         }
 
         boolean alreadySubmitted = reviewRepository.existsByMeetingRoundIdAndReviewerIdAndDeletedAtIsNull(
-                request.meetingRoundId(), userId);
+                meetingRoundId, userId);
         if (alreadySubmitted) {
             throw new BusinessException(ErrorCode.REVIEW_ALREADY_SUBMITTED);
         }
