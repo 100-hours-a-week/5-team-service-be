@@ -149,6 +149,7 @@ public enum ErrorCode {
     // Review
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_NOT_FOUND", "리뷰를 찾을 수 없습니다."),
     REVIEW_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "REVIEW_ALREADY_SUBMITTED", "이미 리뷰를 작성했습니다."),
+    ROUND_NOT_COMPLETED(HttpStatus.CONFLICT, "ROUND_NOT_COMPLETED", "아직 종료되지 않은 회차입니다."),
     REVIEW_PERIOD_EXPIRED(HttpStatus.CONFLICT, "REVIEW_PERIOD_EXPIRED", "리뷰 작성 기간이 만료되었습니다."),
     REVIEW_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "REVIEW_DELETE_FORBIDDEN", "리뷰 삭제 권한이 없습니다."),
     INVALID_RATING_STEP(HttpStatus.BAD_REQUEST, "INVALID_RATING_STEP", "별점은 0.5 단위여야 합니다."),

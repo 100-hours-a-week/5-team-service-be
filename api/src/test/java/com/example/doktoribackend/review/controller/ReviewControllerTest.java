@@ -47,12 +47,11 @@ class ReviewControllerTest {
     @DisplayName("POST /reviews: 리뷰를 생성하고 201을 반환한다")
     void createReview_success() throws Exception {
         // given
-        given(reviewService.createReview(eq(1L), any()))
+        given(reviewService.createReview(eq(1L), eq(100L), any()))
                 .willReturn(new ReviewCreateResponse(1L));
 
         String requestBody = """
                 {
-                    "meetingRoundId": 100,
                     "meetingRating": 4.5,
                     "leaderRating": 4.0,
                     "content": "좋은 모임이었습니다",
@@ -62,7 +61,7 @@ class ReviewControllerTest {
                 """;
 
         // when & then
-        mockMvc.perform(post("/reviews")
+        mockMvc.perform(post("/reviews/meeting-rounds/100")
                         .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails(1L)))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -72,38 +71,17 @@ class ReviewControllerTest {
     }
 
     @Test
-    @DisplayName("POST /reviews: meetingRoundId가 없으면 422를 반환한다")
-    void createReview_missingRoundId() throws Exception {
-        // given
-        String requestBody = """
-                {
-                    "meetingRating": 4.5,
-                    "leaderRating": 4.0
-                }
-                """;
-
-        // when & then
-        mockMvc.perform(post("/reviews")
-                        .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails(1L)))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
-                .andExpect(status().isUnprocessableEntity());
-    }
-
-    @Test
     @DisplayName("POST /reviews: meetingRating이 없으면 422를 반환한다")
     void createReview_missingMeetingRating() throws Exception {
         // given
         String requestBody = """
                 {
-                    "meetingRoundId": 100,
                     "leaderRating": 4.0
                 }
                 """;
 
         // when & then
-        mockMvc.perform(post("/reviews")
+        mockMvc.perform(post("/reviews/meeting-rounds/100")
                         .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails(1L)))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -117,14 +95,13 @@ class ReviewControllerTest {
         // given
         String requestBody = """
                 {
-                    "meetingRoundId": 100,
                     "meetingRating": 4.5,
                     "leaderRating": 4.0
                 }
                 """;
 
         // when & then
-        mockMvc.perform(post("/reviews")
+        mockMvc.perform(post("/reviews/meeting-rounds/100")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
@@ -135,19 +112,18 @@ class ReviewControllerTest {
     @DisplayName("POST /reviews: 이미 리뷰를 작성했으면 409를 반환한다")
     void createReview_alreadySubmitted() throws Exception {
         // given
-        given(reviewService.createReview(eq(1L), any()))
+        given(reviewService.createReview(eq(1L), eq(100L), any()))
                 .willThrow(new BusinessException(ErrorCode.REVIEW_ALREADY_SUBMITTED));
 
         String requestBody = """
                 {
-                    "meetingRoundId": 100,
                     "meetingRating": 4.5,
                     "leaderRating": 4.0
                 }
                 """;
 
         // when & then
-        mockMvc.perform(post("/reviews")
+        mockMvc.perform(post("/reviews/meeting-rounds/100")
                         .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails(1L)))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -159,19 +135,18 @@ class ReviewControllerTest {
     @DisplayName("POST /reviews: 리뷰 기간 만료 시 409를 반환한다")
     void createReview_periodExpired() throws Exception {
         // given
-        given(reviewService.createReview(eq(1L), any()))
+        given(reviewService.createReview(eq(1L), eq(100L), any()))
                 .willThrow(new BusinessException(ErrorCode.REVIEW_PERIOD_EXPIRED));
 
         String requestBody = """
                 {
-                    "meetingRoundId": 100,
                     "meetingRating": 4.5,
                     "leaderRating": 4.0
                 }
                 """;
 
         // when & then
-        mockMvc.perform(post("/reviews")
+        mockMvc.perform(post("/reviews/meeting-rounds/100")
                         .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails(1L)))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

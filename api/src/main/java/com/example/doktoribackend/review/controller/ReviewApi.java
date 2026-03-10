@@ -82,6 +82,15 @@ public interface ReviewApi {
                                             """
                             ),
                             @ExampleObject(
+                                    name = "회차 미종료",
+                                    value = """
+                                            {
+                                              "code": "ROUND_NOT_COMPLETED",
+                                              "message": "아직 종료되지 않은 회차입니다."
+                                            }
+                                            """
+                            ),
+                            @ExampleObject(
                                     name = "기간 만료",
                                     value = """
                                             {
@@ -95,6 +104,7 @@ public interface ReviewApi {
     )
     ResponseEntity<ApiResult<ReviewCreateResponse>> createReview(
             @Parameter(hidden = true) CustomUserDetails userDetails,
+            @Parameter(description = "모임 회차 ID", example = "1") Long meetingRoundId,
             ReviewCreateRequest request
     );
 

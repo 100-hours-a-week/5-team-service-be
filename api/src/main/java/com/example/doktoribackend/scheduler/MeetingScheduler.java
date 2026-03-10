@@ -40,8 +40,8 @@ public class MeetingScheduler {
      * 매 시간 정각에 종료 시간이 지난 회차의 상태를 DONE으로 변경
      * "0 0 * * * *" = 매 시간 00분 00초
      */
-    @Scheduled(cron = "0 0 * * * *")
-    @SchedulerLock(name = "completeExpiredRounds", lockAtMostFor = "55m")
+    @Scheduled(cron = "0 */5 * * * *")
+    @SchedulerLock(name = "completeExpiredRounds", lockAtMostFor = "4m")
     @Transactional
     public void completeExpiredRounds() {
         LocalDateTime now = LocalDateTime.now();
