@@ -1,7 +1,9 @@
 package com.example.doktoribackend.meeting.controller;
 
+import com.example.doktoribackend.common.response.ApiResult;
 import com.example.doktoribackend.common.swagger.AuthErrorResponses;
 import com.example.doktoribackend.common.swagger.CommonErrorResponses;
+import com.example.doktoribackend.meeting.dto.MeetingBookmarkStatusResponse;
 import com.example.doktoribackend.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -56,5 +58,50 @@ public interface MeetingBookmarkApi {
     ResponseEntity<Void> removeBookmark(
             @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(description = "모임 ID", example = "1") Long meetingId
+    );
+
+    @Operation(summary = "관심 모임 여부 조회", description = "로그인 사용자의 해당 모임 북마크 여부를 조회합니다. 비로그인 시 null을 반환합니다.")
+    @ApiResponse(responseCode = "200", description = "OK",
+            content = @Content(mediaType = "application/json",
+                    examples = {
+                            @ExampleObject(name = "로그인 + 북마크됨", value = """
+                                    {
+                                      "code": "OK",
+                                      "message": "요청이 성공적으로 처리되었습니다.",
+                                      "data": {
+                                        "isBookmarked": true
+                                      }
+                                    }
+                                    """),
+                            @ExampleObject(name = "로그인 + 북마크 안됨", value = """
+                                    {
+                                      "code": "OK",
+                                      "message": "요청이 성공적으로 처리되었습니다.",
+                                      "data": {
+                                        "isBookmarked": false
+                                      }
+                                    }
+                                    """),
+                            @ExampleObject(name = "비로그인", value = """
+                                    {
+                                      "code": "OK",
+                                      "message": "요청이 성공적으로 처리되었습니다.",
+                                      "data": {
+                                        "isBookmarked": null
+                                      }
+                                    }
+                                    """)
+                    }))
+    @ApiResponse(responseCode = "404", description = "Meeting not found",
+            content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {
+                              "code": "MEETING_NOT_FOUND",
+                              "message": "존재하지 않는 모임입니다."
+                            }
+                            """)))
+    ResponseEntity<ApiResult<MeetingBookmarkStatusResponse>> getBookmarkStatus(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
+            @Parameter(description = "모임 ID", example = "123") Long meetingId
     );
 }
