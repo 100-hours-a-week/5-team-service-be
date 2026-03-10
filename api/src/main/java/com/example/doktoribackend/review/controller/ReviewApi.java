@@ -54,6 +54,26 @@ public interface ReviewApi {
             )
     )
     @ApiResponse(
+            responseCode = "422",
+            description = "Unprocessable Entity",
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {
+                              "code": "INVALID_INPUT_VALUE",
+                              "message": "요청 값이 유효하지 않습니다.",
+                              "errors": [
+                                { "field": "meetingRating", "reason": "RANGE", "message": "별점은 0.5 이상이어야 합니다" },
+                                { "field": "meetingRating", "reason": "STEP", "message": "별점은 0.5 단위여야 합니다." },
+                                { "field": "leaderRating", "reason": "NOT_NULL", "message": "모임장 별점은 필수입니다" },
+                                { "field": "content", "reason": "LENGTH", "message": "리뷰 내용은 200자 이내여야 합니다" },
+                                { "field": "imageKeys", "reason": "LENGTH", "message": "리뷰 이미지는 최대 5장까지 가능합니다" }
+                              ]
+                            }
+                            """)
+            )
+    )
+    @ApiResponse(
             responseCode = "404",
             description = "Not Found",
             content = @Content(
