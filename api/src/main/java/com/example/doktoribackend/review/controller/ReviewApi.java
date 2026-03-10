@@ -98,6 +98,15 @@ public interface ReviewApi {
                                               "message": "리뷰 작성 기간이 만료되었습니다."
                                             }
                                             """
+                            ),
+                            @ExampleObject(
+                                    name = "독후감 미작성",
+                                    value = """
+                                            {
+                                              "code": "BOOK_REPORT_NOT_SUBMITTED",
+                                              "message": "독후감을 작성하지 않아 리뷰를 작성할 수 없습니다."
+                                            }
+                                            """
                             )
                     }
             )

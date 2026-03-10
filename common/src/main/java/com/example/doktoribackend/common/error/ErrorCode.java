@@ -154,7 +154,8 @@ public enum ErrorCode {
     REVIEW_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "REVIEW_DELETE_FORBIDDEN", "리뷰 삭제 권한이 없습니다."),
     INVALID_RATING_STEP(HttpStatus.BAD_REQUEST, "INVALID_RATING_STEP", "별점은 0.5 단위여야 합니다."),
     INVALID_BEST_MEMBER(HttpStatus.BAD_REQUEST, "INVALID_BEST_MEMBER", "유효하지 않은 베스트 모임원입니다."),
-    REVIEW_IMAGE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "REVIEW_IMAGE_LIMIT_EXCEEDED", "리뷰 이미지는 최대 5장까지 가능합니다.");
+    REVIEW_IMAGE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "REVIEW_IMAGE_LIMIT_EXCEEDED", "리뷰 이미지는 최대 5장까지 가능합니다."),
+    BOOK_REPORT_NOT_SUBMITTED(HttpStatus.CONFLICT, "BOOK_REPORT_NOT_SUBMITTED", "독후감을 작성하지 않아 리뷰를 작성할 수 없습니다.");
 
 
     private final HttpStatus status;

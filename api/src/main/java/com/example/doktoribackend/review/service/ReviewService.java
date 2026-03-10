@@ -1,6 +1,7 @@
 package com.example.doktoribackend.review.service;
 
 import com.example.doktoribackend.bookReport.domain.BookReport;
+import com.example.doktoribackend.bookReport.domain.BookReportStatus;
 import com.example.doktoribackend.bookReport.repository.BookReportRepository;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.s3.ImageUrlResolver;
@@ -64,6 +65,14 @@ public class ReviewService {
                 meetingId, userId, MeetingMemberStatus.APPROVED);
         if (!isMember) {
             throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+        }
+
+        boolean hasBookReport = bookReportRepository
+                .findByUserIdAndMeetingRoundIdAndDeletedAtIsNull(userId, meetingRoundId)
+                .filter(br -> br.getStatus() == BookReportStatus.APPROVED)
+                .isPresent();
+        if (!hasBookReport) {
+            throw new BusinessException(ErrorCode.BOOK_REPORT_NOT_SUBMITTED);
         }
 
         boolean alreadySubmitted = reviewRepository.existsByMeetingRoundIdAndReviewerIdAndDeletedAtIsNull(

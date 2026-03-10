@@ -1,6 +1,7 @@
 package com.example.doktoribackend.review.service;
 
 import com.example.doktoribackend.bookReport.domain.BookReport;
+import com.example.doktoribackend.bookReport.domain.BookReportStatus;
 import com.example.doktoribackend.bookReport.repository.BookReportRepository;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
@@ -237,6 +238,10 @@ class ReviewServiceTest {
             given(meetingMemberRepository.existsByMeetingIdAndUserIdAndStatus(
                     MEETING_ID, USER_ID, MeetingMemberStatus.APPROVED))
                     .willReturn(true);
+            BookReport approvedReport = mock(BookReport.class);
+            given(approvedReport.getStatus()).willReturn(BookReportStatus.APPROVED);
+            given(bookReportRepository.findByUserIdAndMeetingRoundIdAndDeletedAtIsNull(USER_ID, ROUND_ID))
+                    .willReturn(Optional.of(approvedReport));
             given(reviewRepository.existsByMeetingRoundIdAndReviewerIdAndDeletedAtIsNull(ROUND_ID, USER_ID))
                     .willReturn(true);
 
@@ -546,6 +551,10 @@ class ReviewServiceTest {
         given(meetingMemberRepository.existsByMeetingIdAndUserIdAndStatus(
                 MEETING_ID, USER_ID, MeetingMemberStatus.APPROVED))
                 .willReturn(true);
+        BookReport approvedReport = mock(BookReport.class);
+        given(approvedReport.getStatus()).willReturn(BookReportStatus.APPROVED);
+        given(bookReportRepository.findByUserIdAndMeetingRoundIdAndDeletedAtIsNull(USER_ID, ROUND_ID))
+                .willReturn(Optional.of(approvedReport));
         given(reviewRepository.existsByMeetingRoundIdAndReviewerIdAndDeletedAtIsNull(ROUND_ID, USER_ID))
                 .willReturn(false);
     }
