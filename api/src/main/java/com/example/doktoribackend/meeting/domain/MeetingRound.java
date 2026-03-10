@@ -45,6 +45,10 @@ public class MeetingRound extends BaseTimeEntity {
     @Column(name = "end_at", nullable = false)
     private LocalDateTime endAt;
 
+    @Column(name = "best_member_determined", nullable = false)
+    @Builder.Default
+    private Boolean bestMemberDetermined = false;
+
     public static MeetingRound create(
             Meeting meeting,
             Book book,
@@ -72,6 +76,10 @@ public class MeetingRound extends BaseTimeEntity {
 
     public void cancel() {
         this.status = MeetingRoundStatus.CANCELED;
+    }
+
+    public void markBestMemberDetermined() {
+        this.bestMemberDetermined = true;
     }
 
     // 양방향 관계 설정을 위한 메서드
