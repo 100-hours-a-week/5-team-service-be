@@ -1,5 +1,7 @@
 package com.example.doktoribackend.review.service;
 
+import com.example.doktoribackend.bookReport.domain.BookReport;
+import com.example.doktoribackend.bookReport.repository.BookReportRepository;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.exception.UserNotFoundException;
@@ -10,7 +12,6 @@ import com.example.doktoribackend.meeting.domain.MeetingRoundStatus;
 import com.example.doktoribackend.meeting.repository.MeetingMemberRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
 import com.example.doktoribackend.common.s3.ImageUrlResolver;
-import com.example.doktoribackend.meeting.domain.MeetingMember;
 import com.example.doktoribackend.review.domain.Review;
 import com.example.doktoribackend.review.domain.ReviewImage;
 import com.example.doktoribackend.review.dto.MyReviewDetailResponse;
@@ -38,7 +39,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -58,6 +58,9 @@ class ReviewServiceTest {
 
     @Mock
     private MeetingMemberRepository meetingMemberRepository;
+
+    @Mock
+    private BookReportRepository bookReportRepository;
 
     @Mock
     private com.example.doktoribackend.meeting.repository.MeetingRepository meetingRepository;
@@ -407,11 +410,8 @@ class ReviewServiceTest {
             User reviewer = mock(User.class);
             given(reviewer.getId()).willReturn(USER_ID);
 
-            Meeting meeting = mock(Meeting.class);
-            given(meeting.getId()).willReturn(MEETING_ID);
-
             MeetingRound meetingRound = mock(MeetingRound.class);
-            given(meetingRound.getMeeting()).willReturn(meeting);
+            given(meetingRound.getId()).willReturn(ROUND_ID);
 
             ReviewImage image = mock(ReviewImage.class);
             given(image.getImageOrder()).willReturn(1);
@@ -443,17 +443,17 @@ class ReviewServiceTest {
             given(member3.getNickname()).willReturn("member3");
             given(member3.getProfileImagePath()).willReturn(null);
 
-            MeetingMember mm1 = mock(MeetingMember.class);
-            given(mm1.getUser()).willReturn(reviewer);
+            BookReport br1 = mock(BookReport.class);
+            given(br1.getUser()).willReturn(reviewer);
 
-            MeetingMember mm2 = mock(MeetingMember.class);
-            given(mm2.getUser()).willReturn(member2);
+            BookReport br2 = mock(BookReport.class);
+            given(br2.getUser()).willReturn(member2);
 
-            MeetingMember mm3 = mock(MeetingMember.class);
-            given(mm3.getUser()).willReturn(member3);
+            BookReport br3 = mock(BookReport.class);
+            given(br3.getUser()).willReturn(member3);
 
-            given(meetingMemberRepository.findApprovedMembersByMeetingIdOrderByCreatedAt(MEETING_ID))
-                    .willReturn(List.of(mm1, mm2, mm3));
+            given(bookReportRepository.findApprovedByMeetingRoundIdWithUser(ROUND_ID))
+                    .willReturn(List.of(br1, br2, br3));
 
             given(imageUrlResolver.toUrl("reviews/img1.jpg")).willReturn("https://cdn.example.com/reviews/img1.jpg");
             given(imageUrlResolver.toUrl("profiles/2.jpg")).willReturn("https://cdn.example.com/profiles/2.jpg");

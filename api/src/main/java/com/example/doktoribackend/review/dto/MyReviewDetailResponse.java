@@ -1,7 +1,7 @@
 package com.example.doktoribackend.review.dto;
 
+import com.example.doktoribackend.bookReport.domain.BookReport;
 import com.example.doktoribackend.common.s3.ImageUrlResolver;
-import com.example.doktoribackend.meeting.domain.MeetingMember;
 import com.example.doktoribackend.review.domain.Review;
 import com.example.doktoribackend.review.domain.ReviewImage;
 import com.example.doktoribackend.user.domain.User;
@@ -29,7 +29,7 @@ public record MyReviewDetailResponse(
     ) {}
 
     public static MyReviewDetailResponse from(Review review,
-                                               List<MeetingMember> approvedMembers,
+                                               List<BookReport> approvedReports,
                                                Long currentUserId,
                                                ImageUrlResolver imageUrlResolver) {
         List<String> imageUrls = review.getImages().stream()
@@ -37,10 +37,10 @@ public record MyReviewDetailResponse(
                 .map(img -> imageUrlResolver.toUrl(img.getImagePath()))
                 .toList();
 
-        List<MemberInfo> members = approvedMembers.stream()
-                .filter(mm -> !mm.getUser().getId().equals(currentUserId))
-                .map(mm -> {
-                    User user = mm.getUser();
+        List<MemberInfo> members = approvedReports.stream()
+                .filter(br -> !br.getUser().getId().equals(currentUserId))
+                .map(br -> {
+                    User user = br.getUser();
                     return new MemberInfo(
                             user.getId(),
                             user.getNickname(),

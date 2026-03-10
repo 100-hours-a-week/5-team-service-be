@@ -568,21 +568,22 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
-    @Operation(summary = "본인 제외 모임원 조회", description = "해당 모임의 승인된 모임원 목록을 본인 제외하여 조회합니다.")
-    @GetMapping("/{meetingId}/members/others")
+    @Operation(summary = "본인 제외 모임원 조회", description = "해당 회차에 독후감을 작성한 모임원 목록을 본인 제외하여 조회합니다.")
+    @GetMapping("/{meetingId}/rounds/{meetingRoundId}/members/others")
     public ResponseEntity<ApiResult<OtherMembersResponse>> getOtherMembers(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @PathVariable Long meetingId
+            @PathVariable Long meetingId,
+            @PathVariable Long meetingRoundId
     ) {
-        if (userDetails == null) {
-            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
-        }
-
         if (meetingId == null || meetingId <= 0) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        OtherMembersResponse response = meetingService.getOtherMembers(userDetails.getId(), meetingId);
+        if (meetingRoundId == null || meetingRoundId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        OtherMembersResponse response = meetingService.getOtherMembers(userDetails.getId(), meetingId, meetingRoundId);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 

@@ -1,5 +1,7 @@
 package com.example.doktoribackend.review.service;
 
+import com.example.doktoribackend.bookReport.domain.BookReport;
+import com.example.doktoribackend.bookReport.repository.BookReportRepository;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.exception.BusinessException;
@@ -14,7 +16,6 @@ import com.example.doktoribackend.meeting.repository.MeetingRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
 import com.example.doktoribackend.review.domain.Review;
 import com.example.doktoribackend.review.domain.ReviewImage;
-import com.example.doktoribackend.meeting.domain.MeetingMember;
 import com.example.doktoribackend.review.dto.*;
 import com.example.doktoribackend.review.repository.ReviewRepository;
 import com.example.doktoribackend.user.domain.User;
@@ -35,6 +36,7 @@ public class ReviewService {
     private final UserRepository userRepository;
     private final MeetingRoundRepository meetingRoundRepository;
     private final MeetingMemberRepository meetingMemberRepository;
+    private final BookReportRepository bookReportRepository;
     private final MeetingRepository meetingRepository;
     private final ImageUrlResolver imageUrlResolver;
 
@@ -178,10 +180,10 @@ public class ReviewService {
             throw new BusinessException(ErrorCode.REVIEW_NOT_FOUND);
         }
 
-        Long meetingId = review.getMeetingRound().getMeeting().getId();
-        List<MeetingMember> approvedMembers =
-                meetingMemberRepository.findApprovedMembersByMeetingIdOrderByCreatedAt(meetingId);
+        Long meetingRoundId = review.getMeetingRound().getId();
+        List<BookReport> approvedReports =
+                bookReportRepository.findApprovedByMeetingRoundIdWithUser(meetingRoundId);
 
-        return MyReviewDetailResponse.from(review, approvedMembers, userId, imageUrlResolver);
+        return MyReviewDetailResponse.from(review, approvedReports, userId, imageUrlResolver);
     }
 }
