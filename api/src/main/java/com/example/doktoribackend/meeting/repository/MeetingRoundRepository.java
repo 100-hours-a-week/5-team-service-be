@@ -3,9 +3,10 @@ package com.example.doktoribackend.meeting.repository;
 import com.example.doktoribackend.meeting.domain.MeetingRound;
 import com.example.doktoribackend.meeting.domain.MeetingStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -79,19 +80,18 @@ public interface MeetingRoundRepository extends JpaRepository<MeetingRound, Long
             @Param("now") LocalDateTime now
     );
 
-    // 아직 종료되지 않은 회차가 있는 모임 ID 목록 조회
-    @Query("SELECT DISTINCT mr.meeting.id FROM MeetingRound mr " +
-           "WHERE mr.meeting.id IN :meetingIds " +
-           "AND mr.endAt > :now")
-    List<Long> findMeetingIdsWithOngoingRounds(
-            @Param("meetingIds") List<Long> meetingIds,
-            @Param("now") LocalDateTime now);
 
-    @Modifying
-    @Query("UPDATE MeetingRound mr SET mr.status = 'DONE' " +
+    @Query("SELECT mr FROM MeetingRound mr " +
+            "JOIN FETCH mr.meeting " +
             "WHERE mr.status = 'SCHEDULED' " +
             "AND mr.endAt < :now")
-    int bulkUpdateExpiredToDone(@Param("now") LocalDateTime now);
+    List<MeetingRound> findExpiredScheduledRounds(@Param("now") LocalDateTime now, Pageable pageable);
+
+    @Query("SELECT mr FROM MeetingRound mr " +
+            "JOIN FETCH mr.meeting " +
+            "WHERE mr.status = 'DONE' " +
+            "AND mr.bestMemberDetermined = false")
+    List<MeetingRound> findDoneRoundsNotBestMemberDetermined(Pageable pageable);
 
     // 현재 회차 계산: 아직 종료되지 않은 첫 번째 회차의 roundNo (일괄 조회)
     @Query("SELECT mr.meeting.id as meetingId, MIN(mr.roundNo) as currentRoundNo " +
