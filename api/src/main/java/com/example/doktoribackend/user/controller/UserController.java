@@ -8,6 +8,7 @@ import com.example.doktoribackend.meeting.dto.MyMeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MyMeetingListResponse;
 import com.example.doktoribackend.meeting.dto.MyMeetingDetailResponse;
 import com.example.doktoribackend.meeting.service.MeetingService;
+import com.example.doktoribackend.review.dto.MyReviewDetailResponse;
 import com.example.doktoribackend.review.dto.MyReviewListResponse;
 import com.example.doktoribackend.review.service.ReviewService;
 import com.example.doktoribackend.security.CustomUserDetails;
@@ -116,6 +117,16 @@ public class UserController implements UserWithdrawalApi, MyMeetingDetailApi {
         }
 
         MyReviewListResponse response = reviewService.getMyReviews(userDetails.getId(), cursorId, size);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Operation(summary = "나의 리뷰 상세 조회", description = "내가 작성한 리뷰의 상세 정보를 조회합니다.")
+    @GetMapping("/me/reviews/{reviewId}")
+    public ResponseEntity<ApiResult<MyReviewDetailResponse>> getMyReviewDetail(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long reviewId
+    ) {
+        MyReviewDetailResponse response = reviewService.getMyReviewDetail(userDetails.getId(), reviewId);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 

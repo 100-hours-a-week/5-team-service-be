@@ -9,7 +9,11 @@ import com.example.doktoribackend.meeting.domain.MeetingRound;
 import com.example.doktoribackend.meeting.domain.MeetingRoundStatus;
 import com.example.doktoribackend.meeting.repository.MeetingMemberRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
+import com.example.doktoribackend.common.s3.ImageUrlResolver;
+import com.example.doktoribackend.meeting.domain.MeetingMember;
 import com.example.doktoribackend.review.domain.Review;
+import com.example.doktoribackend.review.domain.ReviewImage;
+import com.example.doktoribackend.review.dto.MyReviewDetailResponse;
 import com.example.doktoribackend.review.dto.ReviewCreateRequest;
 import com.example.doktoribackend.review.dto.ReviewCreateResponse;
 import com.example.doktoribackend.review.repository.ReviewRepository;
@@ -54,6 +58,12 @@ class ReviewServiceTest {
 
     @Mock
     private MeetingMemberRepository meetingMemberRepository;
+
+    @Mock
+    private com.example.doktoribackend.meeting.repository.MeetingRepository meetingRepository;
+
+    @Mock
+    private ImageUrlResolver imageUrlResolver;
 
     @InjectMocks
     private ReviewService reviewService;
@@ -401,6 +411,121 @@ class ReviewServiceTest {
 
             // then
             assertThat(response.reviewId()).isEqualTo(2L);
+        }
+    }
+
+    @Nested
+    @DisplayName("getMyReviewDetail")
+    class GetMyReviewDetailTests {
+
+        private static final Long REVIEW_ID = 1L;
+
+        @Test
+        @DisplayName("정상적으로 리뷰 상세를 조회한다")
+        void success() {
+            // given
+            User reviewer = mock(User.class);
+            given(reviewer.getId()).willReturn(USER_ID);
+
+            Meeting meeting = mock(Meeting.class);
+            given(meeting.getId()).willReturn(MEETING_ID);
+
+            MeetingRound meetingRound = mock(MeetingRound.class);
+            given(meetingRound.getMeeting()).willReturn(meeting);
+
+            ReviewImage image = mock(ReviewImage.class);
+            given(image.getImageOrder()).willReturn(1);
+            given(image.getImagePath()).willReturn("reviews/img1.jpg");
+
+            Review review = mock(Review.class);
+            given(review.getId()).willReturn(REVIEW_ID);
+            given(review.getReviewer()).willReturn(reviewer);
+            given(review.getMeetingRound()).willReturn(meetingRound);
+            given(review.getMeetingTitle()).willReturn("테스트 모임");
+            given(review.getRoundNo()).willReturn(1);
+            given(review.getBookTitle()).willReturn("테스트 책");
+            given(review.getMeetingRating()).willReturn(new BigDecimal("4.5"));
+            given(review.getLeaderRating()).willReturn(new BigDecimal("4.0"));
+            given(review.getContent()).willReturn("좋은 모임이었습니다");
+            given(review.getBestMemberId()).willReturn(2L);
+            given(review.getImages()).willReturn(List.of(image));
+
+            given(reviewRepository.findByIdWithReviewerAndRoundAndImages(REVIEW_ID))
+                    .willReturn(Optional.of(review));
+
+            User member2 = mock(User.class);
+            given(member2.getId()).willReturn(2L);
+            given(member2.getNickname()).willReturn("member2");
+            given(member2.getProfileImagePath()).willReturn("profiles/2.jpg");
+
+            User member3 = mock(User.class);
+            given(member3.getId()).willReturn(3L);
+            given(member3.getNickname()).willReturn("member3");
+            given(member3.getProfileImagePath()).willReturn(null);
+
+            MeetingMember mm1 = mock(MeetingMember.class);
+            given(mm1.getUser()).willReturn(reviewer);
+
+            MeetingMember mm2 = mock(MeetingMember.class);
+            given(mm2.getUser()).willReturn(member2);
+
+            MeetingMember mm3 = mock(MeetingMember.class);
+            given(mm3.getUser()).willReturn(member3);
+
+            given(meetingMemberRepository.findApprovedMembersByMeetingIdOrderByCreatedAt(MEETING_ID))
+                    .willReturn(List.of(mm1, mm2, mm3));
+
+            given(imageUrlResolver.toUrl("reviews/img1.jpg")).willReturn("https://cdn.example.com/reviews/img1.jpg");
+            given(imageUrlResolver.toUrl("profiles/2.jpg")).willReturn("https://cdn.example.com/profiles/2.jpg");
+            given(imageUrlResolver.toUrl(null)).willReturn(null);
+
+            // when
+            MyReviewDetailResponse response = reviewService.getMyReviewDetail(USER_ID, REVIEW_ID);
+
+            // then
+            assertThat(response.reviewId()).isEqualTo(REVIEW_ID);
+            assertThat(response.meetingTitle()).isEqualTo("테스트 모임");
+            assertThat(response.leaderRating()).isEqualTo(new BigDecimal("4.0"));
+            assertThat(response.bestMemberId()).isEqualTo(2L);
+            assertThat(response.imageUrls()).containsExactly("https://cdn.example.com/reviews/img1.jpg");
+            assertThat(response.members()).hasSize(2);
+            assertThat(response.members().get(0).userId()).isEqualTo(2L);
+            assertThat(response.members().get(0).nickname()).isEqualTo("member2");
+        }
+
+        @Test
+        @DisplayName("리뷰가 존재하지 않으면 REVIEW_NOT_FOUND 에러를 던진다")
+        void reviewNotFound() {
+            // given
+            given(reviewRepository.findByIdWithReviewerAndRoundAndImages(REVIEW_ID))
+                    .willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> reviewService.getMyReviewDetail(USER_ID, REVIEW_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.REVIEW_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("작성자가 아니면 REVIEW_NOT_FOUND 에러를 던진다")
+        void notOwner() {
+            // given
+            Long otherUserId = 999L;
+            User reviewer = mock(User.class);
+            given(reviewer.getId()).willReturn(otherUserId);
+
+            Review review = mock(Review.class);
+            given(review.getReviewer()).willReturn(reviewer);
+
+            given(reviewRepository.findByIdWithReviewerAndRoundAndImages(REVIEW_ID))
+                    .willReturn(Optional.of(review));
+
+            // when & then
+            assertThatThrownBy(() -> reviewService.getMyReviewDetail(USER_ID, REVIEW_ID))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting(e -> ((BusinessException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.REVIEW_NOT_FOUND);
         }
     }
 

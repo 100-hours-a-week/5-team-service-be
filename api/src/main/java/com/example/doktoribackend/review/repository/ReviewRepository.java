@@ -11,11 +11,8 @@ import java.util.Optional;
 
 public interface ReviewRepository extends JpaRepository<Review, Long> {
 
-    Optional<Review> findByMeetingRoundIdAndReviewerIdAndDeletedAtIsNull(Long meetingRoundId, Long reviewerId);
-
     boolean existsByMeetingRoundIdAndReviewerIdAndDeletedAtIsNull(Long meetingRoundId, Long reviewerId);
 
-    List<Review> findByReviewerIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long reviewerId);
 
     @Query("SELECT r.id FROM Review r " +
             "JOIN r.meetingRound mr " +
@@ -49,4 +46,12 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             "WHERE r.id IN :ids " +
             "ORDER BY r.id DESC")
     List<Review> findAllWithImagesByIdIn(@Param("ids") List<Long> ids);
+
+    @Query("SELECT r FROM Review r " +
+            "JOIN FETCH r.reviewer " +
+            "JOIN FETCH r.meetingRound mr " +
+            "JOIN FETCH mr.meeting " +
+            "LEFT JOIN FETCH r.images " +
+            "WHERE r.id = :reviewId AND r.deletedAt IS NULL")
+    Optional<Review> findByIdWithReviewerAndRoundAndImages(@Param("reviewId") Long reviewId);
 }

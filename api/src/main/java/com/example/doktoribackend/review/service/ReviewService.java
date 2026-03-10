@@ -14,6 +14,7 @@ import com.example.doktoribackend.meeting.repository.MeetingRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
 import com.example.doktoribackend.review.domain.Review;
 import com.example.doktoribackend.review.domain.ReviewImage;
+import com.example.doktoribackend.meeting.domain.MeetingMember;
 import com.example.doktoribackend.review.dto.*;
 import com.example.doktoribackend.review.repository.ReviewRepository;
 import com.example.doktoribackend.user.domain.User;
@@ -166,5 +167,21 @@ public class ReviewService {
         PageInfo pageInfo = new PageInfo(nextCursorId, hasNext, size);
 
         return new MyReviewListResponse(items, pageInfo);
+    }
+
+    @Transactional(readOnly = true)
+    public MyReviewDetailResponse getMyReviewDetail(Long userId, Long reviewId) {
+        Review review = reviewRepository.findByIdWithReviewerAndRoundAndImages(reviewId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
+
+        if (!review.getReviewer().getId().equals(userId)) {
+            throw new BusinessException(ErrorCode.REVIEW_NOT_FOUND);
+        }
+
+        Long meetingId = review.getMeetingRound().getMeeting().getId();
+        List<MeetingMember> approvedMembers =
+                meetingMemberRepository.findApprovedMembersByMeetingIdOrderByCreatedAt(meetingId);
+
+        return MyReviewDetailResponse.from(review, approvedMembers, userId, imageUrlResolver);
     }
 }
