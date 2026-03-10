@@ -53,6 +53,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/meetings/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/meetings/search").permitAll()
                         .requestMatchers(HttpMethod.GET, "/recommendations/meetings").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/reviews/meetings/*").permitAll()
                         .anyRequest().authenticated()
                 )
                 // JWT 인증 필터 추가

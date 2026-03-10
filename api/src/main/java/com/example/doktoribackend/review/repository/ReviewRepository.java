@@ -1,0 +1,57 @@
+package com.example.doktoribackend.review.repository;
+
+import com.example.doktoribackend.review.domain.Review;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface ReviewRepository extends JpaRepository<Review, Long> {
+
+    boolean existsByMeetingRoundIdAndReviewerIdAndDeletedAtIsNull(Long meetingRoundId, Long reviewerId);
+
+
+    @Query("SELECT r.id FROM Review r " +
+            "JOIN r.meetingRound mr " +
+            "JOIN mr.meeting m " +
+            "WHERE m.leaderUser.id = :leaderUserId " +
+            "AND r.deletedAt IS NULL " +
+            "AND (:cursorId IS NULL OR r.id < :cursorId) " +
+            "ORDER BY r.id DESC")
+    List<Long> findIdsByLeaderUserIdWithCursor(@Param("leaderUserId") Long leaderUserId,
+                                               @Param("cursorId") Long cursorId,
+                                               Pageable pageable);
+
+    @Query("SELECT r.id FROM Review r " +
+            "WHERE r.reviewer.id = :reviewerId " +
+            "AND r.deletedAt IS NULL " +
+            "AND (:cursorId IS NULL OR r.id < :cursorId) " +
+            "ORDER BY r.id DESC")
+    List<Long> findIdsByReviewerIdWithCursor(@Param("reviewerId") Long reviewerId,
+                                             @Param("cursorId") Long cursorId,
+                                             Pageable pageable);
+
+    @Query("SELECT r FROM Review r " +
+            "JOIN FETCH r.reviewer " +
+            "LEFT JOIN FETCH r.images " +
+            "WHERE r.id IN :ids " +
+            "ORDER BY r.id DESC")
+    List<Review> findAllWithReviewerAndImagesByIdIn(@Param("ids") List<Long> ids);
+
+    @Query("SELECT r FROM Review r " +
+            "LEFT JOIN FETCH r.images " +
+            "WHERE r.id IN :ids " +
+            "ORDER BY r.id DESC")
+    List<Review> findAllWithImagesByIdIn(@Param("ids") List<Long> ids);
+
+    @Query("SELECT r FROM Review r " +
+            "JOIN FETCH r.reviewer " +
+            "JOIN FETCH r.meetingRound mr " +
+            "JOIN FETCH mr.meeting " +
+            "LEFT JOIN FETCH r.images " +
+            "WHERE r.id = :reviewId AND r.deletedAt IS NULL")
+    Optional<Review> findByIdWithReviewerAndRoundAndImages(@Param("reviewId") Long reviewId);
+}

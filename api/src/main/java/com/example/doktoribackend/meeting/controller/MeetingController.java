@@ -12,6 +12,7 @@ import com.example.doktoribackend.meeting.dto.JoinMeetingResponse;
 import com.example.doktoribackend.meeting.dto.MeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MeetingListResponse;
 import com.example.doktoribackend.meeting.dto.MeetingMembersResponse;
+import com.example.doktoribackend.meeting.dto.OtherMembersResponse;
 import com.example.doktoribackend.meeting.dto.PendingMembersResponse;
 import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
 import com.example.doktoribackend.meeting.dto.MeetingPatchRequest;
@@ -562,6 +563,24 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
         }
 
         MeetingMembersResponse response = meetingService.getMeetingMembers(userDetails.getId(), meetingId);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Operation(summary = "본인 제외 모임원 조회", description = "해당 모임의 승인된 모임원 목록을 본인 제외하여 조회합니다.")
+    @GetMapping("/{meetingId}/members/others")
+    public ResponseEntity<ApiResult<OtherMembersResponse>> getOtherMembers(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        OtherMembersResponse response = meetingService.getOtherMembers(userDetails.getId(), meetingId);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 

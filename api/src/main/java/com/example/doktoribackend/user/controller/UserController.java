@@ -8,6 +8,9 @@ import com.example.doktoribackend.meeting.dto.MyMeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MyMeetingListResponse;
 import com.example.doktoribackend.meeting.dto.MyMeetingDetailResponse;
 import com.example.doktoribackend.meeting.service.MeetingService;
+import com.example.doktoribackend.review.dto.MyReviewDetailResponse;
+import com.example.doktoribackend.review.dto.MyReviewListResponse;
+import com.example.doktoribackend.review.service.ReviewService;
 import com.example.doktoribackend.security.CustomUserDetails;
 import com.example.doktoribackend.user.dto.NotificationAgreementRequest;
 import com.example.doktoribackend.user.dto.NotificationAgreementResponse;
@@ -41,6 +44,7 @@ public class UserController implements UserWithdrawalApi, MyMeetingDetailApi {
     private final OnboardingService onboardingService;
     private final UserService userService;
     private final MeetingService meetingService;
+    private final ReviewService reviewService;
     private final CookieUtil cookieUtil;
 
     @Operation(summary = "내 정보 조회", description = "로그인 사용자의 프로필 정보를 조회합니다.")
@@ -98,6 +102,31 @@ public class UserController implements UserWithdrawalApi, MyMeetingDetailApi {
             @Valid @RequestBody OnboardingRequest request
     ) {
         UserProfileResponse response = onboardingService.onboard(userDetails.getId(), request);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Operation(summary = "나의 리뷰 목록 조회", description = "내가 작성한 리뷰 목록을 조회합니다.")
+    @GetMapping("/me/reviews")
+    public ResponseEntity<ApiResult<MyReviewListResponse>> getMyReviews(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "10") Integer size
+    ) {
+        if (size < 1 || size > 20) {
+            throw new BusinessException(ErrorCode.PAGINATION_SIZE_OUT_OF_RANGE);
+        }
+
+        MyReviewListResponse response = reviewService.getMyReviews(userDetails.getId(), cursorId, size);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Operation(summary = "나의 리뷰 상세 조회", description = "내가 작성한 리뷰의 상세 정보를 조회합니다.")
+    @GetMapping("/me/reviews/{reviewId}")
+    public ResponseEntity<ApiResult<MyReviewDetailResponse>> getMyReviewDetail(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long reviewId
+    ) {
+        MyReviewDetailResponse response = reviewService.getMyReviewDetail(userDetails.getId(), reviewId);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
