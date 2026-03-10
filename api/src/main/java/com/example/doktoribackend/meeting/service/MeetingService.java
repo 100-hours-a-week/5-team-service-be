@@ -20,6 +20,7 @@ import com.example.doktoribackend.meeting.dto.JoinMeetingResponse;
 import com.example.doktoribackend.meeting.dto.MeetingListRequest;
 import com.example.doktoribackend.meeting.dto.MeetingListResponse;
 import com.example.doktoribackend.meeting.dto.MeetingMembersResponse;
+import com.example.doktoribackend.meeting.dto.OtherMembersResponse;
 import com.example.doktoribackend.meeting.dto.PendingMembersResponse;
 import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
 import com.example.doktoribackend.meeting.dto.MeetingPatchRequest;
@@ -774,6 +775,33 @@ public class MeetingService {
                 .memberCount(memberInfos.size())
                 .members(memberInfos)
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public OtherMembersResponse getOtherMembers(Long userId, Long meetingId) {
+        meetingRepository.findById(meetingId)
+                .filter(m -> m.getDeletedAt() == null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+
+        boolean isMember = meetingMemberRepository.existsByMeetingIdAndUserIdAndStatus(
+                meetingId, userId, MeetingMemberStatus.APPROVED);
+        if (!isMember) {
+            throw new BusinessException(ErrorCode.AUTH_FORBIDDEN);
+        }
+
+        List<MeetingMember> approvedMembers =
+                meetingMemberRepository.findApprovedMembersByMeetingIdOrderByCreatedAt(meetingId);
+
+        List<OtherMembersResponse.MemberInfo> members = approvedMembers.stream()
+                .filter(mm -> !mm.getUser().getId().equals(userId))
+                .map(mm -> new OtherMembersResponse.MemberInfo(
+                        mm.getUser().getId(),
+                        mm.getUser().getNickname(),
+                        imageUrlResolver.toUrl(mm.getUser().getProfileImagePath())
+                ))
+                .toList();
+
+        return new OtherMembersResponse(members);
     }
 
     @Transactional(readOnly = true)
