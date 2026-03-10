@@ -2,7 +2,8 @@ package com.example.doktoribackend.config;
 
 import com.example.doktoribackend.security.CustomUserDetails;
 import com.example.doktoribackend.security.jwt.JwtTokenProvider;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -17,13 +18,26 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.stereotype.Component;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class StompChannelInterceptor implements ChannelInterceptor {
 
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final Counter connectSuccessCounter;
+    private final Counter connectFailureCounter;
+
+    public StompChannelInterceptor(JwtTokenProvider jwtTokenProvider, MeterRegistry meterRegistry) {
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.connectSuccessCounter = Counter.builder("chat.ws.connect")
+                .tag("result", "success")
+                .description("WebSocket STOMP CONNECT attempts")
+                .register(meterRegistry);
+        this.connectFailureCounter = Counter.builder("chat.ws.connect")
+                .tag("result", "failure")
+                .description("WebSocket STOMP CONNECT attempts")
+                .register(meterRegistry);
+    }
 
     @Override
     @Nullable
@@ -54,11 +68,14 @@ public class StompChannelInterceptor implements ChannelInterceptor {
                             userDetails, null, userDetails.getAuthorities());
 
             accessor.setUser(authentication);
+            connectSuccessCounter.increment();
 
             return message;
         } catch (MessageDeliveryException ex) {
+            connectFailureCounter.increment();
             throw ex;
         } catch (Exception ex) {
+            connectFailureCounter.increment();
             log.warn("[WebSocket] 인증 실패 - sessionId: {}, reason: {}", sessionId, ex.getMessage());
             throw new MessageDeliveryException("인증에 실패했습니다: " + ex.getMessage());
         }
