@@ -20,6 +20,8 @@ import com.example.doktoribackend.user.dto.UpdateUserProfileRequest;
 import com.example.doktoribackend.user.dto.UserProfileResponse;
 import com.example.doktoribackend.user.service.OnboardingService;
 import com.example.doktoribackend.user.service.UserService;
+import com.example.doktoribackend.meeting.dto.BookmarkedMeetingListResponse;
+import com.example.doktoribackend.meeting.service.MeetingBookmarkService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -39,13 +41,14 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/users")
-public class UserController implements UserWithdrawalApi, MyMeetingDetailApi {
+public class UserController implements UserWithdrawalApi, MyMeetingDetailApi, BookmarkedMeetingsApi {
 
     private final OnboardingService onboardingService;
     private final UserService userService;
     private final MeetingService meetingService;
     private final ReviewService reviewService;
     private final CookieUtil cookieUtil;
+    private final MeetingBookmarkService meetingBookmarkService;
 
     @Operation(summary = "내 정보 조회", description = "로그인 사용자의 프로필 정보를 조회합니다.")
     @GetMapping("/me")
@@ -299,5 +302,31 @@ public class UserController implements UserWithdrawalApi, MyMeetingDetailApi {
         cookieUtil.removeRefreshTokenCookie(response);
 
         return ResponseEntity.noContent().build();
+    }
+
+    private static final int MAX_BOOKMARK_SIZE = 20;
+
+    @Override
+    @GetMapping("/me/bookmarks/meetings")
+    public ResponseEntity<ApiResult<BookmarkedMeetingListResponse>> getBookmarkedMeetings(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestParam(required = false) Long cursorId,
+            @RequestParam(defaultValue = "10") Integer size
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (cursorId != null && cursorId < 1) {
+            throw new BusinessException(ErrorCode.PAGINATION_INVALID_CURSOR);
+        }
+
+        if (size < 1 || size > MAX_BOOKMARK_SIZE) {
+            throw new BusinessException(ErrorCode.PAGINATION_SIZE_OUT_OF_RANGE);
+        }
+
+        BookmarkedMeetingListResponse response = meetingBookmarkService.getBookmarkedMeetings(
+                userDetails.getId(), cursorId, size);
+        return ResponseEntity.ok(ApiResult.ok(response));
     }
 }

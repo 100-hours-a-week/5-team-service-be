@@ -20,6 +20,7 @@ import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateRequest;
 import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateResponse;
 import com.example.doktoribackend.meeting.dto.TopicRecommendationResponse;
 import com.example.doktoribackend.meeting.service.LeaderDelegationService;
+import com.example.doktoribackend.meeting.service.MeetingBookmarkService;
 import com.example.doktoribackend.meeting.service.MeetingService;
 import com.example.doktoribackend.meeting.service.TopicRecommendationService;
 import com.example.doktoribackend.security.CustomUserDetails;
@@ -44,11 +45,12 @@ import java.net.URI;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/meetings")
-public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi, LeaderDelegationApi, CancelParticipationApi, LeaveMeetingApi, MeetingMembersApi, KickMemberApi, PendingMembersApi {
+public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi, LeaderDelegationApi, CancelParticipationApi, LeaveMeetingApi, MeetingMembersApi, KickMemberApi, PendingMembersApi, MeetingBookmarkApi {
 
     private final MeetingService meetingService;
     private final TopicRecommendationService topicRecommendationService;
     private final LeaderDelegationService leaderDelegationService;
+    private final MeetingBookmarkService meetingBookmarkService;
 
     @Operation(summary = "모임 생성", description = "로그인 사용자가 모임을 생성합니다.")
     @ApiResponses({
@@ -636,5 +638,41 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
         PendingMembersResponse response = meetingService.getPendingMembers(
                 userDetails.getId(), meetingId, cursorId, size);
         return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Override
+    @PostMapping("/{meetingId}/bookmarks")
+    public ResponseEntity<Void> addBookmark(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        meetingBookmarkService.addBookmark(userDetails.getId(), meetingId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    @DeleteMapping("/{meetingId}/bookmarks")
+    public ResponseEntity<Void> removeBookmark(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        meetingBookmarkService.removeBookmark(userDetails.getId(), meetingId);
+        return ResponseEntity.noContent().build();
     }
 }
