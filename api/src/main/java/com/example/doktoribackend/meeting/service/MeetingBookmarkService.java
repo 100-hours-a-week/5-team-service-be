@@ -86,14 +86,24 @@ public class MeetingBookmarkService {
         Meeting meeting = bookmark.getMeeting();
         boolean isRecruiting = meeting.getStatus() == MeetingStatus.RECRUITING;
 
+        // remainingDays 계산
+        Long remainingDays = null;
+        if (meeting.getRecruitmentDeadline() != null) {
+            remainingDays = java.time.temporal.ChronoUnit.DAYS.between(
+                    java.time.LocalDate.now(),
+                    meeting.getRecruitmentDeadline()
+            );
+        }
+
         return BookmarkedMeetingItem.builder()
                 .meetingId(meeting.getId())
                 .meetingImagePath(imageUrlResolver.toUrl(meeting.getMeetingImagePath()))
                 .title(meeting.getTitle())
-                .readingGenreName(meeting.getReadingGenre().getName())
+                .readingGenreId(meeting.getReadingGenreId())
                 .leaderNickname(meeting.getLeaderUser().getNickname())
-                .currentMemberCount(meeting.getCurrentCount())
                 .capacity(meeting.getCapacity())
+                .currentMemberCount(meeting.getCurrentCount())
+                .remainingDays(remainingDays)
                 .isRecruiting(isRecruiting)
                 .build();
     }
