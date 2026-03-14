@@ -681,4 +681,46 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
 
         return ResponseEntity.ok(ApiResult.ok(new MeetingBookmarkStatusResponse(isBookmarked)));
     }
+
+    @Operation(summary = "모임 참여 상태 조회", description = "모임의 참여자 정보와 현재 사용자의 참여 상태를 조회합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResult.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "OK",
+                                      "message": "요청이 성공적으로 처리되었습니다.",
+                                      "data": {
+                                        "totalCount": 5,
+                                        "profileImages": [
+                                          "https://cdn.example.com/profiles/u1.png",
+                                          "https://cdn.example.com/profiles/u2.png"
+                                        ],
+                                        "myParticipationStatus": "APPROVED"
+                                      }
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "404", description = "Meeting not found",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "MEETING_NOT_FOUND",
+                                      "message": "존재하지 않는 모임입니다."
+                                    }
+                                    """)))
+    })
+    @GetMapping("/{meetingId}/participation-status")
+    public ResponseEntity<ApiResult<ParticipationStatusResponse>> getParticipationStatus(
+            @PathVariable Long meetingId,
+            @AuthenticationPrincipal CustomUserDetails currentUser
+    ) {
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        Long currentUserId = (currentUser != null) ? currentUser.getId() : null;
+        ParticipationStatusResponse response = meetingService.getParticipationStatus(meetingId, currentUserId);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
 }
