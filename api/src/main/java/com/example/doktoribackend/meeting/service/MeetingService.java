@@ -31,6 +31,7 @@ import com.example.doktoribackend.meeting.dto.MyMeetingListResponse;
 import com.example.doktoribackend.meeting.dto.MyMeetingItem;
 import com.example.doktoribackend.meeting.dto.MyMeetingDetailResponse;
 import com.example.doktoribackend.meeting.dto.PageInfo;
+import com.example.doktoribackend.meeting.dto.ParticipationStatusResponse;
 import com.example.doktoribackend.meeting.dto.MeetingListItem;
 import com.example.doktoribackend.meeting.dto.MeetingListRow;
 import com.example.doktoribackend.meeting.repository.*;
@@ -162,21 +163,8 @@ public class MeetingService {
         // 2. 회차 정보 조회 (책 정보 포함)
         List<MeetingRound> rounds = meetingRoundRepository.findByMeetingIdWithBook(meetingId);
 
-        // 3. 참여자 정보 조회 (APPROVED 상태, 가입순)
-        List<MeetingMember> approvedMembers = meetingMemberRepository
-                .findApprovedMembersByMeetingIdOrderByCreatedAt(meetingId);
-
-        // 4. 현재 사용자 참여 상태 조회
-        String myParticipationStatus = null;
-        if (currentUserId != null) {
-            myParticipationStatus = meetingMemberRepository
-                    .findByMeetingIdAndUserId(meetingId, currentUserId)
-                    .map(mm -> mm.getStatus().name())
-                    .orElse(null);
-        }
-
-        // 5. DTO 변환 및 반환
-        return MeetingDetailResponse.from(meeting, rounds, approvedMembers, myParticipationStatus, imageUrlResolver);
+        // 3. DTO 변환 및 반환
+        return MeetingDetailResponse.from(meeting, rounds, imageUrlResolver);
     }
 
     @Transactional
@@ -959,6 +947,32 @@ public class MeetingService {
             return null;
         }
         return time.atZone(java.time.ZoneId.of("Asia/Seoul")).toOffsetDateTime();
+    }
+
+    /**
+     * 모임 참여 상태 조회 (participantsPreview 분리)
+     */
+    @Transactional(readOnly = true)
+    public ParticipationStatusResponse getParticipationStatus(Long meetingId, Long currentUserId) {
+        // 모임 존재 확인
+        if (!meetingRepository.existsByIdAndDeletedAtIsNull(meetingId)) {
+            throw new BusinessException(ErrorCode.MEETING_NOT_FOUND);
+        }
+
+        // 참여자 정보 조회 (APPROVED 상태)
+        List<MeetingMember> approvedMembers = meetingMemberRepository
+                .findApprovedMembersByMeetingIdOrderByCreatedAt(meetingId);
+
+        // 현재 사용자 참여 상태
+        String myParticipationStatus = null;
+        if (currentUserId != null) {
+            myParticipationStatus = meetingMemberRepository
+                    .findByMeetingIdAndUserId(meetingId, currentUserId)
+                    .map(mm -> mm.getStatus().name())
+                    .orElse(null);
+        }
+
+        return ParticipationStatusResponse.from(approvedMembers, myParticipationStatus, imageUrlResolver);
     }
 
     /**
