@@ -14,6 +14,9 @@ logging:
     org.hibernate.SQL: WARN
     org.hibernate.type.descriptor.sql.BasicBinder: WARN
     com.example.doktoribackend: INFO
+  structured:
+    format:
+      console: logstash
 
 app:
   cookie:
