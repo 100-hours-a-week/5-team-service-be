@@ -10,6 +10,9 @@ spring:
 logging:
   level:
     org.hibernate.SQL: debug
+  structured:
+    format:
+      console: logstash
 app:
   cookie:
     secure: true
