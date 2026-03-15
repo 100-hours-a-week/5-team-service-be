@@ -13,6 +13,9 @@ logging:
     root: INFO
     org.hibernate.SQL: WARN
     org.hibernate.type.descriptor.sql.BasicBinder: WARN
+  structured:
+    format:
+      console: logstash
 
 app:
   cookie:
