@@ -5,6 +5,7 @@ import com.example.doktoribackend.security.jwt.JwtTokenProvider;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageDeliveryException;
@@ -16,6 +17,8 @@ import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Component;
+
+import java.util.UUID;
 
 @Component
 @Slf4j
@@ -45,13 +48,19 @@ public class StompChannelInterceptor implements ChannelInterceptor {
         StompHeaderAccessor accessor =
                 MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
 
-        if (accessor == null || accessor.getCommand() != StompCommand.CONNECT) {
+        if (accessor == null) {
             return message;
         }
 
         String sessionId = accessor.getSessionId();
+        String traceId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        MDC.put("traceId", traceId);
 
         try {
+            if (accessor.getCommand() != StompCommand.CONNECT) {
+                return message;
+            }
+
             String authHeader = accessor.getFirstNativeHeader("Authorization");
             if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
                 log.warn("[WebSocket] 인증 실패 - sessionId: {}, reason: Authorization 헤더 누락", sessionId);
@@ -79,5 +88,11 @@ public class StompChannelInterceptor implements ChannelInterceptor {
             log.warn("[WebSocket] 인증 실패 - sessionId: {}, reason: {}", sessionId, ex.getMessage());
             throw new MessageDeliveryException("인증에 실패했습니다: " + ex.getMessage());
         }
+    }
+
+    @Override
+    public void afterSendCompletion(@NonNull Message<?> message, @NonNull MessageChannel channel,
+                                    boolean sent, Exception ex) {
+        MDC.remove("traceId");
     }
 }

@@ -11,6 +11,9 @@ logging:
   level:
     org.hibernate.SQL: debug
     com.example.doktoribackend.config.WebSocketEventListener: debug
+  structured:
+    format:
+      console: logstash
 app:
   cookie:
     secure: true

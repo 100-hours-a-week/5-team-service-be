@@ -17,6 +17,8 @@ public interface UserMeetingRecommendationRepository extends JpaRepository<UserM
             JOIN FETCH m.leaderUser
             WHERE r.user.id = :userId
               AND r.weekStartDate = :weekStartDate
+              AND m.status = 'RECRUITING'
+              AND m.deletedAt IS NULL
             ORDER BY r.rank ASC
             """)
     List<UserMeetingRecommendation> findByUserIdAndWeekStartDateOrderByRank(
@@ -31,7 +33,12 @@ public interface UserMeetingRecommendationRepository extends JpaRepository<UserM
             JOIN FETCH m.leaderUser
             WHERE m.status = 'RECRUITING'
               AND m.deletedAt IS NULL
-            ORDER BY r.createdAt DESC, r.rank ASC
+              AND r.id = (
+                  SELECT MIN(r2.id)
+                  FROM UserMeetingRecommendation r2
+                  WHERE r2.meeting.id = m.id
+              )
+            ORDER BY m.createdAt DESC
             """)
-    List<UserMeetingRecommendation> findRecruitingMeetingsOrderByLatestAndRank();
+    List<UserMeetingRecommendation> findRecruitingMeetingsDistinct();
 }

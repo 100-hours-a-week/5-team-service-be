@@ -55,6 +55,8 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             "WHERE r.id = :reviewId AND r.deletedAt IS NULL")
     Optional<Review> findByIdWithReviewerAndRoundAndImages(@Param("reviewId") Long reviewId);
 
+    Optional<Review> findByReviewerIdAndMeetingRoundIdAndDeletedAtIsNull(Long reviewerId, Long meetingRoundId);
+
     long countByMeetingRoundIdAndDeletedAtIsNull(Long meetingRoundId);
 
     @Query("SELECT r.bestMemberId FROM Review r " +

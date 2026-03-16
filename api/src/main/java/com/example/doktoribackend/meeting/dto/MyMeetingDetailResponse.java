@@ -53,6 +53,7 @@ public class MyMeetingDetailResponse {
 
         private BookInfo book;
         private BookReportInfo bookReport;
+        private ReviewInfo review;
         private List<TopicInfo> topics;
 
         @Getter
@@ -70,6 +71,14 @@ public class MyMeetingDetailResponse {
         @AllArgsConstructor
         @Builder
         public static class BookReportInfo {
+            private String status;
+            private Long id;
+        }
+
+        @Getter
+        @AllArgsConstructor
+        @Builder
+        public static class ReviewInfo {
             private String status;
             private Long id;
         }
