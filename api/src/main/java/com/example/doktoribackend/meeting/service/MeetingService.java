@@ -35,6 +35,10 @@ import com.example.doktoribackend.meeting.dto.ParticipationStatusResponse;
 import com.example.doktoribackend.meeting.dto.MeetingListItem;
 import com.example.doktoribackend.meeting.dto.MeetingListRow;
 import com.example.doktoribackend.meeting.repository.*;
+import com.example.doktoribackend.review.domain.Review;
+import com.example.doktoribackend.review.domain.ReviewStatusResolver;
+import com.example.doktoribackend.review.domain.UserReviewStatus;
+import com.example.doktoribackend.review.repository.ReviewRepository;
 import com.example.doktoribackend.reading.domain.ReadingGenre;
 import com.example.doktoribackend.reading.repository.ReadingGenreRepository;
 import com.example.doktoribackend.common.s3.ImageUrlResolver;
@@ -71,6 +75,7 @@ public class MeetingService {
     private final ReadingGenreRepository readingGenreRepository;
     private final BookReportRepository bookReportRepository;
     private final MeetingBookmarkRepository meetingBookmarkRepository;
+    private final ReviewRepository reviewRepository;
     private final ImageUrlResolver imageUrlResolver;
 
     @Transactional
@@ -430,7 +435,24 @@ public class MeetingService {
                     .build();
         }
 
-        // 5. topics 조회 및 변환
+        // 5. ReviewInfo 생성
+        Optional<Review> reviewOpt = reviewRepository
+                .findByReviewerIdAndMeetingRoundIdAndDeletedAtIsNull(userId, round.getId());
+
+        MyMeetingDetailResponse.RoundDetail.ReviewInfo reviewInfo;
+        if (reviewOpt.isPresent()) {
+            reviewInfo = MyMeetingDetailResponse.RoundDetail.ReviewInfo.builder()
+                    .status(UserReviewStatus.SUBMITTED.name())
+                    .id(reviewOpt.get().getId())
+                    .build();
+        } else {
+            UserReviewStatus reviewStatus = ReviewStatusResolver.resolveNotSubmitted(now, round, bookReportOpt);
+            reviewInfo = MyMeetingDetailResponse.RoundDetail.ReviewInfo.builder()
+                    .status(reviewStatus.name())
+                    .build();
+        }
+
+        // 6. topics 조회 및 변환
         List<MeetingRoundDiscussionTopic> topics = meetingRoundDiscussionTopicRepository.findByMeetingRoundId(round.getId());
         List<MyMeetingDetailResponse.RoundDetail.TopicInfo> topicInfoList = topics.stream()
                 .map(t -> MyMeetingDetailResponse.RoundDetail.TopicInfo.builder()
@@ -439,7 +461,7 @@ public class MeetingService {
                         .build())
                 .toList();
 
-        // 6. meetingLink 공개 여부 (10분 전부터)
+        // 7. meetingLink 공개 여부 (10분 전부터)
         LocalDateTime tenMinutesBefore = round.getStartAt().minusMinutes(10);
         boolean isLinkAvailable = !now.isBefore(tenMinutesBefore) && now.isBefore(round.getEndAt());
 
@@ -470,6 +492,7 @@ public class MeetingService {
                 .canJoinMeeting(canJoinMeeting)
                 .book(bookInfo)
                 .bookReport(bookReportInfo)
+                .review(reviewInfo)
                 .topics(topicInfoList)
                 .build();
     }
