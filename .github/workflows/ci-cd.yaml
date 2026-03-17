@@ -192,7 +192,7 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      # develop → :develop 태그, main → :sha-xxxxxxx + :latest (docker-bake.hcl에서 처리)
+      # develop → :develop 태그, main → :xxxxxxx (short SHA, ArgoCD 매니페스트와 일치)
       - name: Set image metadata
         id: meta
         run: |
@@ -200,7 +200,7 @@ jobs:
             echo "image-tag=develop" >> $GITHUB_OUTPUT
           else
             SHORT_SHA="${GITHUB_SHA:0:7}"
-            echo "image-tag=sha-${SHORT_SHA}" >> $GITHUB_OUTPUT
+            echo "image-tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
           fi
 
       - name: Set up Docker Buildx
@@ -316,437 +316,69 @@ jobs:
                }" \
                ${{ secrets.DISCORD_WEBHOOK_URL }} || true
 
-  # ─── Prod Blue/Green 배포: API ──────────────────────────────────────
-  deploy-prod-api:
+  # ─── Prod 배포: ArgoCD GitOps ─────────────────────────────────────
+  # ECR push 완료 후 Cloud repo의 K8s 매니페스트 이미지 태그를 업데이트
+  # ArgoCD가 main 브랜치를 polling(3분) → auto-sync → K8s 배포
+  deploy-prod:
     needs: build-and-push
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
       contents: read
-    outputs:
-      color: ${{ steps.deploy.outputs.color }}
-      port: ${{ steps.deploy.outputs.port }}
     steps:
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ap-northeast-2
-
-      - name: Blue/Green Deploy API
-        id: deploy
+      - name: Update K8s manifests in Cloud repo
         run: |
-          REGISTRY="${{ secrets.ECR_REGISTRY }}"
           TAG="${{ needs.build-and-push.outputs.image-tag }}"
-          SERVICE="api"
-          BLUE_PORT=8080; GREEN_PORT=8082; INTERNAL_PORT=8080
-          HEALTH_PATH="/api/actuator/health"
-
-          wait_ssm() {
-            local cmd_id=$1 label=$2 max=${3:-60}
-            for i in $(seq 1 "$max"); do
-              sleep 5
-              STATUS=$(aws ssm list-command-invocations \
-                --command-id "$cmd_id" \
-                --query "CommandInvocations[0].Status" \
-                --output text 2>/dev/null || echo "Pending")
-              echo "[$label $i/$max] $STATUS"
-              case "$STATUS" in
-                Success) return 0 ;;
-                Failed|Cancelled|TimedOut|DeliveryTimedOut)
-                  echo "::error::${label} failed: ${STATUS}"
-                  aws ssm list-command-invocations --command-id "$cmd_id" --details \
-                    --query "CommandInvocations[0].CommandPlugins[0].Output" --output text || true
-                  return 1 ;;
-                None)
-                  if [ "$i" -ge 3 ]; then
-                    echo "::error::${label}: no instance matched SSM target (status=None)"
-                    return 1
-                  fi ;;
-              esac
-            done
-            echo "::error::${label} timed out"; return 1
-          }
-
-          # 1) Discover — 현재 활성 컨테이너/색상 확인
-          # legacy(doktori-api, backend-api)를 먼저 체크: 8080 포트를 점유하므로 Green으로 가야 함
-          DISCOVER_CMDS=$(jq -n '[
-            "if docker ps --format \"{{.Names}}\" | grep -qE \"^(backend-api|doktori-api)$\"; then echo \"ACTIVE=legacy\";",
-            "elif docker ps --format \"{{.Names}}\" | grep -qE \"doktori-api-blue\"; then echo \"ACTIVE=blue\";",
-            "elif docker ps --format \"{{.Names}}\" | grep -qE \"doktori-api-green\"; then echo \"ACTIVE=green\";",
-            "else echo \"ACTIVE=none\"; fi"
-          ]')
-          DISCOVER_ID=$(aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Name,Values=doktori-prod-api" \
-            --parameters "{\"commands\": $DISCOVER_CMDS}" \
-            --timeout-seconds 30 \
-            --comment "discover api color" \
-            --query "Command.CommandId" --output text)
-          wait_ssm "$DISCOVER_ID" "discover" 12
-
-          DISCOVER_OUT=$(aws ssm list-command-invocations --command-id "$DISCOVER_ID" --details \
-            --query "CommandInvocations[0].CommandPlugins[0].Output" --output text)
-          ACTIVE_COLOR=$(echo "$DISCOVER_OUT" | grep -oP 'ACTIVE=\K\w+' || echo "none")
-          echo "Active color: $ACTIVE_COLOR"
-
-          # 색상/포트 결정
-          case "$ACTIVE_COLOR" in
-            blue)   NEW_COLOR=green; NEW_PORT=$GREEN_PORT; OLD_COLOR=blue; OLD_PORT=$BLUE_PORT ;;
-            green)  NEW_COLOR=blue;  NEW_PORT=$BLUE_PORT;  OLD_COLOR=green; OLD_PORT=$GREEN_PORT ;;
-            legacy) NEW_COLOR=green; NEW_PORT=$GREEN_PORT; OLD_COLOR=legacy; OLD_PORT=$BLUE_PORT ;;
-            none)   NEW_COLOR=blue;  NEW_PORT=$BLUE_PORT;  OLD_COLOR=none;  OLD_PORT=0 ;;
-          esac
-          echo "Deploying: $NEW_COLOR (port $NEW_PORT)"
-          echo "color=${NEW_COLOR}" >> $GITHUB_OUTPUT
-          echo "port=${NEW_PORT}" >> $GITHUB_OUTPUT
-
-          # 2) Deploy — 새 컨테이너 기동
-          DEPLOY_CMDS=$(jq -n --arg r "$REGISTRY" --arg t "$TAG" \
-            --arg name "doktori-api-${NEW_COLOR}" \
-            --arg np "$NEW_PORT" --arg ip "$INTERNAL_PORT" '[
-            "set -e",
-            ("aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin " + $r),
-            ("docker pull " + $r + "/doktori/backend-api:" + $t),
-            "mkdir -p /home/ubuntu/app/secrets",
-            "aws ssm get-parameter --name /doktori/prod/FIREBASE_SERVICE_ACCOUNT --with-decryption --query Parameter.Value --output text > /home/ubuntu/app/secrets/firebase-service-account.json",
-            ("docker stop " + $name + " 2>/dev/null || true"),
-            ("docker rm " + $name + " 2>/dev/null || true"),
-            ("docker run -d --name " + $name + " --restart unless-stopped -e SPRING_PROFILES_ACTIVE=prod -e FIREBASE_CREDENTIALS_PATH=file:/app/secrets/firebase-service-account.json -v /home/ubuntu/app/secrets/firebase-service-account.json:/app/secrets/firebase-service-account.json:ro -p " + $np + ":" + $ip + " " + $r + "/doktori/backend-api:" + $t)
-          ]')
-          DEPLOY_ID=$(aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Name,Values=doktori-prod-api" \
-            --parameters "{\"commands\": $DEPLOY_CMDS}" \
-            --timeout-seconds 300 \
-            --comment "deploy api ${NEW_COLOR} ${{ github.sha }}" \
-            --query "Command.CommandId" --output text)
-          wait_ssm "$DEPLOY_ID" "deploy-api" 60
-
-          # 3) Health check — 새 컨테이너 readiness 확인
-          HEALTH_CMDS=$(jq -n --arg np "$NEW_PORT" --arg hp "$HEALTH_PATH" '[
-            "for i in $(seq 1 30); do",
-            ("  if curl -sf http://localhost:" + $np + $hp + " > /dev/null 2>&1; then echo \"HEALTHY\"; exit 0; fi"),
-            "  echo \"Waiting... ($i/30)\"; sleep 10",
-            "done",
-            "echo \"UNHEALTHY\"; exit 1"
-          ]')
-          HEALTH_ID=$(aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Name,Values=doktori-prod-api" \
-            --parameters "{\"commands\": $HEALTH_CMDS}" \
-            --timeout-seconds 360 \
-            --comment "health check api ${NEW_COLOR}" \
-            --query "Command.CommandId" --output text)
-
-          if ! wait_ssm "$HEALTH_ID" "health-api" 75; then
-            echo "::error::Health check failed — collecting logs before rollback"
-            LOGS_CMDS=$(jq -n --arg name "doktori-api-${NEW_COLOR}" '[
-              ("echo \"=== Container Status ===\""),
-              ("docker inspect " + $name + " --format=\"Status={{.State.Status}} ExitCode={{.State.ExitCode}}\" 2>&1 || echo \"container not found\""),
-              ("echo \"=== Last 80 lines of logs ===\""),
-              ("docker logs " + $name + " --tail 80 2>&1 || echo \"no logs available\"")
-            ]')
-            LOGS_ID=$(aws ssm send-command \
-              --document-name "AWS-RunShellScript" \
-              --targets "Key=tag:Name,Values=doktori-prod-api" \
-              --parameters "{\"commands\": $LOGS_CMDS}" \
-              --timeout-seconds 30 \
-              --comment "collect api logs before rollback" \
-              --query "Command.CommandId" --output text)
-            if wait_ssm "$LOGS_ID" "collect-logs-api" 12; then
-              aws ssm list-command-invocations --command-id "$LOGS_ID" --details \
-                --query "CommandInvocations[0].CommandPlugins[0].Output" --output text || true
-            fi
-
-            echo "::error::Rolling back API deployment"
-            ROLLBACK_CMDS=$(jq -n --arg name "doktori-api-${NEW_COLOR}" '[
-              ("docker stop " + $name + " 2>/dev/null || true"),
-              ("docker rm " + $name + " 2>/dev/null || true")
-            ]')
-            RB_ID=$(aws ssm send-command \
-              --document-name "AWS-RunShellScript" \
-              --targets "Key=tag:Name,Values=doktori-prod-api" \
-              --parameters "{\"commands\": $ROLLBACK_CMDS}" \
-              --timeout-seconds 60 \
-              --comment "rollback api" \
-              --query "Command.CommandId" --output text)
-            wait_ssm "$RB_ID" "rollback-api" 12 || true
-            exit 1
-          fi
-
-          # 4) Nginx switch — upstream 포트 전환 + 상태 파일 기록
-          # 상태 파일: 컨테이너 내부(/etc/nginx/state/) + 호스트(/opt/nginx-state/) 이중 기록
-          # - docker restart: 컨테이너 내부 파일 유지
-          # - docker rm + run: 호스트 볼륨 마운트(-v /opt/nginx-state:/etc/nginx/state) 필요
-          SWITCH_CMDS=$(jq -n --arg np "$NEW_PORT" '[
-            "set -e",
-            ("docker exec nginx sed -i -E \"s/:[0-9]+;/:" + $np + ";/\" /etc/nginx/conf.d/upstream-api.conf"),
-            "docker exec nginx nginx -t",
-            "docker exec nginx nginx -s reload",
-            ("docker exec nginx sh -c \"mkdir -p /etc/nginx/state && echo " + $np + " > /etc/nginx/state/active-port-api\""),
-            "mkdir -p /opt/nginx-state",
-            ("echo " + $np + " > /opt/nginx-state/active-port-api")
-          ]')
-          SWITCH_ID=$(aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Name,Values=doktori-prod-nginx" \
-            --parameters "{\"commands\": $SWITCH_CMDS}" \
-            --timeout-seconds 60 \
-            --comment "nginx switch api to ${NEW_COLOR}" \
-            --query "Command.CommandId" --output text)
-          wait_ssm "$SWITCH_ID" "nginx-switch-api" 12
-
-          # 5) Stop old — 이전 컨테이너 정지
-          if [ "$OLD_COLOR" != "none" ]; then
-            if [ "$OLD_COLOR" = "legacy" ]; then
-              OLD_NAMES="backend-api doktori-api"
-            else
-              OLD_NAMES="doktori-api-${OLD_COLOR}"
-            fi
-            STOP_CMDS=$(jq -n --arg names "$OLD_NAMES" '[
-              ("for c in " + $names + "; do docker stop $c 2>/dev/null || true; docker rm $c 2>/dev/null || true; done"),
-              "docker image prune -f"
-            ]')
-            STOP_ID=$(aws ssm send-command \
-              --document-name "AWS-RunShellScript" \
-              --targets "Key=tag:Name,Values=doktori-prod-api" \
-              --parameters "{\"commands\": $STOP_CMDS}" \
-              --timeout-seconds 60 \
-              --comment "stop old api ${OLD_COLOR}" \
-              --query "Command.CommandId" --output text)
-            wait_ssm "$STOP_ID" "stop-old-api" 12 || true
-          fi
-
-          echo "API deployed: ${NEW_COLOR} on port ${NEW_PORT}"
-
-  # ─── Prod Blue/Green 배포: Chat ─────────────────────────────────────
-  deploy-prod-chat:
-    needs: build-and-push
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    outputs:
-      color: ${{ steps.deploy.outputs.color }}
-      port: ${{ steps.deploy.outputs.port }}
-    steps:
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ap-northeast-2
-
-      - name: Blue/Green Deploy Chat
-        id: deploy
-        run: |
           REGISTRY="${{ secrets.ECR_REGISTRY }}"
-          TAG="${{ needs.build-and-push.outputs.image-tag }}"
-          SERVICE="chat"
-          BLUE_PORT=8081; GREEN_PORT=8083; INTERNAL_PORT=8081
-          HEALTH_PATH="/api/actuator/health"
+          API_CHANGED="${{ needs.build-and-push.outputs.api-changed }}"
+          CHAT_CHANGED="${{ needs.build-and-push.outputs.chat-changed }}"
 
-          wait_ssm() {
-            local cmd_id=$1 label=$2 max=${3:-60}
-            for i in $(seq 1 "$max"); do
-              sleep 5
-              STATUS=$(aws ssm list-command-invocations \
-                --command-id "$cmd_id" \
-                --query "CommandInvocations[0].Status" \
-                --output text 2>/dev/null || echo "Pending")
-              echo "[$label $i/$max] $STATUS"
-              case "$STATUS" in
-                Success) return 0 ;;
-                Failed|Cancelled|TimedOut|DeliveryTimedOut)
-                  echo "::error::${label} failed: ${STATUS}"
-                  aws ssm list-command-invocations --command-id "$cmd_id" --details \
-                    --query "CommandInvocations[0].CommandPlugins[0].Output" --output text || true
-                  return 1 ;;
-                None)
-                  if [ "$i" -ge 3 ]; then
-                    echo "::error::${label}: no instance matched SSM target (status=None)"
-                    return 1
-                  fi ;;
-              esac
-            done
-            echo "::error::${label} timed out"; return 1
-          }
+          # Cloud repo 클론
+          git clone --depth 1 https://x-access-token:${{ secrets.CLOUD_REPO_PAT }}@github.com/100-hours-a-week/5-team-service-cloud.git cloud
+          cd cloud
 
-          # 1) Discover — legacy를 먼저 체크
-          DISCOVER_CMDS=$(jq -n '[
-            "if docker ps --format \"{{.Names}}\" | grep -qE \"^(backend-chat|doktori-chat)$\"; then echo \"ACTIVE=legacy\";",
-            "elif docker ps --format \"{{.Names}}\" | grep -qE \"doktori-chat-blue\"; then echo \"ACTIVE=blue\";",
-            "elif docker ps --format \"{{.Names}}\" | grep -qE \"doktori-chat-green\"; then echo \"ACTIVE=green\";",
-            "else echo \"ACTIVE=none\"; fi"
-          ]')
-          DISCOVER_ID=$(aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Name,Values=doktori-prod-chat" \
-            --parameters "{\"commands\": $DISCOVER_CMDS}" \
-            --timeout-seconds 30 \
-            --comment "discover chat color" \
-            --query "Command.CommandId" --output text)
-          wait_ssm "$DISCOVER_ID" "discover" 12
-
-          DISCOVER_OUT=$(aws ssm list-command-invocations --command-id "$DISCOVER_ID" --details \
-            --query "CommandInvocations[0].CommandPlugins[0].Output" --output text)
-          ACTIVE_COLOR=$(echo "$DISCOVER_OUT" | grep -oP 'ACTIVE=\K\w+' || echo "none")
-          echo "Active color: $ACTIVE_COLOR"
-
-          case "$ACTIVE_COLOR" in
-            blue)   NEW_COLOR=green; NEW_PORT=$GREEN_PORT; OLD_COLOR=blue; OLD_PORT=$BLUE_PORT ;;
-            green)  NEW_COLOR=blue;  NEW_PORT=$BLUE_PORT;  OLD_COLOR=green; OLD_PORT=$GREEN_PORT ;;
-            legacy) NEW_COLOR=green; NEW_PORT=$GREEN_PORT; OLD_COLOR=legacy; OLD_PORT=$BLUE_PORT ;;
-            none)   NEW_COLOR=blue;  NEW_PORT=$BLUE_PORT;  OLD_COLOR=none;  OLD_PORT=0 ;;
-          esac
-          echo "Deploying: $NEW_COLOR (port $NEW_PORT)"
-          echo "color=${NEW_COLOR}" >> $GITHUB_OUTPUT
-          echo "port=${NEW_PORT}" >> $GITHUB_OUTPUT
-
-          # 2) Deploy
-          # TODO: Chat 30분 토론 세션 graceful drain — 백엔드 논의 후 추가
-          DEPLOY_CMDS=$(jq -n --arg r "$REGISTRY" --arg t "$TAG" \
-            --arg name "doktori-chat-${NEW_COLOR}" \
-            --arg np "$NEW_PORT" --arg ip "$INTERNAL_PORT" '[
-            "set -e",
-            ("aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin " + $r),
-            ("docker pull " + $r + "/doktori/backend-chat:" + $t),
-            "mkdir -p /home/ubuntu/app/secrets",
-            "aws ssm get-parameter --name /doktori/prod/FIREBASE_SERVICE_ACCOUNT --with-decryption --query Parameter.Value --output text > /home/ubuntu/app/secrets/firebase-service-account.json",
-            ("docker stop " + $name + " 2>/dev/null || true"),
-            ("docker rm " + $name + " 2>/dev/null || true"),
-            ("docker run -d --name " + $name + " --restart unless-stopped -e SPRING_PROFILES_ACTIVE=prod -e FIREBASE_CREDENTIALS_PATH=file:/app/secrets/firebase-service-account.json -v /home/ubuntu/app/secrets/firebase-service-account.json:/app/secrets/firebase-service-account.json:ro -p " + $np + ":" + $ip + " " + $r + "/doktori/backend-chat:" + $t)
-          ]')
-          DEPLOY_ID=$(aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Name,Values=doktori-prod-chat" \
-            --parameters "{\"commands\": $DEPLOY_CMDS}" \
-            --timeout-seconds 300 \
-            --comment "deploy chat ${NEW_COLOR} ${{ github.sha }}" \
-            --query "Command.CommandId" --output text)
-          wait_ssm "$DEPLOY_ID" "deploy-chat" 60
-
-          # 3) Health check
-          HEALTH_CMDS=$(jq -n --arg np "$NEW_PORT" --arg hp "$HEALTH_PATH" '[
-            "for i in $(seq 1 30); do",
-            ("  if curl -sf http://localhost:" + $np + $hp + " > /dev/null 2>&1; then echo \"HEALTHY\"; exit 0; fi"),
-            "  echo \"Waiting... ($i/30)\"; sleep 10",
-            "done",
-            "echo \"UNHEALTHY\"; exit 1"
-          ]')
-          HEALTH_ID=$(aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Name,Values=doktori-prod-chat" \
-            --parameters "{\"commands\": $HEALTH_CMDS}" \
-            --timeout-seconds 360 \
-            --comment "health check chat ${NEW_COLOR}" \
-            --query "Command.CommandId" --output text)
-
-          if ! wait_ssm "$HEALTH_ID" "health-chat" 75; then
-            echo "::error::Health check failed — collecting logs before rollback"
-            LOGS_CMDS=$(jq -n --arg name "doktori-chat-${NEW_COLOR}" '[
-              ("echo \"=== Container Status ===\""),
-              ("docker inspect " + $name + " --format=\"Status={{.State.Status}} ExitCode={{.State.ExitCode}}\" 2>&1 || echo \"container not found\""),
-              ("echo \"=== Last 80 lines of logs ===\""),
-              ("docker logs " + $name + " --tail 80 2>&1 || echo \"no logs available\"")
-            ]')
-            LOGS_ID=$(aws ssm send-command \
-              --document-name "AWS-RunShellScript" \
-              --targets "Key=tag:Name,Values=doktori-prod-chat" \
-              --parameters "{\"commands\": $LOGS_CMDS}" \
-              --timeout-seconds 30 \
-              --comment "collect chat logs before rollback" \
-              --query "Command.CommandId" --output text)
-            if wait_ssm "$LOGS_ID" "collect-logs-chat" 12; then
-              aws ssm list-command-invocations --command-id "$LOGS_ID" --details \
-                --query "CommandInvocations[0].CommandPlugins[0].Output" --output text || true
-            fi
-
-            echo "::error::Rolling back Chat deployment"
-            ROLLBACK_CMDS=$(jq -n --arg name "doktori-chat-${NEW_COLOR}" '[
-              ("docker stop " + $name + " 2>/dev/null || true"),
-              ("docker rm " + $name + " 2>/dev/null || true")
-            ]')
-            RB_ID=$(aws ssm send-command \
-              --document-name "AWS-RunShellScript" \
-              --targets "Key=tag:Name,Values=doktori-prod-chat" \
-              --parameters "{\"commands\": $ROLLBACK_CMDS}" \
-              --timeout-seconds 60 \
-              --comment "rollback chat" \
-              --query "Command.CommandId" --output text)
-            wait_ssm "$RB_ID" "rollback-chat" 12 || true
-            exit 1
+          # 변경된 모듈만 이미지 태그 업데이트
+          if [ "$API_CHANGED" == "true" ]; then
+            sed -i "s|${REGISTRY}/doktori/prod-backend-api:[^ ]*|${REGISTRY}/doktori/prod-backend-api:${TAG}|" \
+              k8s/manifests/workloads/api-deployment.yaml
+            echo "Updated api image tag → ${TAG}"
           fi
 
-          # 4) Nginx switch
-          SWITCH_CMDS=$(jq -n --arg np "$NEW_PORT" '[
-            "set -e",
-            ("docker exec nginx sed -i -E \"s/:[0-9]+;/:" + $np + ";/\" /etc/nginx/conf.d/upstream-chat.conf"),
-            "docker exec nginx nginx -t",
-            "docker exec nginx nginx -s reload",
-            ("docker exec nginx sh -c \"mkdir -p /etc/nginx/state && echo " + $np + " > /etc/nginx/state/active-port-chat\""),
-            "mkdir -p /opt/nginx-state",
-            ("echo " + $np + " > /opt/nginx-state/active-port-chat")
-          ]')
-          SWITCH_ID=$(aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Name,Values=doktori-prod-nginx" \
-            --parameters "{\"commands\": $SWITCH_CMDS}" \
-            --timeout-seconds 60 \
-            --comment "nginx switch chat to ${NEW_COLOR}" \
-            --query "Command.CommandId" --output text)
-          wait_ssm "$SWITCH_ID" "nginx-switch-chat" 12
-
-          # 5) Stop old
-          if [ "$OLD_COLOR" != "none" ]; then
-            if [ "$OLD_COLOR" = "legacy" ]; then
-              OLD_NAMES="backend-chat doktori-chat"
-            else
-              OLD_NAMES="doktori-chat-${OLD_COLOR}"
-            fi
-            STOP_CMDS=$(jq -n --arg names "$OLD_NAMES" '[
-              ("for c in " + $names + "; do docker stop $c 2>/dev/null || true; docker rm $c 2>/dev/null || true; done"),
-              "docker image prune -f"
-            ]')
-            STOP_ID=$(aws ssm send-command \
-              --document-name "AWS-RunShellScript" \
-              --targets "Key=tag:Name,Values=doktori-prod-chat" \
-              --parameters "{\"commands\": $STOP_CMDS}" \
-              --timeout-seconds 60 \
-              --comment "stop old chat ${OLD_COLOR}" \
-              --query "Command.CommandId" --output text)
-            wait_ssm "$STOP_ID" "stop-old-chat" 12 || true
+          if [ "$CHAT_CHANGED" == "true" ]; then
+            sed -i "s|${REGISTRY}/doktori/prod-backend-chat:[^ ]*|${REGISTRY}/doktori/prod-backend-chat:${TAG}|" \
+              k8s/manifests/workloads/chat-deployment.yaml
+            echo "Updated chat image tag → ${TAG}"
           fi
 
-          echo "Chat deployed: ${NEW_COLOR} on port ${NEW_PORT}"
+          # 변경 있으면 commit + push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No manifest changes to commit"
+          else
+            git commit -m "deploy(prod): api=${API_CHANGED} chat=${CHAT_CHANGED} tag=${TAG}
 
-  # ─── Prod 배포 알림 ─────────────────────────────────────────────────
-  notify-prod:
-    needs: [build-and-push, deploy-prod-api, deploy-prod-chat]
-    if: always() && github.ref == 'refs/heads/main' && needs.build-and-push.result == 'success'
-    runs-on: ubuntu-latest
-    steps:
+          Backend commit: ${{ github.sha }}
+          Triggered by: ${{ github.event.head_commit.author.name }}"
+            git push origin main
+            echo "Pushed manifest update → ArgoCD will auto-sync"
+          fi
+
       - name: Notify Discord
+        if: always()
         run: |
           SHORT_SHA="${GITHUB_SHA:0:7}"
+          TAG="${{ needs.build-and-push.outputs.image-tag }}"
           COMMIT_MSG=$(echo '${{ github.event.head_commit.message }}' | head -1)
           COMMIT_AUTHOR="${{ github.event.head_commit.author.name }}"
           COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
           ACTIONS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          API_RESULT="${{ needs.deploy-prod-api.result }}"
-          CHAT_RESULT="${{ needs.deploy-prod-chat.result }}"
-          API_COLOR="${{ needs.deploy-prod-api.outputs.color }}"
-          API_PORT="${{ needs.deploy-prod-api.outputs.port }}"
-          CHAT_COLOR="${{ needs.deploy-prod-chat.outputs.color }}"
-          CHAT_PORT="${{ needs.deploy-prod-chat.outputs.port }}"
-
-          if [ "$API_RESULT" == "success" ] && [ "$CHAT_RESULT" == "success" ]; then
-            COLOR=3066993; STATUS_EMOJI="✅"; STATUS_TEXT="배포 성공"
+          if [ "${{ job.status }}" == "success" ]; then
+            COLOR=3066993; STATUS_EMOJI="✅"; STATUS_TEXT="매니페스트 업데이트 완료 (ArgoCD auto-sync 대기)"
           else
-            COLOR=15158528; STATUS_EMOJI="❌"; STATUS_TEXT="배포 실패 (API:${API_RESULT} Chat:${CHAT_RESULT})"
+            COLOR=15158528; STATUS_EMOJI="❌"; STATUS_TEXT="매니페스트 업데이트 실패"
           fi
 
           curl -sS -H "Content-Type: application/json" -X POST -d "{
@@ -759,8 +391,7 @@ jobs:
                 {\"name\": \"🌿 브랜치\", \"value\": \"\`main\`\", \"inline\": true},
                 {\"name\": \"🔖 커밋\", \"value\": \"[\`${SHORT_SHA}\`](${COMMIT_URL})\", \"inline\": true},
                 {\"name\": \"💬 커밋 메시지\", \"value\": \"${COMMIT_MSG}\", \"inline\": false},
-                {\"name\": \"🔵 API\", \"value\": \"${API_COLOR:-N/A} (port ${API_PORT:-N/A})\", \"inline\": true},
-                {\"name\": \"🟢 Chat\", \"value\": \"${CHAT_COLOR:-N/A} (port ${CHAT_PORT:-N/A})\", \"inline\": true},
+                {\"name\": \"🏷 이미지 태그\", \"value\": \"\`${TAG}\`\", \"inline\": true},
                 {\"name\": \"👤 작성자\", \"value\": \"${COMMIT_AUTHOR}\", \"inline\": true},
                 {\"name\": \"📋 상세 로그\", \"value\": \"[Actions에서 확인](${ACTIONS_URL})\", \"inline\": true}
               ],
