@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
-@Profile({"dev", "staging"})
+@Profile({"dev", "staging", "local"})
 @RestController
 @RequestMapping("/dev")
 @RequiredArgsConstructor
