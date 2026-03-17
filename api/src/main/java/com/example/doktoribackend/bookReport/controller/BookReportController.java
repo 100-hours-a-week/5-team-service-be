@@ -93,4 +93,24 @@ public class BookReportController implements BookReportManagementApi {
                 userDetails.getId(), roundId, bookReportId);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
+
+    @Operation(summary = "독후감 찌르기", description = "모임장이 독후감 미제출 모임원에게 알림을 보냅니다.")
+    @PostMapping("/poke/{meetingMemberId}")
+    public ResponseEntity<ApiResult<Void>> pokeForBookReport(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long roundId,
+            @PathVariable Long meetingMemberId
+    ) {
+        if (roundId == null || roundId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        if (meetingMemberId == null || meetingMemberId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        bookReportService.pokeForBookReport(
+                userDetails.getId(), roundId, meetingMemberId);
+        return ResponseEntity.ok(ApiResult.ok(null));
+    }
 }
