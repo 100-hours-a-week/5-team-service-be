@@ -1,3 +1,3 @@
 package com.example.doktoribackend.room.dto;
 
-public record PageInfo(Long nextCursorId, boolean hasNext, int size) {}
+public record PageInfo(String nextCursorId, boolean hasNext, int size) {}

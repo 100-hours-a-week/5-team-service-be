@@ -1,56 +1,39 @@
 package com.example.doktoribackend.message.domain;
 
-import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Table(
-    name = "messages",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uk_messages_room_sender_client",
-        columnNames = {"room_id", "sender_id", "client_message_id"}
-    ),
-    indexes = {
-        @Index(name = "idx_messages_room_id", columnList = "room_id, id"),
-        @Index(name = "idx_messages_round_id", columnList = "round_id, id")
-    }
-)
+@Document(collection = "messages")
+@CompoundIndexes({
+    @CompoundIndex(name = "uk_room_sender_client", def = "{'roomId':1, 'senderId':1, 'clientMessageId':1}", unique = true),
+    @CompoundIndex(name = "idx_room_id", def = "{'roomId':1}"),
+    @CompoundIndex(name = "idx_round_id", def = "{'roundId':1}")
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Message {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
 
-    @Column(name = "room_id", nullable = false)
     private Long roomId;
-
-    @Column(name = "round_id", nullable = false)
     private Long roundId;
-
-    @Column(name = "sender_id", nullable = false)
     private Long senderId;
-
-    @Column(name = "client_message_id", nullable = false, length = 50)
     private String clientMessageId;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "message_type", nullable = false, length = 20)
     private MessageType messageType;
-
-    @Column(name = "text_message", length = 300)
     private String textMessage;
-
-    @Column(name = "file_path", length = 512)
     private String filePath;
 
-    @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
+    @CreatedDate
     private LocalDateTime createdAt;
 
     @Builder
