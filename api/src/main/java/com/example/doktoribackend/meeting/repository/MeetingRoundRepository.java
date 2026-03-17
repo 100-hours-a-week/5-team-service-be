@@ -90,8 +90,22 @@ public interface MeetingRoundRepository extends JpaRepository<MeetingRound, Long
     @Query("SELECT mr FROM MeetingRound mr " +
             "JOIN FETCH mr.meeting " +
             "WHERE mr.status = 'DONE' " +
-            "AND mr.bestMemberDetermined = false")
-    List<MeetingRound> findDoneRoundsNotBestMemberDetermined(Pageable pageable);
+            "AND mr.bestMemberDetermined = false " +
+            "AND mr.endAt < :cutoff")
+    List<MeetingRound> findDoneRoundsEligibleForBestMember(
+            @Param("cutoff") LocalDateTime cutoff, Pageable pageable);
+
+    @Query("SELECT mr FROM MeetingRound mr " +
+            "JOIN FETCH mr.meeting m " +
+            "WHERE mr.status = 'DONE' " +
+            "AND mr.bestMemberDetermined = false " +
+            "AND mr.endAt >= :cutoff " +
+            "AND (SELECT COUNT(r) FROM Review r " +
+            "     WHERE r.meetingRound.id = mr.id AND r.deletedAt IS NULL) " +
+            "    >= (SELECT COUNT(mm) FROM MeetingMember mm " +
+            "        WHERE mm.meeting.id = m.id AND mm.status = 'APPROVED')")
+    List<MeetingRound> findDoneRoundsWithAllReviewsCompleted(
+            @Param("cutoff") LocalDateTime cutoff, Pageable pageable);
 
     // 현재 회차 계산: 아직 종료되지 않은 첫 번째 회차의 roundNo (일괄 조회)
     @Query("SELECT mr.meeting.id as meetingId, MIN(mr.roundNo) as currentRoundNo " +

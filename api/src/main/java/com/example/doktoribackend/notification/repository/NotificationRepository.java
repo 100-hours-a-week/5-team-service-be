@@ -11,6 +11,7 @@ import java.util.List;
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
     @Query("SELECT n FROM Notification n " +
+            "JOIN FETCH n.type " +
             "WHERE n.user.id = :userId " +
             "AND n.deletedAt IS NULL " +
             "AND n.createdAt >= :since " +
