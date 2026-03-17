@@ -21,6 +21,8 @@ import com.example.doktoribackend.meeting.domain.MeetingMemberStatus;
 import com.example.doktoribackend.meeting.domain.MeetingRound;
 import com.example.doktoribackend.meeting.repository.MeetingMemberRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
+import com.example.doktoribackend.notification.domain.NotificationTypeCode;
+import com.example.doktoribackend.notification.service.NotificationService;
 import com.example.doktoribackend.user.domain.User;
 import com.example.doktoribackend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +51,7 @@ public class BookReportService {
     private final MeetingMemberRepository meetingMemberRepository;
     private final UserRepository userRepository;
     private final AiValidationService aiValidationService;
+    private final NotificationService notificationService;
 
     @Transactional
     public BookReportCreateResponse createBookReport(Long userId, Long roundId, BookReportCreateRequest request) {
@@ -334,5 +337,56 @@ public class BookReportService {
                 .writer(writerInfo)
                 .bookReport(bookReportInfo)
                 .build();
+    }
+
+    @Transactional
+    public void pokeForBookReport(Long userId, Long roundId, Long meetingMemberId) {
+        // 1. 회차 조회 (모임 정보 포함)
+        MeetingRound meetingRound = meetingRoundRepository.findByIdWithBookAndMeeting(roundId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ROUND_NOT_FOUND));
+
+        Meeting meeting = meetingRound.getMeeting();
+
+        // 2. 모임장 권한 체크
+        if (!meeting.isLeader(userId)) {
+            throw new BusinessException(ErrorCode.BOOK_REPORT_MANAGEMENT_FORBIDDEN);
+        }
+
+        // 3. 현재 독후감 제출 가능 기간인지 확인
+        MeetingRound prevRound = findPrevRound(meetingRound);
+        UserBookReportStatus periodStatus = BookReportStatusResolver.resolveNotSubmitted(
+                LocalDateTime.now(), meetingRound, prevRound);
+        if (periodStatus != UserBookReportStatus.NOT_SUBMITTED) {
+            throw new BusinessException(ErrorCode.POKE_NOT_ALLOWED);
+        }
+
+        // 4. 대상 멤버 조회 (APPROVED 상태 확인)
+        MeetingMember targetMember = meetingMemberRepository.findByIdAndMeetingIdWithUser(
+                        meetingMemberId, meeting.getId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_MEMBER_NOT_FOUND));
+
+        if (targetMember.getStatus() != MeetingMemberStatus.APPROVED) {
+            throw new BusinessException(ErrorCode.MEETING_MEMBER_NOT_FOUND);
+        }
+
+        // 5. 대상 멤버가 이미 독후감을 제출했는지 확인
+        Long targetUserId = targetMember.getUser().getId();
+        boolean alreadySubmitted = bookReportRepository
+                .findByUserIdAndMeetingRoundIdAndDeletedAtIsNull(targetUserId, roundId)
+                .isPresent();
+        if (alreadySubmitted) {
+            throw new BusinessException(ErrorCode.POKE_TARGET_ALREADY_SUBMITTED);
+        }
+
+        // 6. 찌르기 알림 발송
+        notificationService.createAndSend(
+                targetUserId,
+                NotificationTypeCode.BOOK_REPORT_POKE,
+                Map.of(
+                        "meetingId", meeting.getId().toString(),
+                        "meetingTitle", meeting.getTitle(),
+                        "roundNo", String.valueOf(meetingRound.getRoundNo())
+                )
+        );
     }
 }
