@@ -1,5 +1,6 @@
 package com.example.doktoribackend.room.integration;
 
+import com.example.doktoribackend.config.TestMongoConfig;
 import com.example.doktoribackend.room.domain.*;
 import com.example.doktoribackend.room.repository.ChattingRoomMemberRepository;
 import com.example.doktoribackend.room.repository.ChattingRoomRepository;
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.*;
 import org.springframework.messaging.converter.MappingJackson2MessageConverter;
 import org.springframework.messaging.simp.stomp.*;
@@ -32,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@Import(TestMongoConfig.class)
 class ChatRoomIntegrationTest {
 
     @LocalServerPort
@@ -108,7 +111,7 @@ class ChatRoomIntegrationTest {
 
     @AfterEach
     void tearDown() {
-        messageRepository.deleteAllInBatch();
+        messageRepository.deleteAll();
         voteCastRepository.deleteAllInBatch();
         voteRepository.deleteAllInBatch();
         roomRoundRepository.deleteAllInBatch();
