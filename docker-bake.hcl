@@ -10,6 +10,8 @@ group "default" {
   targets = ["api", "chat"]
 }
 
+# dev: doktori/backend-api, prod: doktori/prod-backend-api
+# ECR 레포 분리 — dev lifecycle policy가 prod 이미지를 밀어내는 문제 방지
 target "api" {
   context    = "."
   target     = "api"
@@ -17,8 +19,7 @@ target "api" {
   tags = TAG == "develop" ? [
     "${REGISTRY}/doktori/backend-api:develop"
   ] : [
-    "${REGISTRY}/doktori/backend-api:${TAG}",
-    "${REGISTRY}/doktori/backend-api:latest"
+    "${REGISTRY}/doktori/prod-backend-api:${TAG}",
   ]
 }
 
@@ -29,7 +30,6 @@ target "chat" {
   tags = TAG == "develop" ? [
     "${REGISTRY}/doktori/backend-chat:develop"
   ] : [
-    "${REGISTRY}/doktori/backend-chat:${TAG}",
-    "${REGISTRY}/doktori/backend-chat:latest"
+    "${REGISTRY}/doktori/prod-backend-chat:${TAG}",
   ]
 }
