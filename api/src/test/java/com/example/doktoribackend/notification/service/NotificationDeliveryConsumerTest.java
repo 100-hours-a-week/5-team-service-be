@@ -4,12 +4,16 @@ import com.example.doktoribackend.notification.domain.NotificationTypeCode;
 import com.example.doktoribackend.notification.dto.NotificationDeliveryTask;
 import com.example.doktoribackend.notification.dto.SseNotificationEvent;
 import com.rabbitmq.client.Channel;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -34,10 +38,20 @@ class NotificationDeliveryConsumerTest {
     FcmService fcmService;
 
     @Mock
+    RabbitTemplate rabbitTemplate;
+
+    @Mock
     Channel channel;
 
-    @InjectMocks
     NotificationDeliveryConsumer consumer;
+
+    @BeforeEach
+    void setUp() {
+        consumer = new NotificationDeliveryConsumer(
+                sseEmitterService, fcmService, rabbitTemplate, new SimpleMeterRegistry());
+    }
+
+    private final Message message = new Message(new byte[0], new MessageProperties());
 
     @Test
     @DisplayName("SSE 미연결 유저는 SSE + FCM 모두 발송 후 ACK한다")
@@ -45,7 +59,7 @@ class NotificationDeliveryConsumerTest {
         NotificationDeliveryTask task = createTask(List.of(1L));
         given(sseEmitterService.filterSseDisconnectedUsers(List.of(1L))).willReturn(List.of(1L));
 
-        consumer.consume(task, channel, 1L);
+        consumer.consume(task, channel, message, 1L);
 
         then(sseEmitterService).should().sendToUsers(List.of(1L), task.sseEvent());
         then(fcmService).should().sendToUsers(List.of(1L), "제목", "메시지", "/link");
@@ -59,7 +73,7 @@ class NotificationDeliveryConsumerTest {
         NotificationDeliveryTask task = createTask(List.of(1L));
         given(sseEmitterService.filterSseDisconnectedUsers(List.of(1L))).willReturn(List.of());
 
-        consumer.consume(task, channel, 1L);
+        consumer.consume(task, channel, message, 1L);
 
         then(sseEmitterService).should().sendToUsers(List.of(1L), task.sseEvent());
         then(fcmService).should(never()).sendToUsers(anyList(), anyString(), anyString(), anyString());
@@ -73,7 +87,7 @@ class NotificationDeliveryConsumerTest {
         NotificationDeliveryTask task = createTask(userIds);
         given(sseEmitterService.filterSseDisconnectedUsers(userIds)).willReturn(List.of(2L, 3L));
 
-        consumer.consume(task, channel, 1L);
+        consumer.consume(task, channel, message, 1L);
 
         then(sseEmitterService).should().sendToUsers(userIds, task.sseEvent());
         then(fcmService).should().sendToUsers(List.of(2L, 3L), "제목", "메시지", "/link");
@@ -81,17 +95,17 @@ class NotificationDeliveryConsumerTest {
     }
 
     @Test
-    @DisplayName("FCM 실패 시 NACK하여 DLQ로 라우팅한다")
-    void consume_fcmFails_nacks() throws IOException {
+    @DisplayName("FCM 실패 시 ACK 후 wait queue로 재전송한다")
+    void consume_fcmFails_acksAndRetries() throws IOException {
         NotificationDeliveryTask task = createTask(List.of(1L));
         given(sseEmitterService.filterSseDisconnectedUsers(List.of(1L))).willReturn(List.of(1L));
         willThrow(new RuntimeException("FCM 에러"))
                 .given(fcmService).sendToUsers(anyList(), anyString(), anyString(), anyString());
 
-        consumer.consume(task, channel, 1L);
+        consumer.consume(task, channel, message, 1L);
 
-        verify(channel).basicNack(1L, false, false);
-        verify(channel, never()).basicAck(1L, false);
+        verify(channel).basicAck(1L, false);
+        verify(channel, never()).basicNack(1L, false, false);
     }
 
     @Test
@@ -102,7 +116,7 @@ class NotificationDeliveryConsumerTest {
         willThrow(new RuntimeException("SSE 에러"))
                 .given(sseEmitterService).sendToUsers(anyList(), any(SseNotificationEvent.class));
 
-        consumer.consume(task, channel, 1L);
+        consumer.consume(task, channel, message, 1L);
 
         then(fcmService).should().sendToUsers(List.of(1L), "제목", "메시지", "/link");
         verify(channel).basicAck(1L, false);
