@@ -51,14 +51,20 @@ public class MessageMigrationRunner implements ApplicationRunner {
 
     private Document toDocument(Map<String, Object> row) {
         Document doc = new Document();
-        doc.put("roomId", row.get("room_id"));
-        doc.put("roundId", row.get("round_id"));
-        doc.put("senderId", row.get("sender_id"));
+        doc.put("roomId", toLong(row.get("room_id")));
+        doc.put("roundId", toLong(row.get("round_id")));
+        doc.put("senderId", toLong(row.get("sender_id")));
         doc.put("clientMessageId", row.get("client_message_id"));
         doc.put("messageType", row.get("message_type"));
         doc.put("textMessage", row.get("text_message"));
         doc.put("filePath", row.get("file_path"));
         doc.put("createdAt", row.get("created_at"));
         return doc;
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) return null;
+        if (value instanceof Long l) return l;
+        return ((Number) value).longValue();
     }
 }
