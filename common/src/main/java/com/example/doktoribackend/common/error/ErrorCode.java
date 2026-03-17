@@ -116,6 +116,8 @@ public enum ErrorCode {
     DAILY_SUBMISSION_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "DAILY_SUBMISSION_LIMIT_EXCEEDED", "일일 독후감 제출 횟수(3회)를 초과했습니다."),
     BOOK_REPORT_MANAGEMENT_FORBIDDEN(HttpStatus.FORBIDDEN, "BOOK_REPORT_MANAGEMENT_FORBIDDEN", "독후감 관리 권한이 없습니다."),
     BOOK_REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_REPORT_NOT_FOUND", "독후감을 찾을 수 없습니다."),
+    POKE_NOT_ALLOWED(HttpStatus.CONFLICT, "POKE_NOT_ALLOWED", "독후감 제출 가능 기간이 아니어서 찌르기를 할 수 없습니다."),
+    POKE_TARGET_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "POKE_TARGET_ALREADY_SUBMITTED", "이미 독후감을 제출한 모임원입니다."),
 
     // ChatRoom
     CHAT_ROOM_INVALID_CAPACITY(HttpStatus.BAD_REQUEST, "CHAT_ROOM_INVALID_CAPACITY", "채팅방 정원은 2, 4, 6명만 가능합니다."),
