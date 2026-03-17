@@ -1,5 +1,6 @@
 package com.example.doktoribackend.message.integration;
 
+import com.example.doktoribackend.config.TestMongoConfig;
 import com.example.doktoribackend.message.domain.MessageType;
 import com.example.doktoribackend.message.dto.MessageResponse;
 import com.example.doktoribackend.message.repository.MessageRepository;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.messaging.converter.MappingJackson2MessageConverter;
 import org.springframework.messaging.simp.stomp.*;
 import org.springframework.test.context.ActiveProfiles;
@@ -31,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@Import(TestMongoConfig.class)
 class MessageIntegrationTest {
 
     @LocalServerPort
@@ -101,7 +104,7 @@ class MessageIntegrationTest {
 
     @AfterEach
     void tearDown() {
-        messageRepository.deleteAllInBatch();
+        messageRepository.deleteAll();
         roomRoundRepository.deleteAllInBatch();
         chattingRoomMemberRepository.deleteAllInBatch();
         chattingRoomRepository.deleteAllInBatch();

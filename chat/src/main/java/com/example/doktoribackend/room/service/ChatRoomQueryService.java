@@ -54,7 +54,7 @@ public class ChatRoomQueryService {
                 .map(ChatRoomListItem::from)
                 .toList();
 
-        Long nextCursorId = hasNext ? content.getLast().getId() : null;
+        String nextCursorId = hasNext ? String.valueOf(content.getLast().getId()) : null;
         PageInfo pageInfo = new PageInfo(nextCursorId, hasNext, size);
 
         return new ChatRoomListResponse(items, pageInfo);

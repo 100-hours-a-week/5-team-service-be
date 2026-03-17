@@ -71,7 +71,7 @@ class SchedulerLockAnnotationTest {
         assertLockAtMostFor(ZoomLinkSchedulerService.class, "createZoomLinksForUpcomingMeetings", "55s");
         assertLockAtMostFor(BookReportSchedulerService.class, "failStalePendingReports", "4m");
         assertLockAtMostFor(MeetingScheduler.class, "updateExpiredRecruitmentStatus", "23h");
-        assertLockAtMostFor(MeetingScheduler.class, "completeExpiredRounds", "55m");
+        assertLockAtMostFor(MeetingScheduler.class, "completeExpiredRounds", "4m");
     }
 
     private void assertLockAtMostFor(Class<?> clazz, String methodName, String expected) {

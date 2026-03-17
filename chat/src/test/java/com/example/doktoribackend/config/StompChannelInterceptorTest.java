@@ -4,11 +4,12 @@ import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.security.CustomUserDetails;
 import com.example.doktoribackend.security.jwt.JwtTokenProvider;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.Message;
@@ -32,8 +33,12 @@ class StompChannelInterceptorTest {
     @Mock
     private MessageChannel channel;
 
-    @InjectMocks
     private StompChannelInterceptor interceptor;
+
+    @BeforeEach
+    void setUp() {
+        interceptor = new StompChannelInterceptor(jwtTokenProvider, new SimpleMeterRegistry());
+    }
 
     private static final String VALID_TOKEN = "valid.jwt.token";
     private static final Long USER_ID = 1L;

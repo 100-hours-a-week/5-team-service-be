@@ -606,7 +606,7 @@ public interface ChatRoomApi {
     ResponseEntity<ApiResult<MessageListResponse>> getMessages(
             @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(description = "채팅방 ID", example = "1") Long roomId,
-            @Parameter(description = "마지막으로 조회한 메세지 ID (첫 조회 시 생략)", example = "100") Long cursorId,
+            @Parameter(description = "마지막으로 조회한 메세지 ID (첫 조회 시 생략)", example = "507f1f77bcf86cd799439011") String cursorId,
             @Parameter(description = "조회할 메세지 수 (기본값: 20, 최대: 20)", example = "20") Integer size);
 
     @CommonErrorResponses

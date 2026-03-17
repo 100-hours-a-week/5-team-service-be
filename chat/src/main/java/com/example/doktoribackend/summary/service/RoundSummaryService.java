@@ -1,6 +1,7 @@
 package com.example.doktoribackend.summary.service;
 
 import com.example.doktoribackend.message.domain.Message;
+import com.example.doktoribackend.message.domain.MessageType;
 import com.example.doktoribackend.message.repository.MessageRepository;
 import com.example.doktoribackend.room.domain.ChattingRoomMember;
 import com.example.doktoribackend.room.repository.ChattingRoomMemberRepository;
@@ -92,7 +93,7 @@ public class RoundSummaryService {
         readTx.setReadOnly(true);
 
         return readTx.execute(status -> {
-            List<Message> messages = messageRepository.findTextMessagesByRoundIdDesc(roundId);
+            List<Message> messages = messageRepository.findByRoundIdAndMessageTypeOrderByIdDesc(roundId, MessageType.TEXT);
             if (messages.isEmpty()) {
                 return Collections.emptyList();
             }
