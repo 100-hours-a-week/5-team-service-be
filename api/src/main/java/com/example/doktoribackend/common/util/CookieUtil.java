@@ -20,81 +20,64 @@ public class CookieUtil {
 
     private final boolean secure;
     private final String sameSite;
+    private final String domain;
 
     public CookieUtil(
             @Value("${app.cookie.secure}") boolean secure,
-            @Value("${app.cookie.same-site}") String sameSite) {
+            @Value("${app.cookie.same-site}") String sameSite,
+            @Value("${app.cookie.domain:}") String domain) {
         this.secure = secure;
         this.sameSite = sameSite;
+        this.domain = domain;
     }
 
     public void addRefreshTokenCookie(HttpServletResponse response, String refreshToken, long maxAgeSeconds) {
-        ResponseCookie cookie = ResponseCookie.from(REFRESH_TOKEN, refreshToken)
-                .httpOnly(true)
-                .secure(this.secure)
-                .path(REFRESH_COOKIE_PATH)
-                .maxAge(maxAgeSeconds)
-                .sameSite(this.sameSite)
-                .build();
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        addCookie(response, REFRESH_TOKEN, refreshToken, REFRESH_COOKIE_PATH, maxAgeSeconds);
     }
 
     public String resolveRefreshToken(HttpServletRequest request) {
-        Cookie[] cookies = request.getCookies();
-        if (cookies == null) {
-            return null;
-        }
-        for (Cookie cookie : cookies) {
-            if (REFRESH_TOKEN.equals(cookie.getName())) {
-                return cookie.getValue();
-            }
-        }
-        return null;
+        return resolveCookieValue(request, REFRESH_TOKEN);
     }
 
     public void removeRefreshTokenCookie(HttpServletResponse response) {
-        ResponseCookie cookie = ResponseCookie.from(REFRESH_TOKEN, "")
-                .httpOnly(true)
-                .secure(secure)
-                .path(REFRESH_COOKIE_PATH)
-                .maxAge(0)
-                .sameSite(sameSite)
-                .build();
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        addCookie(response, REFRESH_TOKEN, "", REFRESH_COOKIE_PATH, 0);
     }
 
     public void addStateCookie(HttpServletResponse response, String state) {
-        ResponseCookie cookie = ResponseCookie.from(OAUTH_STATE, state)
-                .httpOnly(true)
-                .secure(secure)
-                .path(OAUTH_STATE_PATH)
-                .maxAge(600)
-                .sameSite(sameSite)
-                .build();
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        addCookie(response, OAUTH_STATE, state, OAUTH_STATE_PATH, 600);
     }
 
     public String resolveState(HttpServletRequest request) {
+        return resolveCookieValue(request, OAUTH_STATE);
+    }
+
+    public void removeStateCookie(HttpServletResponse response) {
+        addCookie(response, OAUTH_STATE, "", OAUTH_STATE_PATH, 0);
+    }
+
+    private void addCookie(HttpServletResponse response, String name, String value, String path, long maxAge) {
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(name, value)
+                .httpOnly(true)
+                .secure(secure)
+                .path(path)
+                .maxAge(maxAge)
+                .sameSite(sameSite);
+        if (!domain.isEmpty()) {
+            builder.domain(domain);
+        }
+        response.addHeader(HttpHeaders.SET_COOKIE, builder.build().toString());
+    }
+
+    private String resolveCookieValue(HttpServletRequest request, String name) {
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
             return null;
         }
         for (Cookie cookie : cookies) {
-            if (OAUTH_STATE.equals(cookie.getName())) {
+            if (name.equals(cookie.getName())) {
                 return cookie.getValue();
             }
         }
         return null;
-    }
-
-    public void removeStateCookie(HttpServletResponse response) {
-        ResponseCookie cookie = ResponseCookie.from(OAUTH_STATE, "")
-                .httpOnly(true)
-                .secure(secure)
-                .path(OAUTH_STATE_PATH)
-                .maxAge(0)
-                .sameSite(sameSite)
-                .build();
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 }

@@ -22,6 +22,7 @@ app:
   cookie:
     secure: true
     same-site: Lax
+    domain: doktori.kr
 
 springdoc:
   api-docs:
@@ -30,5 +31,5 @@ springdoc:
     enabled: false
 
 ai:
-  base-url: ${AI_BASE_URL:https://doktori.kr/ai}
+  base-url: ${AI_BASE_URL:https://ai.doktori.kr}
   api-key: ${AI_API_KEY}

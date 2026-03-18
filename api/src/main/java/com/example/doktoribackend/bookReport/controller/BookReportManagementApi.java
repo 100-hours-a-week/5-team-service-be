@@ -181,4 +181,97 @@ public interface BookReportManagementApi {
             @Parameter(description = "회차 ID", example = "123") Long roundId,
             @Parameter(description = "독후감 ID", example = "456") Long bookReportId
     );
+
+    @CommonErrorResponses
+    @AuthErrorResponses
+    @Operation(
+            summary = "독후감 찌르기",
+            description = "모임장이 독후감 제출 가능 기간 내에 미제출한 모임원에게 알림을 보냅니다."
+    )
+    @ApiResponse(
+            responseCode = "200",
+            description = "OK",
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {
+                              "code": "OK",
+                              "message": "요청이 성공적으로 처리되었습니다.",
+                              "data": null
+                            }
+                            """)
+            )
+    )
+    @ApiResponse(
+            responseCode = "403",
+            description = "Forbidden",
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {
+                              "code": "BOOK_REPORT_MANAGEMENT_FORBIDDEN",
+                              "message": "독후감 관리 권한이 없습니다."
+                            }
+                            """)
+            )
+    )
+    @ApiResponse(
+            responseCode = "404",
+            description = "Not Found",
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = {
+                            @ExampleObject(
+                                    name = "회차 없음",
+                                    value = """
+                                            {
+                                              "code": "ROUND_NOT_FOUND",
+                                              "message": "모임 회차를 찾을 수 없습니다."
+                                            }
+                                            """
+                            ),
+                            @ExampleObject(
+                                    name = "멤버 없음",
+                                    value = """
+                                            {
+                                              "code": "MEETING_MEMBER_NOT_FOUND",
+                                              "message": "존재하지 않는 모임 멤버입니다."
+                                            }
+                                            """
+                            )
+                    }
+            )
+    )
+    @ApiResponse(
+            responseCode = "409",
+            description = "Conflict",
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = {
+                            @ExampleObject(
+                                    name = "제출 가능 기간 아님",
+                                    value = """
+                                            {
+                                              "code": "POKE_NOT_ALLOWED",
+                                              "message": "독후감 제출 가능 기간이 아니어서 찌르기를 할 수 없습니다."
+                                            }
+                                            """
+                            ),
+                            @ExampleObject(
+                                    name = "이미 제출한 멤버",
+                                    value = """
+                                            {
+                                              "code": "POKE_TARGET_ALREADY_SUBMITTED",
+                                              "message": "이미 독후감을 제출한 모임원입니다."
+                                            }
+                                            """
+                            )
+                    }
+            )
+    )
+    ResponseEntity<ApiResult<Void>> pokeForBookReport(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
+            @Parameter(description = "회차 ID", example = "123") Long roundId,
+            @Parameter(description = "찌르기 대상 모임 멤버 ID", example = "10") Long meetingMemberId
+    );
 }
