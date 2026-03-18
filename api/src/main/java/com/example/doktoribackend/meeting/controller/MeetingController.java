@@ -173,10 +173,11 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
                                             "endTime": "21:30"
                                           },
                                           "leader": {
-                                            "userId": 45,
                                             "nickname": "startup",
                                             "profileImagePath": "https://cdn.example.com/profiles/45.png",
-                                            "intro": "안녕하세요, 함께 완독해봐요!"
+                                            "intro": "안녕하세요, 함께 완독해봐요!",
+                                            "averageRating": 4.3,
+                                            "leaderMeetingCount": 5
                                           }
                                         },
                                         "rounds": [
