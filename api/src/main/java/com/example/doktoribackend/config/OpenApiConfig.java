@@ -25,7 +25,7 @@ class OpenApiConfig {
                 .servers(List.of(
                         new Server().url("http://localhost:8080/api").description("Local Server"),
                         new Server().url("https://dev.doktori.kr/api").description("Development Server"),
-                        new Server().url("https://doktori.kr/api").description("Production Server")
+                        new Server().url("https://api.doktori.kr/api").description("Production Server")
                 ))
                 .components(new Components()
                         .addSecuritySchemes(bearerSchemeName,

@@ -80,6 +80,7 @@ public enum ErrorCode {
     KICK_NOT_ALLOWED(HttpStatus.CONFLICT, "KICK_NOT_ALLOWED", "강퇴할 수 없는 상태입니다."),
     READING_GENRE_NOT_FOUND(HttpStatus.NOT_FOUND, "READING_GENRE_NOT_FOUND", "존재하지 않는 독서 장르입니다."),
     CAPACITY_LESS_THAN_CURRENT(HttpStatus.CONFLICT, "CAPACITY_LESS_THAN_CURRENT", "정원은 현재 인원보다 작을 수 없습니다."),
+    BOOKMARK_ALREADY_EXISTS(HttpStatus.CONFLICT, "BOOKMARK_ALREADY_EXISTS", "이미 관심 모임으로 등록되어 있습니다."),
 
     // LeaderDelegation
     LEADER_DELEGATION_FORBIDDEN(HttpStatus.FORBIDDEN, "LEADER_DELEGATION_FORBIDDEN", "모임장 위임 권한이 없습니다."),
@@ -115,6 +116,8 @@ public enum ErrorCode {
     DAILY_SUBMISSION_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "DAILY_SUBMISSION_LIMIT_EXCEEDED", "일일 독후감 제출 횟수(3회)를 초과했습니다."),
     BOOK_REPORT_MANAGEMENT_FORBIDDEN(HttpStatus.FORBIDDEN, "BOOK_REPORT_MANAGEMENT_FORBIDDEN", "독후감 관리 권한이 없습니다."),
     BOOK_REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_REPORT_NOT_FOUND", "독후감을 찾을 수 없습니다."),
+    POKE_NOT_ALLOWED(HttpStatus.CONFLICT, "POKE_NOT_ALLOWED", "독후감 제출 가능 기간이 아니어서 찌르기를 할 수 없습니다."),
+    POKE_TARGET_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "POKE_TARGET_ALREADY_SUBMITTED", "이미 독후감을 제출한 모임원입니다."),
 
     // ChatRoom
     CHAT_ROOM_INVALID_CAPACITY(HttpStatus.BAD_REQUEST, "CHAT_ROOM_INVALID_CAPACITY", "채팅방 정원은 2, 4, 6명만 가능합니다."),
@@ -143,7 +146,18 @@ public enum ErrorCode {
     VOTE_NOT_FOUND(HttpStatus.NOT_FOUND, "VOTE_NOT_FOUND", "투표를 찾을 수 없습니다."),
     VOTE_NOT_OPEN(HttpStatus.CONFLICT, "VOTE_NOT_OPEN", "아직 투표가 시작되지 않았습니다."),
     VOTE_ALREADY_CLOSED(HttpStatus.CONFLICT, "VOTE_ALREADY_CLOSED", "이미 종료된 투표입니다."),
-    VOTE_ALREADY_CAST(HttpStatus.CONFLICT, "VOTE_ALREADY_CAST", "이미 투표하였습니다.");
+    VOTE_ALREADY_CAST(HttpStatus.CONFLICT, "VOTE_ALREADY_CAST", "이미 투표하였습니다."),
+
+    // Review
+    REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "REVIEW_NOT_FOUND", "리뷰를 찾을 수 없습니다."),
+    REVIEW_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "REVIEW_ALREADY_SUBMITTED", "이미 리뷰를 작성했습니다."),
+    ROUND_NOT_COMPLETED(HttpStatus.CONFLICT, "ROUND_NOT_COMPLETED", "아직 종료되지 않은 회차입니다."),
+    REVIEW_PERIOD_EXPIRED(HttpStatus.CONFLICT, "REVIEW_PERIOD_EXPIRED", "리뷰 작성 기간이 만료되었습니다."),
+    REVIEW_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "REVIEW_DELETE_FORBIDDEN", "리뷰 삭제 권한이 없습니다."),
+    INVALID_RATING_STEP(HttpStatus.BAD_REQUEST, "INVALID_RATING_STEP", "별점은 0.5 단위여야 합니다."),
+    INVALID_BEST_MEMBER(HttpStatus.BAD_REQUEST, "INVALID_BEST_MEMBER", "유효하지 않은 베스트 모임원입니다."),
+    REVIEW_IMAGE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "REVIEW_IMAGE_LIMIT_EXCEEDED", "리뷰 이미지는 최대 5장까지 가능합니다."),
+    BOOK_REPORT_NOT_SUBMITTED(HttpStatus.CONFLICT, "BOOK_REPORT_NOT_SUBMITTED", "독후감을 작성하지 않아 리뷰를 작성할 수 없습니다.");
 
 
     private final HttpStatus status;

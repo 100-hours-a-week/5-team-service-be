@@ -3,22 +3,9 @@ package com.example.doktoribackend.meeting.controller;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.common.response.ApiResult;
 import com.example.doktoribackend.exception.BusinessException;
-import com.example.doktoribackend.meeting.dto.LeaderDelegationRequest;
-import com.example.doktoribackend.meeting.dto.LeaderDelegationResponse;
-import com.example.doktoribackend.meeting.dto.MeetingCreateRequest;
-import com.example.doktoribackend.meeting.dto.MeetingCreateResponse;
-import com.example.doktoribackend.meeting.dto.MeetingDetailResponse;
-import com.example.doktoribackend.meeting.dto.JoinMeetingResponse;
-import com.example.doktoribackend.meeting.dto.MeetingListRequest;
-import com.example.doktoribackend.meeting.dto.MeetingListResponse;
-import com.example.doktoribackend.meeting.dto.MeetingMembersResponse;
-import com.example.doktoribackend.meeting.dto.PendingMembersResponse;
-import com.example.doktoribackend.meeting.dto.MeetingSearchRequest;
-import com.example.doktoribackend.meeting.dto.MeetingPatchRequest;
-import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateRequest;
-import com.example.doktoribackend.meeting.dto.ParticipationStatusUpdateResponse;
-import com.example.doktoribackend.meeting.dto.TopicRecommendationResponse;
+import com.example.doktoribackend.meeting.dto.*;
 import com.example.doktoribackend.meeting.service.LeaderDelegationService;
+import com.example.doktoribackend.meeting.service.MeetingBookmarkService;
 import com.example.doktoribackend.meeting.service.MeetingService;
 import com.example.doktoribackend.meeting.service.TopicRecommendationService;
 import com.example.doktoribackend.security.CustomUserDetails;
@@ -43,11 +30,12 @@ import java.net.URI;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/meetings")
-public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi, LeaderDelegationApi, CancelParticipationApi, LeaveMeetingApi, MeetingMembersApi, KickMemberApi, PendingMembersApi {
+public class MeetingController implements MeetingParticipationApi, TopicRecommendationApi, LeaderDelegationApi, CancelParticipationApi, LeaveMeetingApi, MeetingMembersApi, KickMemberApi, PendingMembersApi, MeetingBookmarkApi {
 
     private final MeetingService meetingService;
     private final TopicRecommendationService topicRecommendationService;
     private final LeaderDelegationService leaderDelegationService;
+    private final MeetingBookmarkService meetingBookmarkService;
 
     @Operation(summary = "모임 생성", description = "로그인 사용자가 모임을 생성합니다.")
     @ApiResponses({
@@ -150,9 +138,11 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
     })
     @GetMapping
     public ResponseEntity<ApiResult<MeetingListResponse>> getMeetings(
-            @Valid @ModelAttribute MeetingListRequest request
+            @Valid @ModelAttribute MeetingListRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        MeetingListResponse response = meetingService.getMeetings(request);
+        Long userId = (userDetails != null) ? userDetails.getId() : null;
+        MeetingListResponse response = meetingService.getMeetings(request, userId);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
@@ -183,10 +173,11 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
                                             "endTime": "21:30"
                                           },
                                           "leader": {
-                                            "userId": 45,
                                             "nickname": "startup",
                                             "profileImagePath": "https://cdn.example.com/profiles/45.png",
-                                            "intro": "안녕하세요, 함께 완독해봐요!"
+                                            "intro": "안녕하세요, 함께 완독해봐요!",
+                                            "averageRating": 4.3,
+                                            "leaderMeetingCount": 5
                                           }
                                         },
                                         "rounds": [
@@ -361,9 +352,11 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
     })
     @GetMapping("/search")
     public ResponseEntity<ApiResult<MeetingListResponse>> searchMeetings(
-            @Valid @ParameterObject MeetingSearchRequest request
+            @Valid @ParameterObject MeetingSearchRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
-        MeetingListResponse response = meetingService.searchMeetings(request);
+        Long userId = (userDetails != null) ? userDetails.getId() : null;
+        MeetingListResponse response = meetingService.searchMeetings(request, userId);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
@@ -565,6 +558,25 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 
+    @Operation(summary = "본인 제외 모임원 조회", description = "해당 회차에 독후감을 작성한 모임원 목록을 본인 제외하여 조회합니다.")
+    @GetMapping("/{meetingId}/rounds/{meetingRoundId}/members/others")
+    public ResponseEntity<ApiResult<OtherMembersResponse>> getOtherMembers(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId,
+            @PathVariable Long meetingRoundId
+    ) {
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        if (meetingRoundId == null || meetingRoundId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        OtherMembersResponse response = meetingService.getOtherMembers(userDetails.getId(), meetingId, meetingRoundId);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
     @Override
     @DeleteMapping("/{meetingId}/members/{memberId}")
     public ResponseEntity<Void> kickMember(
@@ -616,6 +628,100 @@ public class MeetingController implements MeetingParticipationApi, TopicRecommen
 
         PendingMembersResponse response = meetingService.getPendingMembers(
                 userDetails.getId(), meetingId, cursorId, size);
+        return ResponseEntity.ok(ApiResult.ok(response));
+    }
+
+    @Override
+    @PostMapping("/{meetingId}/bookmarks")
+    public ResponseEntity<Void> addBookmark(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        meetingBookmarkService.addBookmark(userDetails.getId(), meetingId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    @DeleteMapping("/{meetingId}/bookmarks")
+    public ResponseEntity<Void> removeBookmark(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId
+    ) {
+        if (userDetails == null) {
+            throw new BusinessException(ErrorCode.AUTH_UNAUTHORIZED);
+        }
+
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        meetingBookmarkService.removeBookmark(userDetails.getId(), meetingId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    @GetMapping("/{meetingId}/bookmarks")
+    public ResponseEntity<ApiResult<MeetingBookmarkStatusResponse>> getBookmarkStatus(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long meetingId
+    ) {
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        Long userId = (userDetails != null) ? userDetails.getId() : null;
+        Boolean isBookmarked = meetingBookmarkService.getBookmarkStatus(userId, meetingId);
+
+        return ResponseEntity.ok(ApiResult.ok(new MeetingBookmarkStatusResponse(isBookmarked)));
+    }
+
+    @Operation(summary = "모임 참여 상태 조회", description = "모임의 참여자 정보와 현재 사용자의 참여 상태를 조회합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "OK",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResult.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "OK",
+                                      "message": "요청이 성공적으로 처리되었습니다.",
+                                      "data": {
+                                        "totalCount": 5,
+                                        "profileImages": [
+                                          "https://cdn.example.com/profiles/u1.png",
+                                          "https://cdn.example.com/profiles/u2.png"
+                                        ],
+                                        "myParticipationStatus": "APPROVED"
+                                      }
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "404", description = "Meeting not found",
+                    content = @Content(mediaType = "application/json",
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "MEETING_NOT_FOUND",
+                                      "message": "존재하지 않는 모임입니다."
+                                    }
+                                    """)))
+    })
+    @GetMapping("/{meetingId}/participation-status")
+    public ResponseEntity<ApiResult<ParticipationStatusResponse>> getParticipationStatus(
+            @PathVariable Long meetingId,
+            @AuthenticationPrincipal CustomUserDetails currentUser
+    ) {
+        if (meetingId == null || meetingId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        Long currentUserId = (currentUser != null) ? currentUser.getId() : null;
+        ParticipationStatusResponse response = meetingService.getParticipationStatus(meetingId, currentUserId);
         return ResponseEntity.ok(ApiResult.ok(response));
     }
 }

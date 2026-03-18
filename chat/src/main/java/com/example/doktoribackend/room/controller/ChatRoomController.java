@@ -140,11 +140,10 @@ public class ChatRoomController implements ChatRoomApi {
     public ResponseEntity<ApiResult<MessageListResponse>> getMessages(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long roomId,
-            @RequestParam(required = false) Long cursorId,
+            @RequestParam(required = false) String cursorId,
             @RequestParam(defaultValue = "20") Integer size
     ) {
         validateSize(size);
-        validateCursorId(cursorId);
 
         MessageListResponse response = messageService.getMessages(roomId, userDetails.getId(), cursorId, size);
         return ResponseEntity.ok(ApiResult.ok(response));

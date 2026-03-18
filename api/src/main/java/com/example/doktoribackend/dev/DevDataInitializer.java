@@ -16,13 +16,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
-@Profile("dev")
+@Profile({"dev", "staging", "local", "prod"})
 @Component
 @RequiredArgsConstructor
 public class DevDataInitializer implements ApplicationRunner {
 
     static final String DEV_PROVIDER_ID_PREFIX = "dev_test_";
-    private static final int TEST_USER_COUNT = 100;
+    private static final int TEST_USER_COUNT = 500;
 
     private final UserRepository userRepository;
     private final UserAccountRepository userAccountRepository;

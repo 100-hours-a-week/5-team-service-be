@@ -271,16 +271,12 @@ public class MeetingRepositoryImpl implements MeetingRepositoryCustom {
         Root<MeetingMember> memberRoot =
                 memberSubquery.from(MeetingMember.class);
         
-        // APPROVED와 PENDING 모두 포함
+        // ACTIVE 필터: APPROVED 상태만 조회 (PENDING 제외)
+        // INACTIVE 필터: APPROVED 상태만 조회
         memberSubquery.select(memberRoot.get("meeting").get("id"))
                 .where(
                         cb.equal(memberRoot.get("user").get("id"), userId),
-                        cb.or(
-                                cb.equal(memberRoot.get("status"), 
-                                        APPROVED),
-                                cb.equal(memberRoot.get("status"), 
-                                        MeetingMemberStatus.PENDING)
-                        )
+                        cb.equal(memberRoot.get("status"), APPROVED)
                 );
 
         List<Predicate> predicates = new ArrayList<>();

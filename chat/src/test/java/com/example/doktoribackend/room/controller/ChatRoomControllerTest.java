@@ -314,7 +314,7 @@ class ChatRoomControllerTest {
         void getChatRooms_withParams_success() throws Exception {
             ChatRoomListResponse response = new ChatRoomListResponse(
                     List.of(new ChatRoomListItem(4L, "주제4", "설명4", 4, 1, "책제목4", "저자4", "http://thumb4.url")),
-                    new PageInfo(4L, true, 1)
+                    new PageInfo("4", true, 1)
             );
             given(chatRoomQueryService.getChatRooms(10L, 1)).willReturn(response);
 
@@ -740,7 +740,7 @@ class ChatRoomControllerTest {
         @DisplayName("파라미터 없이 요청하면 200 OK와 메시지 목록을 반환한다")
         void getMessages_noParams_success() throws Exception {
             MessageListResponse response = new MessageListResponse(
-                    List.of(new MessageResponse(100L, 1L, "독서왕", MessageType.TEXT, "안녕하세요!", null,
+                    List.of(new MessageResponse("aaa", 1L, "독서왕", MessageType.TEXT, "안녕하세요!", null,
                             LocalDateTime.of(2026, 2, 17, 14, 35, 0))),
                     new PageInfo(null, false, 20)
             );
@@ -752,7 +752,7 @@ class ChatRoomControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.messages").isArray())
                     .andExpect(jsonPath("$.data.messages.length()").value(1))
-                    .andExpect(jsonPath("$.data.messages[0].messageId").value(100))
+                    .andExpect(jsonPath("$.data.messages[0].messageId").value("aaa"))
                     .andExpect(jsonPath("$.data.messages[0].senderNickname").value("독서왕"))
                     .andExpect(jsonPath("$.data.messages[0].messageType").value("TEXT"))
                     .andExpect(jsonPath("$.data.messages[0].textMessage").value("안녕하세요!"))
@@ -763,11 +763,11 @@ class ChatRoomControllerTest {
         @DisplayName("cursorId와 size를 지정하면 해당 파라미터로 조회한다")
         void getMessages_withParams_success() throws Exception {
             MessageListResponse response = new MessageListResponse(
-                    List.of(new MessageResponse(99L, 1L, "독서왕", MessageType.TEXT, "이전 메시지", null,
+                    List.of(new MessageResponse("bbb", 1L, "독서왕", MessageType.TEXT, "이전 메시지", null,
                             LocalDateTime.of(2026, 2, 17, 14, 30, 0))),
-                    new PageInfo(98L, true, 5)
+                    new PageInfo("aaa", true, 5)
             );
-            given(messageService.getMessages(10L, USER_ID, 100L, 5)).willReturn(response);
+            given(messageService.getMessages(10L, USER_ID, "100", 5)).willReturn(response);
 
             mockMvc.perform(get("/chat-rooms/10/messages")
                             .param("cursorId", "100")
@@ -775,9 +775,9 @@ class ChatRoomControllerTest {
                             .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
                             .with(csrf()))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.messages[0].messageId").value(99))
+                    .andExpect(jsonPath("$.data.messages[0].messageId").value("bbb"))
                     .andExpect(jsonPath("$.data.pageInfo.hasNext").value(true))
-                    .andExpect(jsonPath("$.data.pageInfo.nextCursorId").value(98));
+                    .andExpect(jsonPath("$.data.pageInfo.nextCursorId").value("aaa"));
         }
 
         @Test
@@ -814,15 +814,6 @@ class ChatRoomControllerTest {
                     .andExpect(status().isBadRequest());
         }
 
-        @ParameterizedTest(name = "cursorId={0}이면 400 Bad Request")
-        @ValueSource(ints = {0, -1})
-        void invalidCursorId_returns400(int cursorId) throws Exception {
-            mockMvc.perform(get("/chat-rooms/10/messages")
-                            .param("cursorId", String.valueOf(cursorId))
-                            .with(SecurityMockMvcRequestPostProcessors.user(createUserDetails()))
-                            .with(csrf()))
-                    .andExpect(status().isBadRequest());
-        }
     }
 
     @Nested

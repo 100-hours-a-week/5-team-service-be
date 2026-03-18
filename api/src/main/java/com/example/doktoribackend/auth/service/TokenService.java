@@ -1,7 +1,7 @@
 package com.example.doktoribackend.auth.service;
 
-import com.example.doktoribackend.auth.domain.RefreshToken;
-import com.example.doktoribackend.auth.repository.RefreshTokenRepository;
+import com.example.doktoribackend.auth.domain.RefreshTokenRedis;
+import com.example.doktoribackend.auth.repository.RefreshTokenRedisRepository;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
 import com.example.doktoribackend.exception.UserNotFoundException;
@@ -14,11 +14,8 @@ import com.github.f4b6a3.tsid.TsidCreator;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -27,78 +24,82 @@ import java.util.List;
 public class TokenService {
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenRedisRepository refreshTokenRedisRepository;
     private final UserRepository userRepository;
     private final UserPushTokenRepository userPushTokenRepository;
 
-    @Transactional
+    /**
+     * 토큰 발급 (로그인 시)
+     * - 기존 토큰 모두 삭제 후 새 토큰 발급
+     */
     public TokenResponse issueTokens(User user) {
-        revokeAllUserTokens(user);
+        revokeAllUserTokens(user.getId());
         return createTokenPair(user);
     }
 
-    @Transactional
+    /**
+     * 토큰 갱신 (RTR 적용)
+     * - 기존 토큰 삭제 → 새 토큰 발급
+     */
     public TokenResponse refreshTokens(String refreshToken) {
-        try {
-            Claims claims = jwtTokenProvider.validateRefreshToken(refreshToken);
-            String tokenId = jwtTokenProvider.getTokenIdFromRefreshToken(refreshToken);
-            Long userId = Long.parseLong(claims.getSubject());
+        Claims claims = jwtTokenProvider.validateRefreshToken(refreshToken);
+        String tokenId = jwtTokenProvider.getTokenIdFromRefreshToken(refreshToken);
+        Long userId = Long.parseLong(claims.getSubject());
 
-            RefreshToken stored = refreshTokenRepository.findById(tokenId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN));
+        // Redis에서 토큰 조회
+        RefreshTokenRedis stored = refreshTokenRedisRepository.findById(tokenId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_EXIST_REFRESH_TOKEN));
 
-            validateRefreshToken(stored, userId);
-
-            User user = userRepository.findByIdAndDeletedAtIsNull(userId)
-                    .orElseThrow(UserNotFoundException::new);
-            stored.revoke();
-            return createTokenPair(user);
-
-        } catch (OptimisticLockingFailureException e) {
-            log.warn("Concurrent refresh token request detected");
-            throw new BusinessException(ErrorCode.REFRESH_TOKEN_EXPIRED);
-        }
-    }
-
-
-    @Transactional
-    public void logout(String refreshToken) {
-        try {
-            String tokenId = jwtTokenProvider.getTokenIdFromRefreshToken(refreshToken);
-
-            RefreshToken stored = refreshTokenRepository.findById(tokenId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN));
-
-            if (!stored.isRevoked()) {
-                stored.revoke();
-            }
-
-            userPushTokenRepository.deleteById(stored.getUserId());
-        } catch (OptimisticLockingFailureException e) {
-            log.debug("Token already revoked during logout");
-        }
-    }
-
-    @Transactional
-    public void revokeAllUserTokens(User user) {
-        List<RefreshToken> tokens = refreshTokenRepository
-                .findAllByUserAndRevokedFalse(user);
-
-        if (!tokens.isEmpty()) {
-            tokens.forEach(RefreshToken::revoke);
-        }
-    }
-
-    private void validateRefreshToken(RefreshToken stored, Long userId) {
-        if (stored.isRevoked()) {
-            throw new BusinessException(ErrorCode.INVALID_TOKEN_REUSE_DETECTED);
-        }
-        if (stored.isExpired()) {
-            throw new BusinessException(ErrorCode.REFRESH_TOKEN_EXPIRED);
-        }
+        // 토큰 소유자 검증
         if (!stored.getUserId().equals(userId)) {
             throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
+
+        // 사용자 조회
+        User user = userRepository.findByIdAndDeletedAtIsNull(userId)
+                .orElseThrow(UserNotFoundException::new);
+
+        // 기존 토큰 삭제 (RTR: 한 번 사용한 토큰은 즉시 무효화)
+        refreshTokenRedisRepository.deleteById(tokenId);
+
+        // 새 토큰 발급
+        return createTokenPair(user);
+    }
+
+    /**
+     * 로그아웃
+     * - RefreshToken 삭제
+     */
+    public void logout(String refreshToken) {
+        String tokenId = jwtTokenProvider.getTokenIdFromRefreshToken(refreshToken);
+
+        RefreshTokenRedis stored = refreshTokenRedisRepository.findById(tokenId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN));
+
+        // Redis에서 토큰 삭제
+        refreshTokenRedisRepository.deleteById(tokenId);
+
+        // 푸시 토큰도 삭제
+        userPushTokenRepository.deleteById(stored.getUserId());
+    }
+
+    /**
+     * 사용자의 모든 토큰 무효화 (회원 탈퇴 시 호출)
+     * - Redis에서 해당 사용자의 모든 RefreshToken 즉시 삭제
+     */
+    public void revokeAllUserTokens(Long userId) {
+        List<RefreshTokenRedis> tokens = refreshTokenRedisRepository.findAllByUserId(userId);
+        if (!tokens.isEmpty()) {
+            refreshTokenRedisRepository.deleteAll(tokens);
+            log.info("사용자 {}의 RefreshToken {}개 삭제 완료", userId, tokens.size());
+        }
+    }
+
+    /**
+     * 오버로드: User 객체로 호출 시
+     */
+    public void revokeAllUserTokens(User user) {
+        revokeAllUserTokens(user.getId());
     }
 
     private TokenResponse createTokenPair(User user) {
@@ -107,21 +108,23 @@ public class TokenService {
         String tokenId = TsidCreator.getTsid().toString();
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId(), tokenId);
 
-        saveRefreshToken(tokenId, user);
+        saveRefreshToken(tokenId, user.getId());
 
         return new TokenResponse(accessToken, refreshToken);
     }
 
-    private void saveRefreshToken(String tokenId, User user) {
-        LocalDateTime expiresAt = LocalDateTime.now()
-                .plusSeconds(jwtTokenProvider.getRefreshExpSeconds());
-
-        RefreshToken entity = RefreshToken.builder()
+    /**
+     * Redis에 RefreshToken 저장
+     * - TTL 설정으로 만료 시 자동 삭제
+     */
+    private void saveRefreshToken(String tokenId, Long userId) {
+        RefreshTokenRedis token = RefreshTokenRedis.builder()
                 .tokenId(tokenId)
-                .user(user)
-                .expiresAt(expiresAt)
+                .userId(userId)
+                .ttl(jwtTokenProvider.getRefreshExpSeconds())
                 .build();
 
-        refreshTokenRepository.save(entity);
+        refreshTokenRedisRepository.save(token);
+        log.debug("RefreshToken 저장 완료: userId={}, ttl={}초", userId, jwtTokenProvider.getRefreshExpSeconds());
     }
 }

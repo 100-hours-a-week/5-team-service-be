@@ -36,7 +36,12 @@ public class RecommendationService {
                 .limit(4)
                 .toList();
 
-        // 3. ReadingGenre 조회 (N+1 방지)
+        // 3. 추천 데이터가 없으면 게스트와 동일한 fallback 로직 사용
+        if (recommendations.isEmpty()) {
+            return getRecommendedMeetingsForGuest();
+        }
+
+        // 4. ReadingGenre 조회 (N+1 방지)
         List<Long> genreIds = recommendations.stream()
                 .map(r -> r.getMeeting().getReadingGenreId())
                 .distinct()
@@ -46,7 +51,7 @@ public class RecommendationService {
                 .stream()
                 .collect(Collectors.toMap(ReadingGenre::getId, ReadingGenre::getName));
 
-        // 4. DTO 변환
+        // 5. DTO 변환
         return recommendations.stream()
                 .map(r -> toDto(r, genreNameMap))
                 .toList();
@@ -54,9 +59,9 @@ public class RecommendationService {
 
     @Transactional(readOnly = true)
     public List<RecommendedMeetingDto> getRecommendedMeetingsForGuest() {
-        // 1. 모집중인 모임 중 최신순, rank 우선순위로 조회 (최대 4개)
+        // 1. 모집중인 모임 중 중복 제거하여 최신순 조회 (최대 4개)
         List<UserMeetingRecommendation> recommendations = recommendationRepository
-                .findRecruitingMeetingsOrderByLatestAndRank()
+                .findRecruitingMeetingsDistinct()
                 .stream()
                 .limit(4)
                 .toList();

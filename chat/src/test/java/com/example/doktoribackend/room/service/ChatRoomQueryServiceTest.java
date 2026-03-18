@@ -122,7 +122,7 @@ class ChatRoomQueryServiceTest {
             // then
             assertThat(response.items()).hasSize(2);
             assertThat(response.pageInfo().hasNext()).isTrue();
-            assertThat(response.pageInfo().nextCursorId()).isEqualTo(4L);
+            assertThat(response.pageInfo().nextCursorId()).isEqualTo("4");
             assertThat(response.pageInfo().size()).isEqualTo(2);
         }
 

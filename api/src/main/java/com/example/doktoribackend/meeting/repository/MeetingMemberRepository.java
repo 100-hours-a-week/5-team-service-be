@@ -11,8 +11,17 @@ import org.springframework.data.domain.Pageable;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface MeetingMemberRepository extends JpaRepository<MeetingMember, Long> {
+
+    @Query("SELECT mm.meeting.id FROM MeetingMember mm " +
+           "WHERE mm.user.id = :userId " +
+           "AND mm.meeting.id IN :meetingIds")
+    Set<Long> findMeetingIdsByUserIdAndMeetingIds(
+            @Param("userId") Long userId,
+            @Param("meetingIds") List<Long> meetingIds
+    );
 
     @Query("SELECT mm.user.id FROM MeetingMember mm " +
             "WHERE mm.meeting.id = :meetingId " +
@@ -75,5 +84,13 @@ public interface MeetingMemberRepository extends JpaRepository<MeetingMember, Lo
             @Param("cursorId") Long cursorId,
             Pageable pageable
     );
+
+    @Query("SELECT COUNT(mm) FROM MeetingMember mm " +
+           "JOIN mm.meeting m " +
+           "WHERE mm.user.id = :userId " +
+           "AND mm.role = 'LEADER' " +
+           "AND m.status != 'CANCELED' " +
+           "AND m.deletedAt IS NULL")
+    long countActiveLeaderMeetingsByUserId(@Param("userId") Long userId);
 
 }

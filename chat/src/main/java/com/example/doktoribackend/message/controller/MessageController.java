@@ -4,6 +4,7 @@ import com.example.doktoribackend.message.dto.MessageResponse;
 import com.example.doktoribackend.message.dto.MessageSendRequest;
 import com.example.doktoribackend.message.service.MessageService;
 import com.example.doktoribackend.security.CustomUserDetails;
+import io.micrometer.core.annotation.Timed;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -21,6 +22,7 @@ public class MessageController {
     private final MessageService messageService;
     private final SimpMessagingTemplate messagingTemplate;
 
+    @Timed(value = "chat.message.send", description = "Time to process and broadcast a chat message")
     @MessageMapping("/chat-rooms/{roomId}/messages")
     public void sendMessage(@DestinationVariable Long roomId,
                             @Payload MessageSendRequest request,

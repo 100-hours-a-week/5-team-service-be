@@ -91,11 +91,12 @@ class AiQuizGenerationServiceTest {
         @Test
         @DisplayName("일일 횟수 미만이면 로그를 미리 저장하고 AI 호출 후 응답을 반환한다")
         void suggest_underLimit_returnsResponse() {
+            QuizGenerationLog savedLog = savedLogWithId(1L);
             given(quizGenerationLogRepository.findTodayByUserIdWithLock(
                     any(Long.class), any(LocalDateTime.class), any(LocalDateTime.class)))
                     .willReturn(List.of());
             given(quizGenerationLogRepository.save(any(QuizGenerationLog.class)))
-                    .willReturn(savedLogWithId(1L));
+                    .willReturn(savedLog);
             given(aiQuizClient.generate(any(AiQuizGenerateRequest.class)))
                     .willReturn(aiResponse());
 
@@ -114,11 +115,14 @@ class AiQuizGenerationServiceTest {
         @Test
         @DisplayName("일일 2회 사용 후 추가 요청하면 성공한다 (한도=3)")
         void suggest_twoLogsExist_succeeds() {
+            QuizGenerationLog savedLog = savedLogWithId(3L);
+            QuizGenerationLog log1 = mock(QuizGenerationLog.class);
+            QuizGenerationLog log2 = mock(QuizGenerationLog.class);
             given(quizGenerationLogRepository.findTodayByUserIdWithLock(
                     any(Long.class), any(LocalDateTime.class), any(LocalDateTime.class)))
-                    .willReturn(List.of(mock(QuizGenerationLog.class), mock(QuizGenerationLog.class)));
+                    .willReturn(List.of(log1, log2));
             given(quizGenerationLogRepository.save(any(QuizGenerationLog.class)))
-                    .willReturn(savedLogWithId(3L));
+                    .willReturn(savedLog);
             given(aiQuizClient.generate(any(AiQuizGenerateRequest.class)))
                     .willReturn(aiResponse());
 
@@ -172,11 +176,12 @@ class AiQuizGenerationServiceTest {
         @Test
         @DisplayName("AI 호출이 실패하면 미리 저장한 로그를 삭제하고 예외를 전파한다")
         void suggest_aiFails_releasesSlotAndPropagatesException() {
+            QuizGenerationLog savedLog = savedLogWithId(1L);
             given(quizGenerationLogRepository.findTodayByUserIdWithLock(
                     any(Long.class), any(LocalDateTime.class), any(LocalDateTime.class)))
                     .willReturn(List.of());
             given(quizGenerationLogRepository.save(any(QuizGenerationLog.class)))
-                    .willReturn(savedLogWithId(1L));
+                    .willReturn(savedLog);
             given(aiQuizClient.generate(any(AiQuizGenerateRequest.class)))
                     .willThrow(new BusinessException(ErrorCode.AI_QUIZ_GENERATION_FAILED));
 
@@ -198,12 +203,13 @@ class AiQuizGenerationServiceTest {
         @DisplayName("요청의 author, title이 AiQuizGenerateRequest에 그대로 전달된다")
         void suggest_propagatesRequestFields() {
             AiQuizSuggestRequest request = new AiQuizSuggestRequest("작가명", "책제목");
+            QuizGenerationLog savedLog = savedLogWithId(1L);
 
             given(quizGenerationLogRepository.findTodayByUserIdWithLock(
                     any(Long.class), any(LocalDateTime.class), any(LocalDateTime.class)))
                     .willReturn(List.of());
             given(quizGenerationLogRepository.save(any(QuizGenerationLog.class)))
-                    .willReturn(savedLogWithId(1L));
+                    .willReturn(savedLog);
             given(aiQuizClient.generate(any(AiQuizGenerateRequest.class)))
                     .willReturn(aiResponse());
 

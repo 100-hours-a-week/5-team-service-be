@@ -14,4 +14,5 @@ public class MeetingListItem {
     private final Integer capacity;
     private final Integer currentMemberCount;
     private final Long remainingDays;
+    private final Boolean isBookmarked;
 }

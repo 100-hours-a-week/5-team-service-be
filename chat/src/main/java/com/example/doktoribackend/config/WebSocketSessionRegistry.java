@@ -39,6 +39,10 @@ public class WebSocketSessionRegistry {
         return Optional.empty();
     }
 
+    public int getActiveSessionCount() {
+        return sessionMap.size();
+    }
+
     public void removeAllForRoom(Long roomId) {
         sessionMap.entrySet().removeIf(entry -> {
             if (entry.getValue().roomId().equals(roomId)) {
