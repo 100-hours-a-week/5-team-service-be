@@ -85,4 +85,12 @@ public interface MeetingMemberRepository extends JpaRepository<MeetingMember, Lo
             Pageable pageable
     );
 
+    @Query("SELECT COUNT(mm) FROM MeetingMember mm " +
+           "JOIN mm.meeting m " +
+           "WHERE mm.user.id = :userId " +
+           "AND mm.role = 'LEADER' " +
+           "AND m.status != 'CANCELED' " +
+           "AND m.deletedAt IS NULL")
+    long countActiveLeaderMeetingsByUserId(@Param("userId") Long userId);
+
 }

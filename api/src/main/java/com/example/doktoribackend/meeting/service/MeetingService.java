@@ -168,8 +168,16 @@ public class MeetingService {
         // 2. 회차 정보 조회 (책 정보 포함)
         List<MeetingRound> rounds = meetingRoundRepository.findByMeetingIdWithBook(meetingId);
 
-        // 3. DTO 변환 및 반환
-        return MeetingDetailResponse.from(meeting, rounds, imageUrlResolver);
+        // 3. 모임장 리뷰 평균 점수 및 진행 횟수 조회
+        Long leaderUserId = meeting.getLeaderUser().getId();
+        Double averageRating = reviewRepository.findAverageLeaderRatingByLeaderUserId(leaderUserId);
+        if (averageRating != null) {
+            averageRating = Math.round(averageRating * 10) / 10.0;
+        }
+        long leaderMeetingCount = meetingMemberRepository.countActiveLeaderMeetingsByUserId(leaderUserId);
+
+        // 4. DTO 변환 및 반환
+        return MeetingDetailResponse.from(meeting, rounds, imageUrlResolver, averageRating, leaderMeetingCount);
     }
 
     @Transactional
@@ -751,8 +759,14 @@ public class MeetingService {
         MeetingMember myMember = meetingMemberRepository.findByMeetingIdAndUserId(meetingId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_MEMBER_NOT_FOUND));
 
-        // 3. 모임장은 탈퇴 불가 (위임 후 탈퇴해야 함)
+        // 3. 모임장인 경우: 혼자 남았으면 탈퇴 + 모임 취소, 아니면 위임 필요
         if (myMember.isLeader()) {
+            if (meeting.getCurrentCount() == 1) {
+                myMember.cancel(now);
+                meeting.decrementCurrentCount();
+                meeting.updateStatusToCanceled();
+                return;
+            }
             throw new BusinessException(ErrorCode.LEADER_CANNOT_LEAVE);
         }
 
@@ -766,6 +780,12 @@ public class MeetingService {
 
         // 6. 모임 인원 감소
         meeting.decrementCurrentCount();
+
+        // 7. 정원에 여유가 생기고 모집 마감일이 안 지났으면 다시 모집 상태로 변경
+        if (meeting.getStatus() == MeetingStatus.FINISHED
+                && !LocalDate.now().isAfter(meeting.getRecruitmentDeadline())) {
+            meeting.updateStatusToRecruiting();
+        }
     }
 
     @Transactional(readOnly = true)

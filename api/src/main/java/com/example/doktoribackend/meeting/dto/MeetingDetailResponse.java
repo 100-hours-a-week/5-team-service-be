@@ -17,10 +17,12 @@ public class MeetingDetailResponse {
     public static MeetingDetailResponse from(
             Meeting meeting,
             List<MeetingRound> rounds,
-            ImageUrlResolver imageUrlResolver
+            ImageUrlResolver imageUrlResolver,
+            Double averageRating,
+            long leaderMeetingCount
     ) {
         return MeetingDetailResponse.builder()
-                .meeting(MeetingInfo.from(meeting, imageUrlResolver))
+                .meeting(MeetingInfo.from(meeting, imageUrlResolver, averageRating, leaderMeetingCount))
                 .rounds(rounds.stream()
                         .map(RoundInfo::from)
                         .toList())

@@ -74,4 +74,9 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             "  ) sub" +
             ")")
     List<Long> findBestMemberIdsByMeetingRoundId(@Param("meetingRoundId") Long meetingRoundId);
+
+    @Query("SELECT AVG(r.leaderRating) FROM Review r " +
+            "JOIN r.meetingRound mr JOIN mr.meeting m " +
+            "WHERE m.leaderUser.id = :leaderUserId AND r.deletedAt IS NULL")
+    Double findAverageLeaderRatingByLeaderUserId(@Param("leaderUserId") Long leaderUserId);
 }

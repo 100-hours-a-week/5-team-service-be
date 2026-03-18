@@ -11,12 +11,17 @@ public class LeaderInfo {
     private String nickname;
     private String profileImagePath;
     private String intro;
+    private Double averageRating;
+    private long leaderMeetingCount;
 
-    public static LeaderInfo from(User user, String leaderIntro, ImageUrlResolver imageUrlResolver) {
+    public static LeaderInfo from(User user, String leaderIntro, ImageUrlResolver imageUrlResolver,
+                                  Double averageRating, long leaderMeetingCount) {
         return LeaderInfo.builder()
                 .nickname(user.getNickname())
                 .profileImagePath(imageUrlResolver.toUrl(user.getProfileImagePath()))
                 .intro(leaderIntro)
+                .averageRating(averageRating)
+                .leaderMeetingCount(leaderMeetingCount)
                 .build();
     }
 }
