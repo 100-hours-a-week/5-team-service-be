@@ -759,8 +759,14 @@ public class MeetingService {
         MeetingMember myMember = meetingMemberRepository.findByMeetingIdAndUserId(meetingId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_MEMBER_NOT_FOUND));
 
-        // 3. 모임장은 탈퇴 불가 (위임 후 탈퇴해야 함)
+        // 3. 모임장인 경우: 혼자 남았으면 탈퇴 + 모임 취소, 아니면 위임 필요
         if (myMember.isLeader()) {
+            if (meeting.getCurrentCount() == 1) {
+                myMember.cancel(now);
+                meeting.decrementCurrentCount();
+                meeting.updateStatusToCanceled();
+                return;
+            }
             throw new BusinessException(ErrorCode.LEADER_CANNOT_LEAVE);
         }
 
