@@ -33,6 +33,7 @@ public class NotificationRabbitConfig {
     @Bean
     public Queue notificationQueue() {
         return QueueBuilder.durable(QUEUE)
+                .quorum()
                 .ttl(600_000)
                 .deadLetterExchange("")
                 .deadLetterRoutingKey(DLQ)
@@ -49,7 +50,9 @@ public class NotificationRabbitConfig {
 
     @Bean
     public Queue notificationDeadLetterQueue() {
-        return QueueBuilder.durable(DLQ).build();
+        return QueueBuilder.durable(DLQ)
+                .quorum()
+                .build();
     }
 
     @Bean
