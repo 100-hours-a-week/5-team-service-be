@@ -168,8 +168,16 @@ public class MeetingService {
         // 2. 회차 정보 조회 (책 정보 포함)
         List<MeetingRound> rounds = meetingRoundRepository.findByMeetingIdWithBook(meetingId);
 
-        // 3. DTO 변환 및 반환
-        return MeetingDetailResponse.from(meeting, rounds, imageUrlResolver);
+        // 3. 모임장 리뷰 평균 점수 및 진행 횟수 조회
+        Long leaderUserId = meeting.getLeaderUser().getId();
+        Double averageRating = reviewRepository.findAverageLeaderRatingByLeaderUserId(leaderUserId);
+        if (averageRating != null) {
+            averageRating = Math.round(averageRating * 10) / 10.0;
+        }
+        long leaderMeetingCount = meetingMemberRepository.countActiveLeaderMeetingsByUserId(leaderUserId);
+
+        // 4. DTO 변환 및 반환
+        return MeetingDetailResponse.from(meeting, rounds, imageUrlResolver, averageRating, leaderMeetingCount);
     }
 
     @Transactional

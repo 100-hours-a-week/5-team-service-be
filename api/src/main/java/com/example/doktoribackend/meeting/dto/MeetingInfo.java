@@ -32,7 +32,8 @@ public class MeetingInfo {
     private TimeInfo time;
     private LeaderInfo leader;
 
-    public static MeetingInfo from(Meeting meeting, ImageUrlResolver imageUrlResolver) {
+    public static MeetingInfo from(Meeting meeting, ImageUrlResolver imageUrlResolver,
+                                   Double averageRating, long leaderMeetingCount) {
         return MeetingInfo.builder()
                 .meetingId(meeting.getId())
                 .createdAt(meeting.getCreatedAt())
@@ -46,7 +47,8 @@ public class MeetingInfo {
                 .recruitmentDeadline(meeting.getRecruitmentDeadline())
                 .roundCount(meeting.getRoundCount())
                 .time(TimeInfo.from(meeting.getStartTime(), meeting.getDurationMinutes()))
-                .leader(LeaderInfo.from(meeting.getLeaderUser(), meeting.getLeaderIntro(), imageUrlResolver))
+                .leader(LeaderInfo.from(meeting.getLeaderUser(), meeting.getLeaderIntro(), imageUrlResolver,
+                        averageRating, leaderMeetingCount))
                 .build();
     }
 }
