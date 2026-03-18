@@ -780,6 +780,12 @@ public class MeetingService {
 
         // 6. 모임 인원 감소
         meeting.decrementCurrentCount();
+
+        // 7. 정원에 여유가 생기고 모집 마감일이 안 지났으면 다시 모집 상태로 변경
+        if (meeting.getStatus() == MeetingStatus.FINISHED
+                && !LocalDate.now().isAfter(meeting.getRecruitmentDeadline())) {
+            meeting.updateStatusToRecruiting();
+        }
     }
 
     @Transactional(readOnly = true)
