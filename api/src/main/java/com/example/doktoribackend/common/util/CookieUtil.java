@@ -20,22 +20,28 @@ public class CookieUtil {
 
     private final boolean secure;
     private final String sameSite;
+    private final String domain;
 
     public CookieUtil(
             @Value("${app.cookie.secure}") boolean secure,
-            @Value("${app.cookie.same-site}") String sameSite) {
+            @Value("${app.cookie.same-site}") String sameSite,
+            @Value("${app.cookie.domain:}") String domain) {
         this.secure = secure;
         this.sameSite = sameSite;
+        this.domain = domain;
     }
 
     public void addRefreshTokenCookie(HttpServletResponse response, String refreshToken, long maxAgeSeconds) {
-        ResponseCookie cookie = ResponseCookie.from(REFRESH_TOKEN, refreshToken)
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(REFRESH_TOKEN, refreshToken)
                 .httpOnly(true)
                 .secure(this.secure)
                 .path(REFRESH_COOKIE_PATH)
                 .maxAge(maxAgeSeconds)
-                .sameSite(this.sameSite)
-                .build();
+                .sameSite(this.sameSite);
+        if (!domain.isEmpty()) {
+            builder.domain(domain);
+        }
+        ResponseCookie cookie = builder.build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
@@ -53,24 +59,30 @@ public class CookieUtil {
     }
 
     public void removeRefreshTokenCookie(HttpServletResponse response) {
-        ResponseCookie cookie = ResponseCookie.from(REFRESH_TOKEN, "")
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(REFRESH_TOKEN, "")
                 .httpOnly(true)
                 .secure(secure)
                 .path(REFRESH_COOKIE_PATH)
                 .maxAge(0)
-                .sameSite(sameSite)
-                .build();
+                .sameSite(sameSite);
+        if (!domain.isEmpty()) {
+            builder.domain(domain);
+        }
+        ResponseCookie cookie = builder.build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     public void addStateCookie(HttpServletResponse response, String state) {
-        ResponseCookie cookie = ResponseCookie.from(OAUTH_STATE, state)
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(OAUTH_STATE, state)
                 .httpOnly(true)
                 .secure(secure)
                 .path(OAUTH_STATE_PATH)
                 .maxAge(600)
-                .sameSite(sameSite)
-                .build();
+                .sameSite(sameSite);
+        if (!domain.isEmpty()) {
+            builder.domain(domain);
+        }
+        ResponseCookie cookie = builder.build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
@@ -88,13 +100,16 @@ public class CookieUtil {
     }
 
     public void removeStateCookie(HttpServletResponse response) {
-        ResponseCookie cookie = ResponseCookie.from(OAUTH_STATE, "")
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(OAUTH_STATE, "")
                 .httpOnly(true)
                 .secure(secure)
                 .path(OAUTH_STATE_PATH)
                 .maxAge(0)
-                .sameSite(sameSite)
-                .build();
+                .sameSite(sameSite);
+        if (!domain.isEmpty()) {
+            builder.domain(domain);
+        }
+        ResponseCookie cookie = builder.build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 }
