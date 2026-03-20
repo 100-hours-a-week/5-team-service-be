@@ -60,7 +60,7 @@ public class MeetingBookmarkService {
     @Transactional(readOnly = true)
     public BookmarkedMeetingListResponse getBookmarkedMeetings(Long userId, Long cursorId, int size) {
         // 오버플로우 방지를 위한 명시적 범위 제한
-        int safeSize = Math.min(Math.max(size, 1), 20);
+        int safeSize = Math.clamp(size, 1, 20);
 
         // 1. 페이지네이션 조회 (size + 1로 hasNext 판단)
         List<MeetingBookmark> bookmarks = meetingBookmarkRepository.findByUserIdWithCursor(
@@ -114,15 +114,9 @@ public class MeetingBookmarkService {
      * - RECRUITING 상태
      */
     private Meeting findBookmarkableMeeting(Long meetingId) {
-        Meeting meeting = meetingRepository.findById(meetingId)
+        return meetingRepository.findById(meetingId)
                 .filter(m -> m.getDeletedAt() == null)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
-
-        if (meeting.getStatus() != MeetingStatus.RECRUITING) {
-            throw new BusinessException(ErrorCode.MEETING_NOT_FOUND);
-        }
-
-        return meeting;
     }
 
     @Transactional(readOnly = true)
@@ -134,11 +128,6 @@ public class MeetingBookmarkService {
 
         if (!meetingExists) {
             throw new BusinessException(ErrorCode.MEETING_NOT_FOUND);
-        }
-
-        // 2. 비로그인이면 null 반환
-        if (userId == null) {
-            return null;
         }
 
         // 3. 북마크 여부 확인

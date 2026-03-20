@@ -14,6 +14,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfigurationSource;
 
 import static com.example.doktoribackend.security.SecurityPaths.PUBLIC_AUTH;
@@ -48,6 +49,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_AUTH).permitAll()
                         .requestMatchers(PUBLIC_DOCS).permitAll()
+                        .requestMatchers(new AntPathRequestMatcher("/ws"),
+                                         new AntPathRequestMatcher("/ws/**")).permitAll()
                         .requestMatchers(HttpMethod.GET, "/chat-rooms").permitAll()
                         .requestMatchers(HttpMethod.GET, "/meetings").permitAll()
                         .requestMatchers(HttpMethod.GET, "/meetings/*").permitAll()
