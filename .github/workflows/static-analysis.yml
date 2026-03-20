@@ -28,34 +28,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 코드 품질 분석 (Qodana)
-  qodana:
-    name: Qodana (Code Quality)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Run Qodana
-        uses: JetBrains/qodana-action@v2024.3
-        with:
-          results-dir: ${{ runner.temp }}/qodana-results
-          upload-result: true
-          cache-default-branch-only: false
-          primary-cache-key: qodana-${{ hashFiles('build.gradle', 'settings.gradle', 'gradle.properties') }}
-          additional-cache-key: qodana
-        env:
-          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
-
-      - name: Upload SARIF to GitHub
-        uses: github/codeql-action/upload-sarif@v4
-        if: success()
-        with:
-          sarif_file: ${{ runner.temp }}/qodana-results/qodana.sarif.json
-          category: qodana
+  # 코드 품질 분석 (Qodana) — 토큰 만료로 비활성화
+  # qodana:
+  #   name: Qodana (Code Quality)
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 30
+  #
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
+  #
+  #     - name: Run Qodana
+  #       uses: JetBrains/qodana-action@v2024.3
+  #       with:
+  #         results-dir: ${{ runner.temp }}/qodana-results
+  #         upload-result: true
+  #         cache-default-branch-only: false
+  #         primary-cache-key: qodana-${{ hashFiles('build.gradle', 'settings.gradle', 'gradle.properties') }}
+  #         additional-cache-key: qodana
+  #       env:
+  #         QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+  #
+  #     - name: Upload SARIF to GitHub
+  #       uses: github/codeql-action/upload-sarif@v4
+  #       if: success()
+  #       with:
+  #         sarif_file: ${{ runner.temp }}/qodana-results/qodana.sarif.json
+  #         category: qodana
 
   # 보안 취약점 분석 (CodeQL)
   codeql:
