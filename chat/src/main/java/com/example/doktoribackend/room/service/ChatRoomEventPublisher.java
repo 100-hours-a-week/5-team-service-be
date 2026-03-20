@@ -1,10 +1,10 @@
 package com.example.doktoribackend.room.service;
 
+import com.example.doktoribackend.message.service.ChatRoomRedisPublisher;
 import com.example.doktoribackend.room.dto.ChatRoomStartResponse;
 import com.example.doktoribackend.room.dto.NextRoundResponse;
 import com.example.doktoribackend.room.dto.WaitingRoomResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -16,7 +16,7 @@ import java.util.Map;
 public class ChatRoomEventPublisher {
 
     private final WaitingRoomSseService waitingRoomSseService;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final ChatRoomRedisPublisher chatRoomRedisPublisher;
 
     public void broadcastWaitingRoomUpdate(Long roomId, WaitingRoomResponse response) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -49,7 +49,7 @@ public class ChatRoomEventPublisher {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                messagingTemplate.convertAndSend("/topic/chat-rooms/" + roomId, response);
+                chatRoomRedisPublisher.publish(roomId, response);
             }
         });
     }
@@ -58,7 +58,7 @@ public class ChatRoomEventPublisher {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                messagingTemplate.convertAndSend("/topic/chat-rooms/" + roomId, Map.of("type", "ROOM_ENDED"));
+                chatRoomRedisPublisher.publish(roomId, Map.of("type", "ROOM_ENDED"));
             }
         });
     }
