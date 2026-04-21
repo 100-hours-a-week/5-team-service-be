@@ -45,4 +45,9 @@ public interface MeetingRepository extends JpaRepository<Meeting, Long>, Meeting
     int bulkUpdateExpiredToFinished(@Param("today") LocalDate today);
 
     boolean existsByIdAndDeletedAtIsNull(Long id);
+
+    @Query("SELECT m.id FROM Meeting m " +
+            "WHERE m.leaderUser.id = (SELECT m2.leaderUser.id FROM Meeting m2 WHERE m2.id = :meetingId) " +
+            "AND m.deletedAt IS NULL")
+    List<Long> findLeaderMeetingIdsByMeetingId(@Param("meetingId") Long meetingId);
 }

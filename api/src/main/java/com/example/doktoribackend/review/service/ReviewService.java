@@ -15,6 +15,7 @@ import com.example.doktoribackend.meeting.dto.PageInfo;
 import com.example.doktoribackend.meeting.repository.MeetingMemberRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
+import com.example.doktoribackend.meeting.service.MeetingCacheService;
 import com.example.doktoribackend.review.domain.Review;
 import com.example.doktoribackend.review.domain.ReviewImage;
 import com.example.doktoribackend.review.dto.*;
@@ -40,6 +41,7 @@ public class ReviewService {
     private final BookReportRepository bookReportRepository;
     private final MeetingRepository meetingRepository;
     private final ImageUrlResolver imageUrlResolver;
+    private final MeetingCacheService meetingCacheService;
 
     @Transactional
     public ReviewCreateResponse createReview(Long userId, Long meetingRoundId, ReviewCreateRequest request) {
@@ -114,12 +116,16 @@ public class ReviewService {
 
         reviewRepository.save(review);
 
+        // 캐시 무효화 (averageRating은 리더 기준이므로 같은 리더의 모든 모임 캐시 삭제)
+        meetingRepository.findLeaderMeetingIdsByMeetingId(meetingId)
+                .forEach(meetingCacheService::evictDetail);
+
         return new ReviewCreateResponse(review.getId());
     }
 
     @Transactional
     public void deleteReview(Long userId, Long reviewId) {
-        Review review = reviewRepository.findById(reviewId)
+        Review review = reviewRepository.findByIdWithReviewerAndRoundAndImages(reviewId)
                 .filter(r -> r.getDeletedAt() == null)
                 .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
 
@@ -128,6 +134,11 @@ public class ReviewService {
         }
 
         review.softDelete();
+
+        // 캐시 무효화 (averageRating은 리더 기준이므로 같은 리더의 모든 모임 캐시 삭제)
+        Long meetingId = review.getMeetingRound().getMeeting().getId();
+        meetingRepository.findLeaderMeetingIdsByMeetingId(meetingId)
+                .forEach(meetingCacheService::evictDetail);
     }
 
     @Transactional(readOnly = true)

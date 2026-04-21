@@ -3,14 +3,18 @@ package com.example.doktoribackend.meeting.dto;
 import com.example.doktoribackend.meeting.domain.Meeting;
 import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class MeetingInfo {
     private Long meetingId;
 

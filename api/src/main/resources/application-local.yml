@@ -12,6 +12,7 @@ spring:
 logging:
   level:
     org.hibernate.SQL: debug
+    com.example.doktoribackend.meeting.service.MeetingCacheService: debug
 
 app:
   cookie:

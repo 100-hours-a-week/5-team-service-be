@@ -69,6 +69,9 @@ class ReviewServiceTest {
     @Mock
     private ImageUrlResolver imageUrlResolver;
 
+    @Mock
+    private com.example.doktoribackend.meeting.service.MeetingCacheService meetingCacheService;
+
     @InjectMocks
     private ReviewService reviewService;
 
@@ -297,11 +300,18 @@ class ReviewServiceTest {
             User reviewer = mock(User.class);
             given(reviewer.getId()).willReturn(USER_ID);
 
+            Meeting meeting = mock(Meeting.class);
+            given(meeting.getId()).willReturn(MEETING_ID);
+            MeetingRound meetingRound = mock(MeetingRound.class);
+            given(meetingRound.getMeeting()).willReturn(meeting);
+
             Review review = mock(Review.class);
             given(review.getDeletedAt()).willReturn(null);
             given(review.getReviewer()).willReturn(reviewer);
+            given(review.getMeetingRound()).willReturn(meetingRound);
 
-            given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+            given(reviewRepository.findByIdWithReviewerAndRoundAndImages(reviewId)).willReturn(Optional.of(review));
+            given(meetingRepository.findLeaderMeetingIdsByMeetingId(MEETING_ID)).willReturn(List.of(MEETING_ID));
 
             // when
             reviewService.deleteReview(USER_ID, reviewId);
@@ -315,7 +325,7 @@ class ReviewServiceTest {
         void reviewNotFound() {
             // given
             Long reviewId = 1L;
-            given(reviewRepository.findById(reviewId)).willReturn(Optional.empty());
+            given(reviewRepository.findByIdWithReviewerAndRoundAndImages(reviewId)).willReturn(Optional.empty());
 
             // when & then
             assertThatThrownBy(() -> reviewService.deleteReview(USER_ID, reviewId))
@@ -332,7 +342,7 @@ class ReviewServiceTest {
             Review review = mock(Review.class);
             given(review.getDeletedAt()).willReturn(LocalDateTime.now());
 
-            given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+            given(reviewRepository.findByIdWithReviewerAndRoundAndImages(reviewId)).willReturn(Optional.of(review));
 
             // when & then
             assertThatThrownBy(() -> reviewService.deleteReview(USER_ID, reviewId))
@@ -354,7 +364,7 @@ class ReviewServiceTest {
             given(review.getDeletedAt()).willReturn(null);
             given(review.getReviewer()).willReturn(reviewer);
 
-            given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+            given(reviewRepository.findByIdWithReviewerAndRoundAndImages(reviewId)).willReturn(Optional.of(review));
 
             // when & then
             assertThatThrownBy(() -> reviewService.deleteReview(USER_ID, reviewId))
@@ -376,11 +386,18 @@ class ReviewServiceTest {
             User reviewer = mock(User.class);
             given(reviewer.getId()).willReturn(USER_ID);
 
+            Meeting meeting = mock(Meeting.class);
+            given(meeting.getId()).willReturn(MEETING_ID);
+            MeetingRound meetingRound = mock(MeetingRound.class);
+            given(meetingRound.getMeeting()).willReturn(meeting);
+
             Review review = mock(Review.class);
             given(review.getDeletedAt()).willReturn(null);
             given(review.getReviewer()).willReturn(reviewer);
+            given(review.getMeetingRound()).willReturn(meetingRound);
 
-            given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+            given(reviewRepository.findByIdWithReviewerAndRoundAndImages(reviewId)).willReturn(Optional.of(review));
+            given(meetingRepository.findLeaderMeetingIdsByMeetingId(MEETING_ID)).willReturn(List.of(MEETING_ID));
 
             reviewService.deleteReview(USER_ID, reviewId);
             verify(review).softDelete();
@@ -557,5 +574,7 @@ class ReviewServiceTest {
                 .willReturn(Optional.of(approvedReport));
         given(reviewRepository.existsByMeetingRoundIdAndReviewerIdAndDeletedAtIsNull(ROUND_ID, USER_ID))
                 .willReturn(false);
+        given(meetingRepository.findLeaderMeetingIdsByMeetingId(MEETING_ID))
+                .willReturn(List.of(MEETING_ID));
     }
 }
