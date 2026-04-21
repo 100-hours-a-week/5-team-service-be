@@ -11,6 +11,7 @@ import com.example.doktoribackend.meeting.repository.MeetingRepository;
 import com.example.doktoribackend.meeting.repository.MeetingRoundRepository;
 import com.example.doktoribackend.review.repository.ReviewRepository;
 import com.example.doktoribackend.user.domain.User;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -28,10 +31,12 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("getMeetingDetail: 모임 상세 조회")
 class GetMeetingDetailServiceTest {
 
@@ -50,12 +55,21 @@ class GetMeetingDetailServiceTest {
     @Mock
     ImageUrlResolver imageUrlResolver;
 
+    @Mock
+    MeetingCacheService meetingCacheService;
+
     @InjectMocks
     MeetingService meetingService;
 
     private static final Long MEETING_ID = 10L;
     private static final Long LEADER_USER_ID = 1L;
     private static final Long CURRENT_USER_ID = 5L;
+
+    @BeforeEach
+    void setUp() {
+        // 모든 테스트에서 캐시 미스 시뮬레이션
+        given(meetingCacheService.getDetail(anyLong())).willReturn(null);
+    }
 
     @Nested
     @DisplayName("성공 케이스")
