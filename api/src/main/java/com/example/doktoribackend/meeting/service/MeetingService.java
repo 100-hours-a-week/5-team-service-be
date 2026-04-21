@@ -77,6 +77,7 @@ public class MeetingService {
     private final MeetingBookmarkRepository meetingBookmarkRepository;
     private final ReviewRepository reviewRepository;
     private final ImageUrlResolver imageUrlResolver;
+    private final MeetingCacheService meetingCacheService;
 
     @Transactional
     public MeetingCreateResponse createMeeting(Long userId, MeetingCreateRequest request) {
@@ -160,15 +161,27 @@ public class MeetingService {
 
     @Transactional(readOnly = true)
     public MeetingDetailResponse getMeetingDetail(Long meetingId, Long currentUserId) {
-        // 1. 모임 기본 정보 조회 (모임장 포함)
+        // 1. 캐시 조회
+        Optional<MeetingDetailResponse> cached = meetingCacheService.getDetail(meetingId);
+        if (cached != null) {
+            if (cached.isEmpty()) {
+                throw new BusinessException(ErrorCode.MEETING_NOT_FOUND);
+            }
+            return cached.get();
+        }
+
+        // 2. 캐시 미스 → DB 조회
         Meeting meeting = meetingRepository.findByIdWithLeader(meetingId)
                 .filter(m -> m.getDeletedAt() == null)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEETING_NOT_FOUND));
+                .orElse(null);
 
-        // 2. 회차 정보 조회 (책 정보 포함)
+        if (meeting == null) {
+            meetingCacheService.putNullMarker(meetingId);
+            throw new BusinessException(ErrorCode.MEETING_NOT_FOUND);
+        }
+
         List<MeetingRound> rounds = meetingRoundRepository.findByMeetingIdWithBook(meetingId);
 
-        // 3. 모임장 리뷰 평균 점수 및 진행 횟수 조회
         Long leaderUserId = meeting.getLeaderUser().getId();
         Double averageRating = reviewRepository.findAverageLeaderRatingByLeaderUserId(leaderUserId);
         if (averageRating != null) {
@@ -176,8 +189,13 @@ public class MeetingService {
         }
         long leaderMeetingCount = meetingMemberRepository.countActiveLeaderMeetingsByUserId(leaderUserId);
 
-        // 4. DTO 변환 및 반환
-        return MeetingDetailResponse.from(meeting, rounds, imageUrlResolver, averageRating, leaderMeetingCount);
+        MeetingDetailResponse response = MeetingDetailResponse.from(
+                meeting, rounds, imageUrlResolver, averageRating, leaderMeetingCount);
+
+        // 3. 캐시 저장
+        meetingCacheService.putDetail(meetingId, response);
+
+        return response;
     }
 
     @Transactional
@@ -717,6 +735,9 @@ public class MeetingService {
             joinRequest.reject(now);
         }
 
+        // 7. 캐시 무효화
+        meetingCacheService.evictDetail(meetingId);
+
         return ParticipationStatusUpdateResponse.builder()
                 .meetingId(meetingId)
                 .joinRequestId(joinRequestId)
@@ -941,6 +962,9 @@ public class MeetingService {
             User leader = meeting.getLeaderUser();
             leader.updateLeaderIntro(request.leaderIntro());
         }
+
+        // 9. 캐시 무효화
+        meetingCacheService.evictDetail(meetingId);
 
         return new MeetingCreateResponse(meeting.getId());
     }
