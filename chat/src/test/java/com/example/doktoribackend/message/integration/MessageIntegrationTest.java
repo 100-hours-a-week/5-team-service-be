@@ -1,6 +1,7 @@
 package com.example.doktoribackend.message.integration;
 
 import com.example.doktoribackend.config.TestMongoConfig;
+import com.example.doktoribackend.config.TestRedisConfig;
 import com.example.doktoribackend.message.domain.MessageType;
 import com.example.doktoribackend.message.dto.MessageResponse;
 import com.example.doktoribackend.message.repository.MessageRepository;
@@ -33,7 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@Import(TestMongoConfig.class)
+@Import({TestMongoConfig.class, TestRedisConfig.class})
 class MessageIntegrationTest {
 
     @LocalServerPort

@@ -1,6 +1,7 @@
 package com.example.doktoribackend.room.integration;
 
 import com.example.doktoribackend.config.TestMongoConfig;
+import com.example.doktoribackend.config.TestRedisConfig;
 import com.example.doktoribackend.room.domain.*;
 import com.example.doktoribackend.room.repository.ChattingRoomMemberRepository;
 import com.example.doktoribackend.room.repository.ChattingRoomRepository;
@@ -34,7 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@Import(TestMongoConfig.class)
+@Import({TestMongoConfig.class, TestRedisConfig.class})
 class ChatRoomIntegrationTest {
 
     @LocalServerPort
