@@ -3,13 +3,17 @@ package com.example.doktoribackend.meeting.dto;
 import com.example.doktoribackend.meeting.domain.Meeting;
 import com.example.doktoribackend.meeting.domain.MeetingRound;
 import com.example.doktoribackend.common.s3.ImageUrlResolver;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.util.List;
 
 @Getter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class MeetingDetailResponse {
     private MeetingInfo meeting;
     private List<RoundInfo> rounds;

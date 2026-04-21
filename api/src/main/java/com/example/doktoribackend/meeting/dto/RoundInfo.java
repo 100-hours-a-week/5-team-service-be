@@ -2,13 +2,17 @@ package com.example.doktoribackend.meeting.dto;
 
 import com.example.doktoribackend.meeting.domain.MeetingRound;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 
 @Getter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class RoundInfo {
     private Integer roundNo;
 

@@ -2,11 +2,15 @@ package com.example.doktoribackend.meeting.dto;
 
 import com.example.doktoribackend.common.s3.ImageUrlResolver;
 import com.example.doktoribackend.user.domain.User;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class LeaderInfo {
     private String nickname;
     private String profileImagePath;
