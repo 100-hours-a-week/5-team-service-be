@@ -25,8 +25,12 @@ spring:
       pool-name: ChatHikariPool
 
   data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+      password: ${SPRING_REDIS_PASSWORD:}
     mongodb:
-      uri: ${MONGO_URI:mongodb://doktori:doktori123@localhost:27017/doktori_chat?authSource=admin}
+      uri: ${MONGO_URI:mongodb://doktori:doktori123@localhost:27017/doktoridb?authSource=admin}
       auto-index-creation: true
   jpa:
     hibernate:

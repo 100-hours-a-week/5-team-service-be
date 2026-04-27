@@ -3,9 +3,6 @@ spring:
     import: 'aws-parameterstore:/doktori/prod/'
   data:
     redis:
-      host: ${SPRING_REDIS_HOST:localhost}
-      port: ${SPRING_REDIS_PORT:6379}
-      password: ${SPRING_REDIS_PASSWORD:}
       timeout: 3000ms
       lettuce:
         pool:
@@ -41,3 +38,18 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+
+ai:
+  base-url: ${AI_BASE_URL:http://ai.prod.doktori.internal:8000/ai}
+  api-key: ${AI_API_KEY}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: redis-sentinel
+  data:
+    redis:
+      sentinel:
+        master: ${SPRING_REDIS_SENTINEL_MASTER}
+        nodes: ${SPRING_REDIS_SENTINEL_NODES}

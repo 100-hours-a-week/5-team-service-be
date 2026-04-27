@@ -44,5 +44,16 @@ springdoc:
     enabled: false
 
 ai:
-  base-url: ${AI_BASE_URL:https://ai.doktori.kr}
+  base-url: ${AI_BASE_URL:http://ai.prod.doktori.internal:8000/ai}
   api-key: ${AI_API_KEY}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: redis-sentinel
+  data:
+    redis:
+      sentinel:
+        master: ${SPRING_REDIS_SENTINEL_MASTER}
+        nodes: ${SPRING_REDIS_SENTINEL_NODES}
