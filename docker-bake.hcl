@@ -3,33 +3,25 @@ variable "REGISTRY" {
 }
 
 variable "TAG" {
-  default = "develop"
+  default = "dev-develop"
 }
 
 group "default" {
   targets = ["api", "chat"]
 }
 
-# dev: doktori/backend-api, prod: doktori/prod-backend-api
-# ECR 레포 분리 — dev lifecycle policy가 prod 이미지를 밀어내는 문제 방지
+# ECR repo는 dev/prod를 repo로 나누지 않고 tag prefix로 구분한다.
+# Terraform ECR lifecycle policy는 prod-* / dev-* 태그를 보존 기준으로 사용한다.
 target "api" {
   context    = "."
   target     = "api"
   platforms  = ["linux/arm64"]
-  tags = TAG == "develop" ? [
-    "${REGISTRY}/doktori/backend-api:develop"
-  ] : [
-    "${REGISTRY}/doktori/prod-backend-api:${TAG}",
-  ]
+  tags       = ["${REGISTRY}/doktori/backend-api:${TAG}"]
 }
 
 target "chat" {
   context    = "."
   target     = "chat"
   platforms  = ["linux/arm64"]
-  tags = TAG == "develop" ? [
-    "${REGISTRY}/doktori/backend-chat:develop"
-  ] : [
-    "${REGISTRY}/doktori/prod-backend-chat:${TAG}",
-  ]
+  tags       = ["${REGISTRY}/doktori/backend-chat:${TAG}"]
 }

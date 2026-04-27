@@ -192,15 +192,15 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      # develop → :develop 태그, main → :xxxxxxx (short SHA, ArgoCD 매니페스트와 일치)
+      # develop → :dev-develop 태그, main → :prod-xxxxxxx (short SHA, ArgoCD 매니페스트와 일치)
       - name: Set image metadata
         id: meta
         run: |
           if [ "${{ github.ref }}" == "refs/heads/develop" ]; then
-            echo "image-tag=develop" >> $GITHUB_OUTPUT
+            echo "image-tag=dev-develop" >> $GITHUB_OUTPUT
           else
             SHORT_SHA="${GITHUB_SHA:0:7}"
-            echo "image-tag=${SHORT_SHA}" >> $GITHUB_OUTPUT
+            echo "image-tag=prod-${SHORT_SHA}" >> $GITHUB_OUTPUT
           fi
 
       - name: Set up Docker Buildx
@@ -339,13 +339,13 @@ jobs:
 
           # 변경된 모듈만 이미지 태그 업데이트
           if [ "$API_CHANGED" == "true" ]; then
-            sed -i "s|${REGISTRY}/doktori/prod-backend-api:[^ ]*|${REGISTRY}/doktori/prod-backend-api:${TAG}|" \
+            sed -i "s|${REGISTRY}/doktori/backend-api:[^ ]*|${REGISTRY}/doktori/backend-api:${TAG}|" \
               k8s/manifests/workloads/api-deployment.yaml
             echo "Updated api image tag → ${TAG}"
           fi
 
           if [ "$CHAT_CHANGED" == "true" ]; then
-            sed -i "s|${REGISTRY}/doktori/prod-backend-chat:[^ ]*|${REGISTRY}/doktori/prod-backend-chat:${TAG}|" \
+            sed -i "s|${REGISTRY}/doktori/backend-chat:[^ ]*|${REGISTRY}/doktori/backend-chat:${TAG}|" \
               k8s/manifests/workloads/chat-deployment.yaml
             echo "Updated chat image tag → ${TAG}"
           fi
