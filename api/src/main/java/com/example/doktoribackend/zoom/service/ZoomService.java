@@ -4,43 +4,49 @@ import com.example.doktoribackend.config.ZoomConfig;
 import com.example.doktoribackend.zoom.exception.ZoomApiException;
 import com.example.doktoribackend.zoom.exception.ZoomAuthenticationException;
 import com.example.doktoribackend.zoom.exception.ZoomRetryableException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 
+/**
+ * Zoom 미팅 생성.
+ *
+ * <p>재시도는 걸지 않는다. {@link ZoomLinkSchedulerService} 가 1분마다 10분치를 미리 처리하므로
+ * 이미 사실상 10회의 자연 재시도가 존재한다. 여기에 in-call 재시도를 얹으면 10분간 최대 30회
+ * 호출이 되어 Zoom rate limit(429)을 오히려 유발한다.
+ */
 @Slf4j
 @Service
 public class ZoomService {
 
-    private final ZoomConfig zoomConfig;
-    private final RestClient restClient;
-
     private static final int DEFAULT_DURATION_MINUTES = 60;
 
-    public ZoomService(ZoomConfig zoomConfig) {
+    private final ZoomConfig zoomConfig;
+    private final RestClient restClient;
+    private final ZoomAccessTokenProvider accessTokenProvider;
+
+    public ZoomService(RestClient zoomRestClient, ZoomConfig zoomConfig,
+                       ZoomAccessTokenProvider accessTokenProvider) {
+        this.restClient = zoomRestClient;
         this.zoomConfig = zoomConfig;
-        this.restClient = RestClient.builder().build();
+        this.accessTokenProvider = accessTokenProvider;
     }
 
+    @CircuitBreaker(name = "zoom")
     public String createMeeting(String topic, LocalDateTime startTime, int durationMinutes) {
         try {
-            String accessToken = getAccessToken();
-
+            String accessToken = accessTokenProvider.getAccessToken();
             String meetingUrl = zoomConfig.getApiBaseUrl() + "/users/me/meetings";
-
             Map<String, Object> meetingRequest = buildMeetingRequest(topic, startTime, durationMinutes);
 
             Map<String, Object> responseBody = restClient.post()
@@ -110,40 +116,6 @@ public class ZoomService {
         meetingRequest.put("settings", settings);
 
         return meetingRequest;
-    }
-
-    private String getAccessToken() {
-        try {
-            String tokenUrl = "https://zoom.us/oauth/token";
-
-            String auth = zoomConfig.getClientId() + ":" + zoomConfig.getClientSecret();
-            String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes());
-
-            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-            body.add("grant_type", "account_credentials");
-            body.add("account_id", zoomConfig.getAccountId());
-
-            Map<String, Object> responseBody = restClient.post()
-                    .uri(tokenUrl)
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .header("Authorization", "Basic " + encodedAuth)
-                    .body(body)
-                    .retrieve()
-                    .onStatus(HttpStatusCode::isError, (req, res) -> {
-                        log.error("Zoom Access Token 발급 실패 - Status: {}, Body: {}",
-                                res.getStatusCode(), new String(res.getBody().readAllBytes()));
-                        throw new ZoomAuthenticationException("Zoom 인증에 실패했습니다.");
-                    })
-                    .body(new ParameterizedTypeReference<>() {});
-
-            return (String) Objects.requireNonNull(responseBody).get("access_token");
-
-        } catch (ZoomAuthenticationException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("Zoom Access Token 발급 실패", e);
-            throw new ZoomAuthenticationException("Zoom 인증에 실패했습니다.", e);
-        }
     }
 
     private String formatStartTime(LocalDateTime startTime) {

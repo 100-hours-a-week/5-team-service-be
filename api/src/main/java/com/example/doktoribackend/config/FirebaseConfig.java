@@ -20,6 +20,16 @@ public class FirebaseConfig {
     @Value("${firebase.credentials-path}")
     private Resource credentialsResource;
 
+    /**
+     * FCM 은 SDK 호출이라 RestClient 타임아웃이 적용되지 않는다. SDK 자체 설정으로 지정한다.
+     * 미설정 시 SDK 기본값(사실상 무제한)이라 FCM 지연이 알림 스레드를 그대로 묶는다.
+     */
+    @Value("${firebase.connect-timeout-ms:3000}")
+    private int connectTimeoutMs;
+
+    @Value("${firebase.read-timeout-ms:5000}")
+    private int readTimeoutMs;
+
     @PostConstruct
     public void initialize() {
         try {
@@ -27,6 +37,8 @@ public class FirebaseConfig {
                 FirebaseOptions options = FirebaseOptions.builder()
                         .setCredentials(GoogleCredentials.fromStream(
                                 credentialsResource.getInputStream()))
+                        .setConnectTimeout(connectTimeoutMs)
+                        .setReadTimeout(readTimeoutMs)
                         .build();
                 FirebaseApp.initializeApp(options);
             }
