@@ -11,6 +11,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
@@ -21,7 +22,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 
+/**
+ * 재시도·서킷 브레이커는 Resilience4j 설정이 담당하므로, 이 클라이언트는 원시 예외를
+ * 그대로 전파해야 recordExceptions 가 실패로 집계할 수 있다. BusinessException 으로의
+ * 변환은 재시도가 소진된 뒤 fallback 에서만 일어난다.
+ */
 @ExtendWith(MockitoExtension.class)
 class AiQuizClientTest {
 
@@ -45,13 +52,15 @@ class AiQuizClientTest {
     @BeforeEach
     void setUp() {
         request = new AiQuizGenerateRequest("손원평", "아몬드");
+    }
 
+    /** fallback 테스트는 HTTP 호출을 하지 않으므로 이 스텁이 필요한 곳에서만 세운다. */
+    private void stubRestClientChain() {
         doReturn(requestBodyUriSpec).when(aiRestClient).post();
         doReturn(requestBodySpec).when(requestBodyUriSpec).uri(anyString());
         doReturn(requestBodySpec).when(requestBodySpec).contentType(any(MediaType.class));
         doReturn(requestBodySpec).when(requestBodySpec).body((Object) any());
         doReturn(responseSpec).when(requestBodySpec).retrieve();
-        doReturn(responseSpec).when(responseSpec).onStatus(any(), any());
     }
 
     private AiQuizGenerateResponse validResponse() {
@@ -72,6 +81,7 @@ class AiQuizClientTest {
         @Test
         @DisplayName("AI 서버가 유효한 응답을 반환하면 AiQuizGenerateResponse를 반환한다")
         void generate_success() {
+            stubRestClientChain();
             doReturn(validResponse()).when(responseSpec).body(AiQuizGenerateResponse.class);
 
             AiQuizGenerateResponse result = aiQuizClient.generate(request);
@@ -89,20 +99,20 @@ class AiQuizClientTest {
     class Failure {
 
         @Test
-        @DisplayName("AI 서버 오류 시 BusinessException(AI_QUIZ_GENERATION_FAILED)을 던진다")
-        void generate_aiError_throwsBusinessException() {
-            doThrow(new BusinessException(ErrorCode.AI_QUIZ_GENERATION_FAILED))
+        @DisplayName("5xx 예외는 서킷 집계를 위해 원시 예외 그대로 전파한다")
+        void generate_serverError_propagatesRawException() {
+            stubRestClientChain();
+            doThrow(HttpServerErrorException.create(INTERNAL_SERVER_ERROR, "err", null, null, null))
                     .when(responseSpec).body(AiQuizGenerateResponse.class);
 
             assertThatThrownBy(() -> aiQuizClient.generate(request))
-                    .isInstanceOf(BusinessException.class)
-                    .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
-                            .isEqualTo(ErrorCode.AI_QUIZ_GENERATION_FAILED));
+                    .isInstanceOf(HttpServerErrorException.class);
         }
 
         @Test
         @DisplayName("AI 서버 응답 body가 null이면 BusinessException(AI_QUIZ_GENERATION_FAILED)을 던진다")
         void generate_nullBody_throwsBusinessException() {
+            stubRestClientChain();
             doReturn(null).when(responseSpec).body(AiQuizGenerateResponse.class);
 
             assertThatThrownBy(() -> aiQuizClient.generate(request))
@@ -110,14 +120,17 @@ class AiQuizClientTest {
                     .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
                             .isEqualTo(ErrorCode.AI_QUIZ_GENERATION_FAILED));
         }
+    }
+
+    @Nested
+    @DisplayName("fallback")
+    class Fallback {
 
         @Test
-        @DisplayName("네트워크 예외 발생 시 BusinessException(AI_QUIZ_GENERATION_FAILED)을 던진다")
-        void generate_networkException_throwsBusinessException() {
-            doThrow(new RuntimeException("Connection refused"))
-                    .when(responseSpec).body(AiQuizGenerateResponse.class);
-
-            assertThatThrownBy(() -> aiQuizClient.generate(request))
+        @DisplayName("재시도 소진 후 fallback은 BusinessException(AI_QUIZ_GENERATION_FAILED)으로 변환한다")
+        void generateFallback_convertsToBusinessException() {
+            assertThatThrownBy(() -> aiQuizClient.generateFallback(
+                    request, HttpServerErrorException.create(INTERNAL_SERVER_ERROR, "err", null, null, null)))
                     .isInstanceOf(BusinessException.class)
                     .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
                             .isEqualTo(ErrorCode.AI_QUIZ_GENERATION_FAILED));
