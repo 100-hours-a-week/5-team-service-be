@@ -29,6 +29,11 @@ kakao:
   book:
     rest-api-key: test-rest-api-key
 
+aladin:
+  book:
+    base-url: https://www.aladin.co.kr/ttb/api
+    ttb-key: test-ttb-key
+
 app:
   jwt:
     secret: test-jwt-secret

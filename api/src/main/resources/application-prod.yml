@@ -1,6 +1,9 @@
 spring:
   config:
-    import: 'aws-parameterstore:/doktori/prod/'
+    # 프로파일 문서가 application.yml 의 import 를 덮어쓸 수 있으므로 공통 설정도 여기 명시한다.
+    import:
+      - 'classpath:resilience4j-defaults.yml'
+      - 'aws-parameterstore:/doktori/prod/'
   data:
     redis:
       timeout: 3000ms
