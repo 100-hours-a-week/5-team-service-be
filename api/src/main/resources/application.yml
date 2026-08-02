@@ -145,6 +145,17 @@ resilience4j:
         baseConfig: externalApi
         # 로그인은 사용자가 화면 앞에서 대기하는 흐름이라 느려지는 단계를 일찍 잡는다.
         slowCallDurationThreshold: 2s
+      fcm:
+        baseConfig: externalApi
+        # 알림 발송은 호출량이 적어 기본 최소 20건으로는 감지되지 않는다.
+        minimumNumberOfCalls: 5
+        # firebase.read-timeout-ms(5000) 와 맞춘다. 이보다 길면 발동 자체가 안 된다.
+        slowCallDurationThreshold: 5s
+        # 배치 호출 자체의 실패만 집계한다. 개별 메시지의 UNREGISTERED 는 FCM 이 정상 동작한
+        # 응답이므로 실패로 세면 무효 토큰이 많을 때 멀쩡한 FCM 의 서킷이 열린다.
+        recordExceptions:
+          - com.google.firebase.messaging.FirebaseMessagingException
+          - java.io.IOException
       zoom:
         baseConfig: externalApi
         # 스케줄러가 1분마다 호출하므로 호출량이 적다. 최소 건수를 낮춰야 감지가 된다.
