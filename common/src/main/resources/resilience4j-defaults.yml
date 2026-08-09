@@ -1,0 +1,95 @@
+# 외부 API 공통 복원력 설정.
+# api / chat 모듈이 spring.config.import 로 가져다 쓴다. 모듈별 인스턴스(kakaoAuth, zoom)는
+# 각 모듈의 application.yml 에 정의한다.
+#
+# 튜닝 근거
+#  - Resilience4j 기본 minimumNumberOfCalls 는 100 이라 저트래픽 서비스에서는 서킷이 사실상 열리지 않는다.
+#    감지 지연을 기준으로 역산해 30초 시간 기반 창 + 최소 20건으로 잡았다.
+#    (주의: 30초 안에 20건이 모여야 판정이 시작된다. 약 0.67 RPS 미만이면 감지되지 않으므로
+#     실제 트래픽을 prometheus http_server_requests 로 확인해 조정할 것.)
+#  - slowCallDurationThreshold 기본값은 60초라 사실상 발동하지 않는다. 완전히 죽기 전
+#    느려지는 단계를 잡는 것이 목적이므로 호출별 정상 응답 시간에 맞춰 낮춘다.
+#  - recordExceptions 를 5xx / 타임아웃 / IO 로 제한한다. 검색 결과 없음 같은 비즈니스 예외가
+#    실패로 집계되면 외부 API 가 멀쩡한데도 서킷이 열린다.
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      externalApi:
+        registerHealthIndicator: true
+        slidingWindowType: TIME_BASED
+        slidingWindowSize: 30
+        minimumNumberOfCalls: 20
+        failureRateThreshold: 50
+        slowCallRateThreshold: 50
+        slowCallDurationThreshold: 1s
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        recordExceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.ResourceAccessException
+          - java.io.IOException
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
+          - com.example.doktoribackend.exception.BusinessException
+    instances:
+      kakaoBook:
+        baseConfig: externalApi
+      aladinBook:
+        baseConfig: externalApi
+        # 알라딘은 잘못된 키·쿼터 초과를 HTTP 200 + errorCode 로 응답하므로 별도 예외를 실패로 집계한다.
+        recordExceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.ResourceAccessException
+          - java.io.IOException
+          - com.example.doktoribackend.common.client.book.BookSearchProviderException
+      aiServer:
+        baseConfig: externalApi
+        # LLM 호출은 정상 응답도 수 초~수십 초가 걸린다. 1초 기준을 쓰면 전부 slow call 로 잡혀
+        # 서킷이 즉시 영구 Open 된다.
+        slidingWindowSize: 120
+        minimumNumberOfCalls: 5
+        slowCallDurationThreshold: 30s
+        waitDurationInOpenState: 60s
+
+  retry:
+    configs:
+      externalApi:
+        maxAttempts: 3
+        waitDuration: 200ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        enableRandomizedWait: true
+        randomizedWaitFactor: 0.5
+        retryExceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.ResourceAccessException
+          - java.io.IOException
+        ignoreExceptions:
+          # Retry 가 CircuitBreaker 보다 바깥에 적용되므로, 이 항목이 없으면 서킷이 Open 인 동안
+          # CallNotPermittedException 을 재시도하며 백오프 지연만 쌓인다.
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
+          - org.springframework.web.client.HttpClientErrorException
+          - com.example.doktoribackend.exception.BusinessException
+    instances:
+      kakaoBook:
+        baseConfig: externalApi
+      aladinBook:
+        # 이미 degrade 된 경로이므로 재시도를 줄여 사용자 대기 시간을 억제한다.
+        baseConfig: externalApi
+        maxAttempts: 2
+      aiValidation:
+        baseConfig: externalApi
+        maxAttempts: 3
+        waitDuration: 1s
+      # 아래 셋은 사용자가 화면에서 대기하는 동기 흐름이므로 재시도를 줄인다.
+      aiQuiz:
+        baseConfig: externalApi
+        maxAttempts: 2
+      aiSummary:
+        baseConfig: externalApi
+        maxAttempts: 2
+      aiTopic:
+        baseConfig: externalApi
+        maxAttempts: 2

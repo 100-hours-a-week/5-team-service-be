@@ -8,14 +8,10 @@ import com.example.doktoribackend.notification.domain.NotificationTypeCode;
 import com.example.doktoribackend.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.client.RestClient;
 
 import java.util.Map;
 
@@ -27,62 +23,23 @@ public class AiValidationService {
     private final BookReportRepository bookReportRepository;
     private final PlatformTransactionManager transactionManager;
     private final NotificationService notificationService;
-    private final RestClient aiRestClient;
-
-    private static final int MAX_RETRY = 3;
-
-    @Value("${ai.retry-delay-ms:2000}")
-    private long retryDelayMs;
+    private final AiValidationClient aiValidationClient;
 
     @Async("aiValidationExecutor")
     public void validate(Long bookReportId, String bookTitle, String content) {
         AiValidationRequest request = new AiValidationRequest(bookTitle, content);
 
-        String uri = "/book-reports/" + bookReportId + "/validate";
+        AiValidationResponse response = aiValidationClient.validate(bookReportId, request);
 
-        AiValidationResponse response = executeWithRetry(uri, request, bookReportId);
-
-        if (response != null) {
-            TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
-            transactionTemplate.execute(status -> {
-                updateBookReportStatus(bookReportId, response);
-                return null;
-            });
-        }
-    }
-
-    private AiValidationResponse executeWithRetry(String uri, AiValidationRequest request, Long bookReportId) {
-        int attempt = 0;
-        while (attempt < MAX_RETRY) {
-            try {
-                return aiRestClient.post()
-                        .uri(uri)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .body(request)
-                        .retrieve()
-                        .onStatus(HttpStatusCode::isError, (req, res) -> {
-                            throw new RuntimeException("AI validation HTTP error: status=" + res.getStatusCode());
-                        })
-                        .body(AiValidationResponse.class);
-            } catch (Exception ex) {
-                attempt++;
-                log.warn("Retrying AI validation for bookReportId: {}, attempt: {}, error: {}",
-                        bookReportId, attempt, ex.getMessage());
-
-                if (attempt < MAX_RETRY) {
-                    try {
-                        Thread.sleep(retryDelayMs * attempt);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        log.error("AI validation retry interrupted for bookReportId: {}", bookReportId);
-                        return null;
-                    }
-                }
-            }
+        if (response == null) {
+            return;
         }
 
-        log.error("AI validation failed for bookReportId: {} after {} retries", bookReportId, MAX_RETRY);
-        return null;
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        transactionTemplate.execute(status -> {
+            updateBookReportStatus(bookReportId, response);
+            return null;
+        });
     }
 
     private void updateBookReportStatus(Long bookReportId, AiValidationResponse response) {

@@ -37,6 +37,9 @@ public enum ErrorCode {
 
     // External API
     UPSTREAM_KAKAO_FAILED(HttpStatus.BAD_GATEWAY, "UPSTREAM_KAKAO_FAILED", "카카오 API 호출에 실패했습니다."),
+    // 카카오 인증 서버 장애(서킷 Open). 사용자 인증 실패(401)와 구분해야 프론트가 재시도 안내를 할 수 있다.
+    KAKAO_AUTH_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "KAKAO_AUTH_UNAVAILABLE",
+            "카카오 로그인이 일시적으로 불안정합니다. 잠시 후 다시 시도해 주세요."),
 
     // User
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "존재하지 않는 사용자입니다."),

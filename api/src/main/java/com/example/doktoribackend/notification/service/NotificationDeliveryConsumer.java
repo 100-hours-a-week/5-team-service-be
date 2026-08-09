@@ -1,6 +1,7 @@
 package com.example.doktoribackend.notification.service;
 
 import com.example.doktoribackend.config.NotificationRabbitConfig;
+import com.example.doktoribackend.notification.dto.FcmSendResult;
 import com.example.doktoribackend.notification.dto.NotificationDeliveryTask;
 import com.rabbitmq.client.Channel;
 import io.micrometer.core.instrument.Counter;
@@ -14,6 +15,8 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -56,6 +59,10 @@ public class NotificationDeliveryConsumer {
                 .register(meterRegistry);
     }
 
+    /**
+     * ack 를 먼저 하고 실패분만 수동으로 재발행한다. nack 재큐잉은 즉시 되돌아와 무한 루프가 되므로
+     * 지연 재시도는 wait 큐의 TTL 로 처리한다.
+     */
     @RabbitListener(queues = NotificationRabbitConfig.QUEUE)
     public void consume(
             NotificationDeliveryTask task,
@@ -63,25 +70,34 @@ public class NotificationDeliveryConsumer {
             Message message,
             @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag
     ) throws IOException {
+        List<Long> retryUserIds;
         try {
-            deliver(task);
-            channel.basicAck(deliveryTag, false);
-            deliverySuccessCounter.increment();
+            retryUserIds = deliver(task);
         } catch (Exception e) {
-            channel.basicAck(deliveryTag, false);
+            log.error("Notification delivery aborted unexpectedly for userIds: {}", task.userIds(), e);
+            retryUserIds = task.userIds();
+        }
 
-            int retryCount = getRetryCount(message);
-            if (retryCount < NotificationRabbitConfig.MAX_RETRY_COUNT) {
-                log.warn("Notification delivery failed (attempt {}/{}), retrying for userIds: {}",
-                        retryCount + 1, NotificationRabbitConfig.MAX_RETRY_COUNT, task.userIds(), e);
-                sendToWaitQueue(task, retryCount + 1);
-                deliveryRetriedCounter.increment();
-            } else {
-                log.error("Notification delivery permanently failed after {} retries for userIds: {}",
-                        NotificationRabbitConfig.MAX_RETRY_COUNT, task.userIds(), e);
-                sendToDlq(task, retryCount);
-                deliveryFailureCounter.increment();
-            }
+        channel.basicAck(deliveryTag, false);
+
+        if (retryUserIds.isEmpty()) {
+            deliverySuccessCounter.increment();
+            return;
+        }
+
+        int retryCount = getRetryCount(message);
+        NotificationDeliveryTask retryTask = task.withUserIds(retryUserIds);
+
+        if (retryCount < NotificationRabbitConfig.MAX_RETRY_COUNT) {
+            log.warn("Notification delivery failed (attempt {}/{}), retrying for userIds: {}",
+                    retryCount + 1, NotificationRabbitConfig.MAX_RETRY_COUNT, retryUserIds);
+            sendToWaitQueue(retryTask, retryCount + 1);
+            deliveryRetriedCounter.increment();
+        } else {
+            log.error("Notification delivery permanently failed after {} retries for userIds: {}",
+                    NotificationRabbitConfig.MAX_RETRY_COUNT, retryUserIds);
+            sendToDlq(retryTask, retryCount);
+            deliveryFailureCounter.increment();
         }
     }
 
@@ -97,39 +113,41 @@ public class NotificationDeliveryConsumer {
         channel.basicAck(deliveryTag, false);
     }
 
-    private void deliver(NotificationDeliveryTask task) {
+    /**
+     * @return 재전송이 필요한 사용자. 비어 있으면 전원 전달에 성공한 것이다.
+     */
+    private List<Long> deliver(NotificationDeliveryTask task) {
         List<Long> userIds = task.userIds();
+        // 매 시도마다 다시 계산한다. 재시도 시점에는 접속 상태가 바뀌어 있을 수 있다.
         List<Long> fcmTargetIds = sseEmitterService.filterSseDisconnectedUsers(userIds);
+        List<Long> sseTargetIds = userIds.stream()
+                .filter(id -> !fcmTargetIds.contains(id))
+                .toList();
 
-        boolean sseFailed = false;
-        boolean fcmFailed = false;
+        List<Long> retryUserIds = new ArrayList<>();
 
         try {
             sseEmitterService.sendToUsers(userIds, task.sseEvent());
         } catch (Exception e) {
-            log.error("SSE delivery failed for userIds: {}", userIds, e);
-            sseFailed = true;
+            log.error("SSE delivery failed for userIds: {}", sseTargetIds, e);
+            // SSE 는 Redis pub/sub 이라 접속자 전체가 함께 실패한다.
+            retryUserIds.addAll(sseTargetIds);
         }
 
         if (!fcmTargetIds.isEmpty()) {
-            try {
-                fcmService.sendToUsers(fcmTargetIds, task.title(), task.message(), task.linkPath());
-            } catch (Exception e) {
-                log.error("FCM delivery failed for userIds: {}", fcmTargetIds, e);
-                fcmFailed = true;
-            }
+            FcmSendResult result = fcmService.sendToUsers(
+                    fcmTargetIds, task.title(), task.message(), task.linkPath());
+            retryUserIds.addAll(result.retryableUserIds());
         }
 
-        if (sseFailed && fcmFailed) {
-            throw new RuntimeException("Both SSE and FCM delivery failed for userIds: " + userIds);
-        }
+        return List.copyOf(new LinkedHashSet<>(retryUserIds));
     }
 
     private int getRetryCount(Message message) {
         Map<String, Object> headers = message.getMessageProperties().getHeaders();
         Object count = headers.get(RETRY_COUNT_HEADER);
-        if (count instanceof Number) {
-            return ((Number) count).intValue();
+        if (count instanceof Number number) {
+            return number.intValue();
         }
         return 0;
     }

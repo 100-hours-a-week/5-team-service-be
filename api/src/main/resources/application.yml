@@ -2,6 +2,9 @@ spring:
   application:
     name: doktori-backend
 
+  config:
+    import: classpath:resilience4j-defaults.yml
+
   flyway:
     enabled: true
     baseline-on-migrate: true
@@ -75,9 +78,21 @@ kakao:
     token-url: https://kauth.kakao.com/oauth/token
     user-info-url: https://kapi.kakao.com/v2/user/me
     frontend-redirect: ${KAKAO_FRONTEND_REDIRECT}
+    connect-timeout: 2s
+    read-timeout: 3s
   book:
     base-url: ${KAKAO_BOOK_BASE_URL:https://dapi.kakao.com/v3/search/book}
     rest-api-key: ${KAKAO_REST_API_KEY}
+    connect-timeout: 2s
+    read-timeout: 3s
+
+# 카카오 도서 API 장애 시 대체 공급자. 일 5,000건 한도이므로 장기 장애 시 소진에 주의.
+aladin:
+  book:
+    base-url: ${ALADIN_BASE_URL:https://www.aladin.co.kr/ttb/api}
+    ttb-key: ${ALADIN_TTB_KEY}
+    connect-timeout: 2s
+    read-timeout: 3s
 
 app:
   jwt:
@@ -119,6 +134,47 @@ zoom:
   client-id: ${ZOOM_CLIENT_ID}
   client-secret: ${ZOOM_CLIENT_SECRET}
   api-base-url: https://api.zoom.us/v2
+  connect-timeout: 2s
+  read-timeout: 5s
+
+# api 모듈 전용 인스턴스. 공통 설정은 classpath:resilience4j-defaults.yml 참고.
+resilience4j:
+  circuitbreaker:
+    instances:
+      kakaoAuth:
+        baseConfig: externalApi
+        # 로그인은 사용자가 화면 앞에서 대기하는 흐름이라 느려지는 단계를 일찍 잡는다.
+        slowCallDurationThreshold: 2s
+      fcm:
+        baseConfig: externalApi
+        # 알림 발송은 호출량이 적어 기본 최소 20건으로는 감지되지 않는다.
+        minimumNumberOfCalls: 5
+        # firebase.read-timeout-ms(5000) 와 맞춘다. 이보다 길면 발동 자체가 안 된다.
+        slowCallDurationThreshold: 5s
+        # 배치 호출 자체의 실패만 집계한다. 개별 메시지의 UNREGISTERED 는 FCM 이 정상 동작한
+        # 응답이므로 실패로 세면 무효 토큰이 많을 때 멀쩡한 FCM 의 서킷이 열린다.
+        recordExceptions:
+          - com.google.firebase.messaging.FirebaseMessagingException
+          - java.io.IOException
+      zoom:
+        baseConfig: externalApi
+        # 스케줄러가 1분마다 호출하므로 호출량이 적다. 최소 건수를 낮춰야 감지가 된다.
+        minimumNumberOfCalls: 5
+        slowCallDurationThreshold: 3s
+        # Zoom 은 재시도 가능/불가능을 예외 타입으로 이미 구분해 둔다.
+        # 401(인증 실패)·기타 4xx 는 재시도해도 소용없으므로 집계에서 제외한다.
+        recordExceptions:
+          - com.example.doktoribackend.zoom.exception.ZoomRetryableException
+          - org.springframework.web.client.ResourceAccessException
+        ignoreExceptions:
+          - com.example.doktoribackend.zoom.exception.ZoomAuthenticationException
+          - com.example.doktoribackend.zoom.exception.ZoomApiException
+  retry:
+    instances:
+      # 인가 코드는 일회용이라 exchangeToken 에는 재시도를 걸지 않는다. 멱등인 사용자 정보 조회만 재시도한다.
+      kakaoUserInfo:
+        baseConfig: externalApi
+        maxAttempts: 2
 
 firebase:
   credentials-path: ${FIREBASE_CREDENTIALS_PATH:classpath:firebase-service-account.json}

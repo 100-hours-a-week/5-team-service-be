@@ -2,43 +2,35 @@ package com.example.doktoribackend.book.service;
 
 import com.example.doktoribackend.book.domain.Book;
 import com.example.doktoribackend.book.repository.BookRepository;
-import com.example.doktoribackend.common.client.KakaoBookClient;
-import com.example.doktoribackend.common.client.KakaoBookResponse;
+import com.example.doktoribackend.common.client.book.BookItem;
+import com.example.doktoribackend.common.client.book.BookSearchGateway;
 import com.example.doktoribackend.common.error.ErrorCode;
 import com.example.doktoribackend.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDate;
 
 @Service
 @RequiredArgsConstructor
 public class BookService {
 
     private final BookRepository bookRepository;
-    private final KakaoBookClient kakaoBookClient;
+    private final BookSearchGateway bookSearchGateway;
 
     public Book resolveBook(String isbn) {
         return bookRepository.findByIsbn(isbn)
-                .orElseGet(() -> kakaoBookClient.searchByIsbn(isbn)
-                        .map(doc -> bookRepository.save(toBookFromKakao(doc, isbn)))
+                .orElseGet(() -> bookSearchGateway.findByIsbn(isbn)
+                        .map(item -> bookRepository.save(toBook(item, isbn)))
                         .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND)));
     }
 
-    private Book toBookFromKakao(KakaoBookResponse.KakaoBookDocument doc, String isbn) {
-        String authors = doc.authors() != null ? String.join(", ", doc.authors()) : null;
-        LocalDate publishedAt = parsePublishedAt(doc.datetime());
-        return Book.create(isbn, doc.title(), authors, doc.publisher(), doc.thumbnail(), publishedAt);
-    }
-
-    private LocalDate parsePublishedAt(String datetime) {
-        if (datetime == null || datetime.isBlank()) {
-            return null;
-        }
-        try {
-            return LocalDate.parse(datetime.substring(0, 10));
-        } catch (Exception e) {
-            return null;
-        }
+    private Book toBook(BookItem item, String isbn) {
+        return Book.create(
+                isbn,
+                item.title(),
+                item.authors(),
+                item.publisher(),
+                item.thumbnailUrl(),
+                item.publishedAt()
+        );
     }
 }

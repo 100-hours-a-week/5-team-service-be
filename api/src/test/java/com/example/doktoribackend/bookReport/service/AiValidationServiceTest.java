@@ -8,7 +8,6 @@ import com.example.doktoribackend.meeting.domain.MeetingRound;
 import com.example.doktoribackend.notification.domain.NotificationTypeCode;
 import com.example.doktoribackend.notification.service.NotificationService;
 import com.example.doktoribackend.user.domain.User;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -18,18 +17,26 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.web.client.RestClient;
 
 import java.util.Map;
 import java.util.Optional;
 
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
+/**
+ * 재시도·서킷 브레이커는 {@link AiValidationClient} 의 Resilience4j 설정이 담당하므로
+ * 이 테스트는 AI 응답을 받은 뒤의 상태 전이만 검증한다.
+ * 재시도 동작 자체는 common 모듈의 ResilienceConfigTest 에서 설정 단위로 검증한다.
+ */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class AiValidationServiceTest {
@@ -44,33 +51,10 @@ class AiValidationServiceTest {
     private NotificationService notificationService;
 
     @Mock
-    private RestClient aiRestClient;
-
-    @Mock
-    private RestClient.RequestBodyUriSpec requestBodyUriSpec;
-
-    @Mock
-    private RestClient.RequestBodySpec requestBodySpec;
-
-    @Mock
-    private RestClient.ResponseSpec responseSpec;
+    private AiValidationClient aiValidationClient;
 
     @InjectMocks
     private AiValidationService aiValidationService;
-
-    @BeforeEach
-    void setUp() {
-        // Thread.sleep 없이 재시도 테스트
-        ReflectionTestUtils.setField(aiValidationService, "retryDelayMs", 0L);
-
-        // doReturn/when 방식: stub 설정 시 실제 메서드를 호출하지 않아 varargs 문제를 피함
-        doReturn(requestBodyUriSpec).when(aiRestClient).post();
-        doReturn(requestBodySpec).when(requestBodyUriSpec).uri(anyString());
-        doReturn(requestBodySpec).when(requestBodySpec).contentType(any());
-        doReturn(requestBodySpec).when(requestBodySpec).body((Object) any());
-        doReturn(responseSpec).when(requestBodySpec).retrieve();
-        doReturn(responseSpec).when(responseSpec).onStatus(any(), any());
-    }
 
     @Nested
     @DisplayName("AI 응답 상태별 처리")
@@ -82,7 +66,7 @@ class AiValidationServiceTest {
             Long bookReportId = 1L;
             BookReport bookReport = createMockBookReport(bookReportId, 10L, 100L, "테스트 모임");
 
-            given(responseSpec.body(AiValidationResponse.class))
+            given(aiValidationClient.validate(anyLong(), any()))
                     .willReturn(new AiValidationResponse("SUBMITTED", null));
             given(bookReportRepository.findById(bookReportId))
                     .willReturn(Optional.of(bookReport));
@@ -105,7 +89,7 @@ class AiValidationServiceTest {
             BookReport bookReport = createMockBookReport(bookReportId, 10L, 100L, "테스트 모임");
             String rejectionReason = "책과 관련 없는 내용입니다.";
 
-            given(responseSpec.body(AiValidationResponse.class))
+            given(aiValidationClient.validate(anyLong(), any()))
                     .willReturn(new AiValidationResponse("REJECTED", rejectionReason));
             given(bookReportRepository.findById(bookReportId))
                     .willReturn(Optional.of(bookReport));
@@ -127,7 +111,7 @@ class AiValidationServiceTest {
             Long bookReportId = 1L;
             BookReport bookReport = createMockBookReport(bookReportId, 10L, 100L, "테스트 모임");
 
-            given(responseSpec.body(AiValidationResponse.class))
+            given(aiValidationClient.validate(anyLong(), any()))
                     .willReturn(new AiValidationResponse("UNKNOWN_STATUS", null));
             given(bookReportRepository.findById(bookReportId))
                     .willReturn(Optional.of(bookReport));
@@ -145,7 +129,7 @@ class AiValidationServiceTest {
         void bookReportNotFound_doesNotSaveOrNotify() {
             Long bookReportId = 999L;
 
-            given(responseSpec.body(AiValidationResponse.class))
+            given(aiValidationClient.validate(anyLong(), any()))
                     .willReturn(new AiValidationResponse("SUBMITTED", null));
             given(bookReportRepository.findById(bookReportId))
                     .willReturn(Optional.empty());
@@ -162,7 +146,7 @@ class AiValidationServiceTest {
             Long bookReportId = 1L;
             BookReport bookReport = createMockBookReport(bookReportId, 10L, 100L, "테스트 모임");
 
-            given(responseSpec.body(AiValidationResponse.class))
+            given(aiValidationClient.validate(anyLong(), any()))
                     .willReturn(new AiValidationResponse("SUBMITTED", null));
             given(bookReportRepository.findById(bookReportId))
                     .willReturn(Optional.of(bookReport));
@@ -177,38 +161,18 @@ class AiValidationServiceTest {
     }
 
     @Nested
-    @DisplayName("재시도 로직")
-    class RetryTests {
+    @DisplayName("AI 호출 실패 처리")
+    class FailureTests {
 
         @Test
-        @DisplayName("첫 번째 시도 실패 후 재시도 성공 시 독후감 상태를 정상 업데이트한다")
-        void firstAttemptFails_secondSucceeds_updatesStatus() {
+        @DisplayName("재시도까지 모두 실패해 클라이언트가 null을 반환하면 독후감 상태를 변경하지 않는다")
+        void clientReturnsNull_doesNotUpdateStatus() {
             Long bookReportId = 1L;
-            BookReport bookReport = createMockBookReport(bookReportId, 10L, 100L, "테스트 모임");
 
-            given(responseSpec.body(AiValidationResponse.class))
-                    .willThrow(new RuntimeException("Connection timeout"))
-                    .willReturn(new AiValidationResponse("SUBMITTED", null));
-            given(bookReportRepository.findById(bookReportId))
-                    .willReturn(Optional.of(bookReport));
+            given(aiValidationClient.validate(anyLong(), any())).willReturn(null);
 
             aiValidationService.validate(bookReportId, "책 제목", "독후감 내용");
 
-            verify(responseSpec, times(2)).body(AiValidationResponse.class);
-            verify(bookReport).approve();
-        }
-
-        @Test
-        @DisplayName("MAX_RETRY(3)회 모두 실패하면 독후감 상태를 변경하지 않는다")
-        void allRetriesFail_doesNotUpdateStatus() {
-            Long bookReportId = 1L;
-
-            given(responseSpec.body(AiValidationResponse.class))
-                    .willThrow(new RuntimeException("Connection refused"));
-
-            aiValidationService.validate(bookReportId, "책 제목", "독후감 내용");
-
-            verify(responseSpec, times(3)).body(AiValidationResponse.class);
             verify(bookReportRepository, never()).save(any());
             verify(notificationService, never()).createAndSend(any(), any(), anyMap());
         }

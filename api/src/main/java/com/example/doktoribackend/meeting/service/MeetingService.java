@@ -1,6 +1,7 @@
 package com.example.doktoribackend.meeting.service;
 
-import com.example.doktoribackend.common.client.KakaoBookClient;
+import com.example.doktoribackend.common.client.book.BookItem;
+import com.example.doktoribackend.common.client.book.BookSearchGateway;
 import com.example.doktoribackend.book.domain.Book;
 import com.example.doktoribackend.common.client.KakaoBookResponse;
 import com.example.doktoribackend.book.repository.BookRepository;
@@ -70,7 +71,7 @@ public class MeetingService {
     private final MeetingMemberRepository meetingMemberRepository;
     private final MeetingRoundDiscussionTopicRepository meetingRoundDiscussionTopicRepository;
     private final BookRepository bookRepository;
-    private final KakaoBookClient kakaoBookClient;
+    private final BookSearchGateway bookSearchGateway;
     private final UserRepository userRepository;
     private final ReadingGenreRepository readingGenreRepository;
     private final BookReportRepository bookReportRepository;
@@ -608,8 +609,8 @@ public class MeetingService {
 
         return bookRepository.findByIsbn(isbn)
                 .map(this::reviveIfDeleted)
-                .orElseGet(() -> kakaoBookClient.searchByIsbn(isbn)
-                        .map(doc -> bookRepository.save(toBookFromKakao(doc, isbn)))
+                .orElseGet(() -> bookSearchGateway.findByIsbn(isbn)
+                        .map(item -> bookRepository.save(toBook(item, isbn)))
                         .orElseThrow(() -> new BusinessException(ErrorCode.BOOK_NOT_FOUND)));
     }
 
@@ -620,17 +621,14 @@ public class MeetingService {
         return existing;
     }
 
-    private Book toBookFromKakao(KakaoBookResponse.KakaoBookDocument doc, String isbn) {
-        String authors = doc.authors() != null ? String.join(", ", doc.authors()) : null;
-        LocalDate publishedAt = parsePublishedAt(doc.datetime());
-
+    private Book toBook(BookItem item, String isbn) {
         return Book.create(
                 isbn,
-                doc.title(),
-                authors,
-                doc.publisher(),
-                doc.thumbnail(),
-                publishedAt
+                item.title(),
+                item.authors(),
+                item.publisher(),
+                item.thumbnailUrl(),
+                item.publishedAt()
         );
     }
 
